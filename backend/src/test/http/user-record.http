@@ -29,3 +29,19 @@ GET http://localhost:8080/api/records
 
 ### 按状态查询用户记录
 GET http://localhost:8080/api/records?status=WATCHED
+
+### 按 id 查询用户记录
+GET http://localhost:8080/api/records/10
+
+### 按 id 更新用户记录
+PUT http://localhost:8080/api/records/1
+Content-Type: application/json
+
+{
+  "subjectTitle": "咒术回战 第二次补番",
+  "recordStatus": "WATCHED",
+  "scoreValue": 49,
+  "recordYear": 2024,
+  "recordQuarter": "Q2",
+  "note": "更新后的备注"
+}

@@ -46,6 +46,34 @@ public class UserSubjectRecordService {
                 .toList();
     }
 
+    public UserSubjectRecordResponse getRecordById(Long id) {
+        UserSubjectRecord record = userSubjectRecordRepository.findById(id).orElse(null);
+
+        if (record == null) {
+            return null;
+        }
+
+        return toResponse(record);
+    }
+
+    public UserSubjectRecordResponse updateRecord(Long id, UserSubjectRecordCreateRequest request) {
+        UserSubjectRecord existingRecord = userSubjectRecordRepository.findById(id).orElse(null);
+
+        if (existingRecord == null) {
+            return null;
+        }
+
+        existingRecord.setSubjectTitle(request.getSubjectTitle());
+        existingRecord.setRecordStatus(request.getRecordStatus());
+        existingRecord.setScoreValue(request.getScoreValue());
+        existingRecord.setRecordYear(request.getRecordYear());
+        existingRecord.setRecordQuarter(request.getRecordQuarter());
+        existingRecord.setNote(request.getNote());
+
+        UserSubjectRecord updatedRecord = userSubjectRecordRepository.save(existingRecord);
+        return toResponse(updatedRecord);
+    }
+
     private UserSubjectRecordResponse toResponse(UserSubjectRecord record) {
         return new UserSubjectRecordResponse(
                 record.getId(),

@@ -32,4 +32,29 @@ public class UserSubjectRecordController {
         List<UserSubjectRecordResponse> records = userSubjectRecordService.getRecords(status);
         return ApiResponse.success(records);
     }
+
+    @GetMapping("/{id}")
+    public ApiResponse<?> getRecordById(@PathVariable Long id) {
+        UserSubjectRecordResponse record = userSubjectRecordService.getRecordById(id);
+
+        if (record == null) {
+            return ApiResponse.fail(4041, "记录不存在");
+        }
+
+        return ApiResponse.success(record);
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<?> updateRecord(
+            @PathVariable Long id,
+            @RequestBody UserSubjectRecordCreateRequest request
+    ) {
+        UserSubjectRecordResponse updatedRecord = userSubjectRecordService.updateRecord(id, request);
+
+        if (updatedRecord == null) {
+            return ApiResponse.fail(4041, "记录不存在");
+        }
+
+        return ApiResponse.success(updatedRecord);
+    }
 }
