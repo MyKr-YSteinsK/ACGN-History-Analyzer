@@ -31,7 +31,7 @@ GET http://localhost:8080/api/records
 GET http://localhost:8080/api/records?status=WATCHED
 
 ### 按 id 查询用户记录
-GET http://localhost:8080/api/records/10
+GET http://localhost:8080/api/records/1
 
 ### 按 id 更新用户记录
 PUT http://localhost:8080/api/records/1
@@ -44,4 +44,20 @@ Content-Type: application/json
   "recordYear": 2024,
   "recordQuarter": "Q2",
   "note": "更新后的备注"
+}
+
+### 删除一条用户记录
+DELETE http://localhost:8080/api/records/1
+
+### 非法新增：缺少标题并且季度非法
+POST http://localhost:8080/api/records
+Content-Type: application/json
+
+{
+  "subjectTitle": "",
+  "recordStatus": "WATCHED",
+  "scoreValue": 48,
+  "recordYear": 2024,
+  "recordQuarter": "Q5",
+  "note": "这是一条非法请求"
 }

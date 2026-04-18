@@ -86,4 +86,13 @@ public class UserSubjectRecordService {
                 record.getNote()
         );
     }
+
+    public boolean deleteRecord(Long id) {
+        if (!userSubjectRecordRepository.existsById(id)) {
+            return false;
+        }
+
+        userSubjectRecordRepository.deleteById(id);
+        return true;
+    }
 }

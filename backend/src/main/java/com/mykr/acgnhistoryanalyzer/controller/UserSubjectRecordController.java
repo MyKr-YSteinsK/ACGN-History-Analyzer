@@ -6,7 +6,7 @@ import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.service.UserSubjectRecordService;
 import org.springframework.web.bind.annotation.*;
-
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -20,7 +20,7 @@ public class UserSubjectRecordController {
     }
 
     @PostMapping
-    public ApiResponse<UserSubjectRecordResponse> createRecord(@RequestBody UserSubjectRecordCreateRequest request) {
+    public ApiResponse<UserSubjectRecordResponse> createRecord(@Valid @RequestBody UserSubjectRecordCreateRequest request) {
         UserSubjectRecordResponse savedRecord = userSubjectRecordService.createRecord(request);
         return ApiResponse.success(savedRecord);
     }
@@ -47,7 +47,7 @@ public class UserSubjectRecordController {
     @PutMapping("/{id}")
     public ApiResponse<?> updateRecord(
             @PathVariable Long id,
-            @RequestBody UserSubjectRecordCreateRequest request
+            @Valid @RequestBody UserSubjectRecordCreateRequest request
     ) {
         UserSubjectRecordResponse updatedRecord = userSubjectRecordService.updateRecord(id, request);
 
@@ -56,5 +56,16 @@ public class UserSubjectRecordController {
         }
 
         return ApiResponse.success(updatedRecord);
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<?> deleteRecord(@PathVariable Long id) {
+        boolean deleted = userSubjectRecordService.deleteRecord(id);
+
+        if (!deleted) {
+            return ApiResponse.fail(4041, "记录不存在");
+        }
+
+        return ApiResponse.success("删除成功");
     }
 }
