@@ -1,0 +1,42 @@
+### 新增一个多季多部分示例作品
+POST http://localhost:8080/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "进击的巨人",
+  "subtitle": "The Final Season Part 1",
+  "displayTitle": "进击的巨人 The Final Season Part 1",
+  "seasonIndex": 4,
+  "partIndex": 1,
+  "coverUrl": "https://example.com/aot-final-part1.jpg",
+  "summary": "用于测试的最终季前半部分示例数据",
+  "releaseYear": 2020,
+  "releaseMonth": 12,
+  "category": "ANIME",
+  "studioName": "MAPPA",
+  "platformLink": "https://bgm.tv/subject/example",
+  "status": "NORMAL"
+}
+
+### 新增一个不带季和部分的普通作品
+POST http://localhost:8080/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "孤独摇滚！",
+  "displayTitle": "孤独摇滚！",
+  "coverUrl": "https://example.com/bocchi.jpg",
+  "summary": "用于测试的普通单作品示例数据",
+  "releaseYear": 2022,
+  "releaseMonth": 10,
+  "category": "ANIME",
+  "studioName": "CloverWorks",
+  "platformLink": "https://bgm.tv/subject/example2",
+  "status": "NORMAL"
+}
+
+### 查询全部作品
+GET http://localhost:8080/api/subjects
+
+### 按主类型查询作品
+GET http://localhost:8080/api/subjects?category=ANIME
