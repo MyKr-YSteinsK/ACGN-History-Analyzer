@@ -3,7 +3,7 @@ POST http://localhost:8080/api/records
 Content-Type: application/json
 
 {
-  "subjectTitle": "咒术回战",
+  "subjectTitle": "黄金神威",
   "recordStatus": "WATCHED",
   "scoreValue": 48,
   "recordYear": 2024,
@@ -11,5 +11,21 @@ Content-Type: application/json
   "note": "补番"
 }
 
+### 再来一条
+POST http://localhost:8080/api/records
+Content-Type: application/json
+
+{
+"subjectTitle": "金牌得主",
+"recordStatus": "ON_HOLD",
+"scoreValue": 48,
+"recordYear": 2026,
+"recordQuarter": "Q1",
+"note": "没有"
+}
+
 ### 查询全部用户记录
 GET http://localhost:8080/api/records
+
+### 按状态查询用户记录
+GET http://localhost:8080/api/records?status=WATCHED
