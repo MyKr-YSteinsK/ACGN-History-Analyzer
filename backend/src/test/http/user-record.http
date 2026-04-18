@@ -1,0 +1,15 @@
+### 新增一条用户记录
+POST http://localhost:8080/api/records
+Content-Type: application/json
+
+{
+  "subjectTitle": "咒术回战",
+  "recordStatus": "WATCHED",
+  "scoreValue": 48,
+  "recordYear": 2024,
+  "recordQuarter": "Q1",
+  "note": "补番"
+}
+
+### 查询全部用户记录
+GET http://localhost:8080/api/records
