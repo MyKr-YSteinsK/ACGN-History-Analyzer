@@ -40,3 +40,32 @@ GET http://localhost:8080/api/subjects
 
 ### 按主类型查询作品
 GET http://localhost:8080/api/subjects?category=ANIME
+
+### 按 id 查询作品
+GET http://localhost:8080/api/subjects/1
+
+### 按 id 更新作品
+PUT http://localhost:8080/api/subjects/1
+Content-Type: application/json
+
+{
+  "titleCn": "进击的巨人",
+  "subtitle": "The Final Season Part 2",
+  "displayTitle": "进击的巨人 The Final Season Part 2",
+  "seasonIndex": 4,
+  "partIndex": 2,
+  "coverUrl": "https://example.com/aot-final-part2.jpg",
+  "summary": "用于测试的最终季后半部分示例数据",
+  "releaseYear": 2021,
+  "releaseMonth": 1,
+  "category": "ANIME",
+  "studioName": "MAPPA",
+  "platformLink": "https://bgm.tv/subject/example-updated",
+  "status": "NORMAL"
+}
+
+### 删除一个未被引用的作品
+DELETE http://localhost:8080/api/subjects/2
+
+### 删除一个已被引用的作品
+DELETE http://localhost:8080/api/subjects/1

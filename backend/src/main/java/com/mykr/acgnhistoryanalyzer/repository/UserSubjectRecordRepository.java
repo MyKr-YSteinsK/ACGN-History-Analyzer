@@ -9,4 +9,6 @@ import java.util.List;
 public interface UserSubjectRecordRepository extends JpaRepository<UserSubjectRecord, Long> {
 
     List<UserSubjectRecord> findByRecordStatus(RecordStatus recordStatus);
+
+    boolean existsBySubjectId(Long subjectId);
 }

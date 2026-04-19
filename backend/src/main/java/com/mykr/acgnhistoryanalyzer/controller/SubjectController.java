@@ -32,4 +32,43 @@ public class SubjectController {
         List<SubjectResponse> subjects = subjectService.getSubjects(category);
         return ApiResponse.success(subjects);
     }
+
+    @GetMapping("/{id}")
+    public ApiResponse<?> getSubjectById(@PathVariable Long id) {
+        SubjectResponse subject = subjectService.getSubjectById(id);
+
+        if (subject == null) {
+            return ApiResponse.fail(4043, "作品不存在");
+        }
+
+        return ApiResponse.success(subject);
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<?> updateSubject(
+            @PathVariable Long id,
+            @Valid @RequestBody SubjectCreateRequest request
+    ) {
+        SubjectResponse updatedSubject = subjectService.updateSubject(id, request);
+
+        if (updatedSubject == null) {
+            return ApiResponse.fail(4043, "作品不存在");
+        }
+
+        return ApiResponse.success(updatedSubject);
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<?> deleteSubject(@PathVariable Long id) {
+        if (!subjectService.subjectExists(id)) {
+            return ApiResponse.fail(4043, "作品不存在");
+        }
+
+        if (subjectService.isSubjectReferenced(id)) {
+            return ApiResponse.fail(4092, "作品已被用户记录引用，不能删除");
+        }
+
+        subjectService.deleteSubject(id);
+        return ApiResponse.success("删除成功");
+    }
 }
