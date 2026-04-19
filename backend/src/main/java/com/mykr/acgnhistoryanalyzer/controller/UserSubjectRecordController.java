@@ -5,8 +5,9 @@ import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.service.UserSubjectRecordService;
-import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
@@ -20,7 +21,11 @@ public class UserSubjectRecordController {
     }
 
     @PostMapping
-    public ApiResponse<UserSubjectRecordResponse> createRecord(@Valid @RequestBody UserSubjectRecordCreateRequest request) {
+    public ApiResponse<?> createRecord(@Valid @RequestBody UserSubjectRecordCreateRequest request) {
+        if (!userSubjectRecordService.subjectExists(request.getSubjectId())) {
+            return ApiResponse.fail(4042, "作品不存在");
+        }
+
         UserSubjectRecordResponse savedRecord = userSubjectRecordService.createRecord(request);
         return ApiResponse.success(savedRecord);
     }
@@ -49,6 +54,10 @@ public class UserSubjectRecordController {
             @PathVariable Long id,
             @Valid @RequestBody UserSubjectRecordCreateRequest request
     ) {
+        if (!userSubjectRecordService.subjectExists(request.getSubjectId())) {
+            return ApiResponse.fail(4042, "作品不存在");
+        }
+
         UserSubjectRecordResponse updatedRecord = userSubjectRecordService.updateRecord(id, request);
 
         if (updatedRecord == null) {

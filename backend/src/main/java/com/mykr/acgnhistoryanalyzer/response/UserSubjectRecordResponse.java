@@ -3,6 +3,7 @@ package com.mykr.acgnhistoryanalyzer.response;
 public class UserSubjectRecordResponse {
 
     private Long id;
+    private Long subjectId;
     private String subjectTitle;
     private String recordStatus;
     private String recordStatusLabel;
@@ -11,10 +12,12 @@ public class UserSubjectRecordResponse {
     private String recordQuarter;
     private String note;
 
-    public UserSubjectRecordResponse(Long id, String subjectTitle, String recordStatus,
-                                     String recordStatusLabel, Integer scoreValue,
-                                     Integer recordYear, String recordQuarter, String note) {
+    public UserSubjectRecordResponse(Long id, Long subjectId, String subjectTitle,
+                                     String recordStatus, String recordStatusLabel,
+                                     Integer scoreValue, Integer recordYear,
+                                     String recordQuarter, String note) {
         this.id = id;
+        this.subjectId = subjectId;
         this.subjectTitle = subjectTitle;
         this.recordStatus = recordStatus;
         this.recordStatusLabel = recordStatusLabel;
@@ -26,6 +29,10 @@ public class UserSubjectRecordResponse {
 
     public Long getId() {
         return id;
+    }
+
+    public Long getSubjectId() {
+        return subjectId;
     }
 
     public String getSubjectTitle() {

@@ -1,7 +1,9 @@
 package com.mykr.acgnhistoryanalyzer.service;
 
 import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
+import com.mykr.acgnhistoryanalyzer.entity.Subject;
 import com.mykr.acgnhistoryanalyzer.entity.UserSubjectRecord;
+import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
@@ -13,14 +15,28 @@ import java.util.List;
 public class UserSubjectRecordService {
 
     private final UserSubjectRecordRepository userSubjectRecordRepository;
+    private final SubjectRepository subjectRepository;
 
-    public UserSubjectRecordService(UserSubjectRecordRepository userSubjectRecordRepository) {
+    public UserSubjectRecordService(UserSubjectRecordRepository userSubjectRecordRepository,
+                                    SubjectRepository subjectRepository) {
         this.userSubjectRecordRepository = userSubjectRecordRepository;
+        this.subjectRepository = subjectRepository;
+    }
+
+    public boolean subjectExists(Long subjectId) {
+        return subjectRepository.existsById(subjectId);
     }
 
     public UserSubjectRecordResponse createRecord(UserSubjectRecordCreateRequest request) {
+        Subject subject = subjectRepository.findById(request.getSubjectId()).orElse(null);
+
+        if (subject == null) {
+            return null;
+        }
+
         UserSubjectRecord record = new UserSubjectRecord(
-                request.getSubjectTitle(),
+                subject.getId(),
+                subject.getDisplayTitle(),
                 request.getRecordStatus(),
                 request.getScoreValue(),
                 request.getRecordYear(),
@@ -63,7 +79,14 @@ public class UserSubjectRecordService {
             return null;
         }
 
-        existingRecord.setSubjectTitle(request.getSubjectTitle());
+        Subject subject = subjectRepository.findById(request.getSubjectId()).orElse(null);
+
+        if (subject == null) {
+            return null;
+        }
+
+        existingRecord.setSubjectId(subject.getId());
+        existingRecord.setSubjectTitle(subject.getDisplayTitle());
         existingRecord.setRecordStatus(request.getRecordStatus());
         existingRecord.setScoreValue(request.getScoreValue());
         existingRecord.setRecordYear(request.getRecordYear());
@@ -74,19 +97,6 @@ public class UserSubjectRecordService {
         return toResponse(updatedRecord);
     }
 
-    private UserSubjectRecordResponse toResponse(UserSubjectRecord record) {
-        return new UserSubjectRecordResponse(
-                record.getId(),
-                record.getSubjectTitle(),
-                record.getRecordStatus().name(),
-                record.getRecordStatus().getLabel(),
-                record.getScoreValue(),
-                record.getRecordYear(),
-                record.getRecordQuarter(),
-                record.getNote()
-        );
-    }
-
     public boolean deleteRecord(Long id) {
         if (!userSubjectRecordRepository.existsById(id)) {
             return false;
@@ -94,5 +104,28 @@ public class UserSubjectRecordService {
 
         userSubjectRecordRepository.deleteById(id);
         return true;
+    }
+
+    private UserSubjectRecordResponse toResponse(UserSubjectRecord record) {
+        String subjectTitle = record.getSubjectTitle();
+
+        if (record.getSubjectId() != null) {
+            Subject subject = subjectRepository.findById(record.getSubjectId()).orElse(null);
+            if (subject != null) {
+                subjectTitle = subject.getDisplayTitle();
+            }
+        }
+
+        return new UserSubjectRecordResponse(
+                record.getId(),
+                record.getSubjectId(),
+                subjectTitle,
+                record.getRecordStatus().name(),
+                record.getRecordStatus().getLabel(),
+                record.getScoreValue(),
+                record.getRecordYear(),
+                record.getRecordQuarter(),
+                record.getNote()
+        );
     }
 }

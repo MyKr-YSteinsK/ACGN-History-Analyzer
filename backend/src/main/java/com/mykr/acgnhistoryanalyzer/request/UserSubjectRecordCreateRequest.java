@@ -5,8 +5,9 @@ import jakarta.validation.constraints.*;
 
 public class UserSubjectRecordCreateRequest {
 
-    @NotBlank(message = "作品标题不能为空")
-    private String subjectTitle;
+    @NotNull(message = "作品ID不能为空")
+    @Positive(message = "作品ID必须大于0")
+    private Long subjectId;
 
     @NotNull(message = "记录状态不能为空")
     private RecordStatus recordStatus;
@@ -30,8 +31,8 @@ public class UserSubjectRecordCreateRequest {
     public UserSubjectRecordCreateRequest() {
     }
 
-    public String getSubjectTitle() {
-        return subjectTitle;
+    public Long getSubjectId() {
+        return subjectId;
     }
 
     public RecordStatus getRecordStatus() {
@@ -54,8 +55,8 @@ public class UserSubjectRecordCreateRequest {
         return note;
     }
 
-    public void setSubjectTitle(String subjectTitle) {
-        this.subjectTitle = subjectTitle;
+    public void setSubjectId(Long subjectId) {
+        this.subjectId = subjectId;
     }
 
     public void setRecordStatus(RecordStatus recordStatus) {

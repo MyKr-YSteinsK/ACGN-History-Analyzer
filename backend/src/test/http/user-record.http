@@ -1,27 +1,14 @@
-### 新增一条用户记录
+### 新增一条用户记录（关联作品ID）
 POST http://localhost:8080/api/records
 Content-Type: application/json
 
 {
-  "subjectTitle": "黄金神威",
+  "subjectId": 1,
   "recordStatus": "WATCHED",
   "scoreValue": 48,
   "recordYear": 2024,
   "recordQuarter": "Q1",
   "note": "补番"
-}
-
-### 再来一条
-POST http://localhost:8080/api/records
-Content-Type: application/json
-
-{
-"subjectTitle": "金牌得主",
-"recordStatus": "ON_HOLD",
-"scoreValue": 48,
-"recordYear": 2026,
-"recordQuarter": "Q1",
-"note": "没有"
 }
 
 ### 查询全部用户记录
@@ -31,14 +18,14 @@ GET http://localhost:8080/api/records
 GET http://localhost:8080/api/records?status=WATCHED
 
 ### 按 id 查询用户记录
-GET http://localhost:8080/api/records/1
+GET http://localhost:8080/api/records/2
 
-### 按 id 更新用户记录
-PUT http://localhost:8080/api/records/1
+### 按 id 更新用户记录（改成关联作品ID）
+PUT http://localhost:8080/api/records/2
 Content-Type: application/json
 
 {
-  "subjectTitle": "咒术回战 第二次补番",
+  "subjectId": 1,
   "recordStatus": "WATCHED",
   "scoreValue": 49,
   "recordYear": 2024,

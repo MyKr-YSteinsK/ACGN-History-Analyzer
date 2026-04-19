@@ -11,6 +11,9 @@ public class UserSubjectRecord {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "subject_id")
+    private Long subjectId;
+
     @Column(name = "subject_title", nullable = false, length = 255)
     private String subjectTitle;
 
@@ -33,8 +36,9 @@ public class UserSubjectRecord {
     public UserSubjectRecord() {
     }
 
-    public UserSubjectRecord(String subjectTitle, RecordStatus recordStatus, Integer scoreValue,
-                             Integer recordYear, String recordQuarter, String note) {
+    public UserSubjectRecord(Long subjectId, String subjectTitle, RecordStatus recordStatus,
+                             Integer scoreValue, Integer recordYear, String recordQuarter, String note) {
+        this.subjectId = subjectId;
         this.subjectTitle = subjectTitle;
         this.recordStatus = recordStatus;
         this.scoreValue = scoreValue;
@@ -45,6 +49,10 @@ public class UserSubjectRecord {
 
     public Long getId() {
         return id;
+    }
+
+    public Long getSubjectId() {
+        return subjectId;
     }
 
     public String getSubjectTitle() {
@@ -69,6 +77,10 @@ public class UserSubjectRecord {
 
     public String getNote() {
         return note;
+    }
+
+    public void setSubjectId(Long subjectId) {
+        this.subjectId = subjectId;
     }
 
     public void setSubjectTitle(String subjectTitle) {
