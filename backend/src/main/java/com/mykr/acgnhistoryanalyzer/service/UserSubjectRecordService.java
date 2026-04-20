@@ -9,6 +9,7 @@ import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
+import com.mykr.acgnhistoryanalyzer.response.RecordYearOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.specification.UserSubjectRecordSpecifications;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -185,6 +186,81 @@ public class UserSubjectRecordService {
                 normalCount,
                 badCount,
                 unratedCount
+        );
+    }
+
+    public RecordYearOverviewResponse getYearOverview(Integer year) {
+        Specification<UserSubjectRecord> specification =
+                buildRecordSpecification(year, null, null, null, null);
+
+        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(specification);
+
+        int totalCount = records.size();
+        int highScoreCount = 0;
+        int watchedCount = 0;
+        int onHoldCount = 0;
+        int wantToWatchCount = 0;
+        int excellentCount = 0;
+        int normalCount = 0;
+        int badCount = 0;
+        int unratedCount = 0;
+        int q1Count = 0;
+        int q2Count = 0;
+        int q3Count = 0;
+        int q4Count = 0;
+
+        for (UserSubjectRecord record : records) {
+            if (record.getRecordStatus() != null) {
+                switch (record.getRecordStatus()) {
+                    case WATCHED -> watchedCount++;
+                    case ON_HOLD -> onHoldCount++;
+                    case WANT_TO_WATCH -> wantToWatchCount++;
+                }
+            }
+
+            if (record.getRecordQuarter() != null) {
+                switch (record.getRecordQuarter()) {
+                    case "Q1" -> q1Count++;
+                    case "Q2" -> q2Count++;
+                    case "Q3" -> q3Count++;
+                    case "Q4" -> q4Count++;
+                }
+            }
+
+            Integer score = record.getScoreValue();
+
+            if (score == null) {
+                unratedCount++;
+            } else {
+                if (score >= 45) {
+                    highScoreCount++;
+                }
+
+                if (score >= 42 && score <= 50) {
+                    excellentCount++;
+                } else if (score >= 35 && score <= 41) {
+                    normalCount++;
+                } else if (score >= 20 && score <= 34) {
+                    badCount++;
+                }
+            }
+        }
+
+        return new RecordYearOverviewResponse(
+                year,
+                totalCount,
+                highScoreCount,
+                watchedCount,
+                onHoldCount,
+                wantToWatchCount,
+                excellentCount,
+                normalCount,
+                badCount,
+                unratedCount,
+                q1Count,
+                q2Count,
+                q3Count,
+                q4Count
         );
     }
 

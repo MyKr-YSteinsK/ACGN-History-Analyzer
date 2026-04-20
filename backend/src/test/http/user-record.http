@@ -84,3 +84,9 @@ GET http://localhost:8080/api/records/stats/quarter-overview?year=2024&quarter=Q
 
 ### 查询另一个季度概览
 GET http://localhost:8080/api/records/stats/quarter-overview?year=2024&quarter=Q2
+
+### 查询某年年度概览
+GET http://localhost:8080/api/records/stats/year-overview?year=2024
+
+### 查询另一年年度概览
+GET http://localhost:8080/api/records/stats/year-overview?year=2025

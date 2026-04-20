@@ -5,6 +5,7 @@ import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
+import com.mykr.acgnhistoryanalyzer.response.RecordYearOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.service.UserSubjectRecordService;
 import jakarta.validation.Valid;
@@ -63,6 +64,15 @@ public class UserSubjectRecordController {
     ) {
         RecordQuarterOverviewResponse overview =
                 userSubjectRecordService.getQuarterOverview(year, quarter);
+        return ApiResponse.success(overview);
+    }
+
+    @GetMapping("/stats/year-overview")
+    public ApiResponse<RecordYearOverviewResponse> getYearOverview(
+            @RequestParam Integer year
+    ) {
+        RecordYearOverviewResponse overview =
+                userSubjectRecordService.getYearOverview(year);
         return ApiResponse.success(overview);
     }
 
