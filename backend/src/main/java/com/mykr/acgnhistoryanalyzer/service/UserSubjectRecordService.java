@@ -7,6 +7,8 @@ import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
+import com.mykr.acgnhistoryanalyzer.specification.UserSubjectRecordSpecifications;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -48,14 +50,17 @@ public class UserSubjectRecordService {
         return toResponse(savedRecord);
     }
 
-    public List<UserSubjectRecordResponse> getRecords(RecordStatus status) {
-        List<UserSubjectRecord> records;
+    public List<UserSubjectRecordResponse> getRecords(Integer year, String quarter,
+                                                      RecordStatus status, Integer minScore, Integer maxScore) {
 
-        if (status == null) {
-            records = userSubjectRecordRepository.findAll();
-        } else {
-            records = userSubjectRecordRepository.findByRecordStatus(status);
-        }
+        Specification<UserSubjectRecord> specification = Specification
+                .where(UserSubjectRecordSpecifications.hasRecordYear(year))
+                .and(UserSubjectRecordSpecifications.hasRecordQuarter(quarter))
+                .and(UserSubjectRecordSpecifications.hasRecordStatus(status))
+                .and(UserSubjectRecordSpecifications.hasMinScore(minScore))
+                .and(UserSubjectRecordSpecifications.hasMaxScore(maxScore));
+
+        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(specification);
 
         return records.stream()
                 .map(this::toResponse)

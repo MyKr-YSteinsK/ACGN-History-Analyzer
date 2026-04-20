@@ -32,9 +32,14 @@ public class UserSubjectRecordController {
 
     @GetMapping
     public ApiResponse<List<UserSubjectRecordResponse>> getRecords(
-            @RequestParam(required = false) RecordStatus status
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String quarter,
+            @RequestParam(required = false) RecordStatus status,
+            @RequestParam(required = false) Integer minScore,
+            @RequestParam(required = false) Integer maxScore
     ) {
-        List<UserSubjectRecordResponse> records = userSubjectRecordService.getRecords(status);
+        List<UserSubjectRecordResponse> records =
+                userSubjectRecordService.getRecords(year, quarter, status, minScore, maxScore);
         return ApiResponse.success(records);
     }
 

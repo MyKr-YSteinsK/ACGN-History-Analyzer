@@ -48,3 +48,12 @@ Content-Type: application/json
   "recordQuarter": "Q5",
   "note": "这是一条非法请求"
 }
+
+### 按记录年份和季度查询
+GET http://localhost:8080/api/records?year=2024&quarter=Q1
+
+### 按状态和最低分查询
+GET http://localhost:8080/api/records?status=WATCHED&minScore=45
+
+### 按年份、季度、状态和评分区间组合查询
+GET http://localhost:8080/api/records?year=2024&quarter=Q1&status=WATCHED&minScore=45&maxScore=50
