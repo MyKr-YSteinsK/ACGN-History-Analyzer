@@ -6,6 +6,7 @@ import com.mykr.acgnhistoryanalyzer.entity.UserSubjectRecord;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
+import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.specification.UserSubjectRecordSpecifications;
 import org.springframework.data.jpa.domain.Specification;
@@ -53,18 +54,48 @@ public class UserSubjectRecordService {
     public List<UserSubjectRecordResponse> getRecords(Integer year, String quarter,
                                                       RecordStatus status, Integer minScore, Integer maxScore) {
 
-        Specification<UserSubjectRecord> specification = Specification
-                .where(UserSubjectRecordSpecifications.hasRecordYear(year))
-                .and(UserSubjectRecordSpecifications.hasRecordQuarter(quarter))
-                .and(UserSubjectRecordSpecifications.hasRecordStatus(status))
-                .and(UserSubjectRecordSpecifications.hasMinScore(minScore))
-                .and(UserSubjectRecordSpecifications.hasMaxScore(maxScore));
+        Specification<UserSubjectRecord> specification =
+                buildRecordSpecification(year, quarter, status, minScore, maxScore);
 
         List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(specification);
 
         return records.stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    public RecordScoreBandStatsResponse getScoreBandStats(Integer year, String quarter, RecordStatus status) {
+        Specification<UserSubjectRecord> specification =
+                buildRecordSpecification(year, quarter, status, null, null);
+
+        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(specification);
+
+        int excellentCount = 0;
+        int normalCount = 0;
+        int badCount = 0;
+        int unratedCount = 0;
+
+        for (UserSubjectRecord record : records) {
+            Integer score = record.getScoreValue();
+
+            if (score == null) {
+                unratedCount++;
+            } else if (score >= 42 && score <= 50) {
+                excellentCount++;
+            } else if (score >= 35 && score <= 41) {
+                normalCount++;
+            } else if (score >= 20 && score <= 34) {
+                badCount++;
+            }
+        }
+
+        return new RecordScoreBandStatsResponse(
+                records.size(),
+                excellentCount,
+                normalCount,
+                badCount,
+                unratedCount
+        );
     }
 
     public UserSubjectRecordResponse getRecordById(Long id) {
@@ -109,6 +140,17 @@ public class UserSubjectRecordService {
 
         userSubjectRecordRepository.deleteById(id);
         return true;
+    }
+
+    private Specification<UserSubjectRecord> buildRecordSpecification(Integer year, String quarter,
+                                                                      RecordStatus status,
+                                                                      Integer minScore, Integer maxScore) {
+        return Specification
+                .where(UserSubjectRecordSpecifications.hasRecordYear(year))
+                .and(UserSubjectRecordSpecifications.hasRecordQuarter(quarter))
+                .and(UserSubjectRecordSpecifications.hasRecordStatus(status))
+                .and(UserSubjectRecordSpecifications.hasMinScore(minScore))
+                .and(UserSubjectRecordSpecifications.hasMaxScore(maxScore));
     }
 
     private UserSubjectRecordResponse toResponse(UserSubjectRecord record) {

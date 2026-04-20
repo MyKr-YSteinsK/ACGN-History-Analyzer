@@ -3,9 +3,9 @@ POST http://localhost:8080/api/records
 Content-Type: application/json
 
 {
-  "subjectId": 1,
+  "subjectId": 2,
   "recordStatus": "WATCHED",
-  "scoreValue": 48,
+  "scoreValue": 35,
   "recordYear": 2024,
   "recordQuarter": "Q1",
   "note": "补番"
@@ -57,3 +57,12 @@ GET http://localhost:8080/api/records?status=WATCHED&minScore=45
 
 ### 按年份、季度、状态和评分区间组合查询
 GET http://localhost:8080/api/records?year=2024&quarter=Q1&status=WATCHED&minScore=45&maxScore=50
+
+### 按年份和季度统计评分分层
+GET http://localhost:8080/api/records/stats/score-bands?year=2024&quarter=Q1
+
+### 按年份、季度和状态统计评分分层
+GET http://localhost:8080/api/records/stats/score-bands?year=2024&quarter=Q1&status=WATCHED
+
+### 不带条件统计全部评分分层
+GET http://localhost:8080/api/records/stats/score-bands

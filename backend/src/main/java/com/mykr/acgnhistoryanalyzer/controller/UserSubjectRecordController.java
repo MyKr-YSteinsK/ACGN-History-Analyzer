@@ -3,6 +3,7 @@ package com.mykr.acgnhistoryanalyzer.controller;
 import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
+import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.service.UserSubjectRecordService;
 import jakarta.validation.Valid;
@@ -41,6 +42,17 @@ public class UserSubjectRecordController {
         List<UserSubjectRecordResponse> records =
                 userSubjectRecordService.getRecords(year, quarter, status, minScore, maxScore);
         return ApiResponse.success(records);
+    }
+
+    @GetMapping("/stats/score-bands")
+    public ApiResponse<RecordScoreBandStatsResponse> getScoreBandStats(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String quarter,
+            @RequestParam(required = false) RecordStatus status
+    ) {
+        RecordScoreBandStatsResponse stats =
+                userSubjectRecordService.getScoreBandStats(year, quarter, status);
+        return ApiResponse.success(stats);
     }
 
     @GetMapping("/{id}")
