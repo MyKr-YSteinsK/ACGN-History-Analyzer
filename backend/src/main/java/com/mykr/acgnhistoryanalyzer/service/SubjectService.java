@@ -43,13 +43,20 @@ public class SubjectService {
         return toResponse(savedSubject);
     }
 
-    public List<SubjectResponse> getSubjects(String category) {
+    public List<SubjectResponse> getSubjects(String category, String keyword) {
         List<Subject> subjects;
 
-        if (category == null || category.isBlank()) {
+        boolean hasCategory = category != null && !category.isBlank();
+        boolean hasKeyword = keyword != null && !keyword.isBlank();
+
+        if (!hasCategory && !hasKeyword) {
             subjects = subjectRepository.findAll();
-        } else {
+        } else if (hasCategory && !hasKeyword) {
             subjects = subjectRepository.findByCategory(category);
+        } else if (!hasCategory) {
+            subjects = subjectRepository.findByDisplayTitleContainingIgnoreCase(keyword);
+        } else {
+            subjects = subjectRepository.findByCategoryAndDisplayTitleContainingIgnoreCase(category, keyword);
         }
 
         return subjects.stream()

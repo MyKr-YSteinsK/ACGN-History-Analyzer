@@ -108,11 +108,19 @@ public class UserSubjectRecordService {
 
     private UserSubjectRecordResponse toResponse(UserSubjectRecord record) {
         String subjectTitle = record.getSubjectTitle();
+        String subjectCategory = null;
+        Integer subjectReleaseYear = null;
+        Integer subjectReleaseMonth = null;
+        String subjectCoverUrl = null;
 
         if (record.getSubjectId() != null) {
             Subject subject = subjectRepository.findById(record.getSubjectId()).orElse(null);
             if (subject != null) {
                 subjectTitle = subject.getDisplayTitle();
+                subjectCategory = subject.getCategory();
+                subjectReleaseYear = subject.getReleaseYear();
+                subjectReleaseMonth = subject.getReleaseMonth();
+                subjectCoverUrl = subject.getCoverUrl();
             }
         }
 
@@ -120,6 +128,10 @@ public class UserSubjectRecordService {
                 record.getId(),
                 record.getSubjectId(),
                 subjectTitle,
+                subjectCategory,
+                subjectReleaseYear,
+                subjectReleaseMonth,
+                subjectCoverUrl,
                 record.getRecordStatus().name(),
                 record.getRecordStatus().getLabel(),
                 record.getScoreValue(),

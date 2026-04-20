@@ -5,6 +5,10 @@ public class UserSubjectRecordResponse {
     private Long id;
     private Long subjectId;
     private String subjectTitle;
+    private String subjectCategory;
+    private Integer subjectReleaseYear;
+    private Integer subjectReleaseMonth;
+    private String subjectCoverUrl;
     private String recordStatus;
     private String recordStatusLabel;
     private Integer scoreValue;
@@ -13,12 +17,18 @@ public class UserSubjectRecordResponse {
     private String note;
 
     public UserSubjectRecordResponse(Long id, Long subjectId, String subjectTitle,
+                                     String subjectCategory, Integer subjectReleaseYear,
+                                     Integer subjectReleaseMonth, String subjectCoverUrl,
                                      String recordStatus, String recordStatusLabel,
                                      Integer scoreValue, Integer recordYear,
                                      String recordQuarter, String note) {
         this.id = id;
         this.subjectId = subjectId;
         this.subjectTitle = subjectTitle;
+        this.subjectCategory = subjectCategory;
+        this.subjectReleaseYear = subjectReleaseYear;
+        this.subjectReleaseMonth = subjectReleaseMonth;
+        this.subjectCoverUrl = subjectCoverUrl;
         this.recordStatus = recordStatus;
         this.recordStatusLabel = recordStatusLabel;
         this.scoreValue = scoreValue;
@@ -37,6 +47,22 @@ public class UserSubjectRecordResponse {
 
     public String getSubjectTitle() {
         return subjectTitle;
+    }
+
+    public String getSubjectCategory() {
+        return subjectCategory;
+    }
+
+    public Integer getSubjectReleaseYear() {
+        return subjectReleaseYear;
+    }
+
+    public Integer getSubjectReleaseMonth() {
+        return subjectReleaseMonth;
+    }
+
+    public String getSubjectCoverUrl() {
+        return subjectCoverUrl;
     }
 
     public String getRecordStatus() {

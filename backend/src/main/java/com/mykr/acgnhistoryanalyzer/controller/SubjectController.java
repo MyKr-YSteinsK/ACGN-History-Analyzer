@@ -27,9 +27,10 @@ public class SubjectController {
 
     @GetMapping
     public ApiResponse<List<SubjectResponse>> getSubjects(
-            @RequestParam(required = false) String category
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String keyword
     ) {
-        List<SubjectResponse> subjects = subjectService.getSubjects(category);
+        List<SubjectResponse> subjects = subjectService.getSubjects(category, keyword);
         return ApiResponse.success(subjects);
     }
 

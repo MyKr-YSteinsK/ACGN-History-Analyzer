@@ -69,3 +69,12 @@ DELETE http://localhost:8080/api/subjects/2
 
 ### 删除一个已被引用的作品
 DELETE http://localhost:8080/api/subjects/1
+
+### 按关键词搜索作品
+GET http://localhost:8080/api/subjects?keyword=巨人
+
+### 按关键词搜索 Final
+GET http://localhost:8080/api/subjects?keyword=Final
+
+### 按类型 + 关键词搜索
+GET http://localhost:8080/api/subjects?category=ANIME&keyword=Final

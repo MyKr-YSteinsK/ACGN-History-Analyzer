@@ -8,4 +8,8 @@ import java.util.List;
 public interface SubjectRepository extends JpaRepository<Subject, Long> {
 
     List<Subject> findByCategory(String category);
+
+    List<Subject> findByDisplayTitleContainingIgnoreCase(String keyword);
+
+    List<Subject> findByCategoryAndDisplayTitleContainingIgnoreCase(String category, String keyword);
 }
