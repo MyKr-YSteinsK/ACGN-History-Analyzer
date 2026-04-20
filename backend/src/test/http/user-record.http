@@ -66,3 +66,21 @@ GET http://localhost:8080/api/records/stats/score-bands?year=2024&quarter=Q1&sta
 
 ### 不带条件统计全部评分分层
 GET http://localhost:8080/api/records/stats/score-bands
+
+### 查询全部高分记录（默认45分及以上）
+GET http://localhost:8080/api/records/high-score
+
+### 查询某年某季度高分记录
+GET http://localhost:8080/api/records/high-score?year=2024&quarter=Q1
+
+### 查询某年某季度已看状态的高分记录
+GET http://localhost:8080/api/records/high-score?year=2024&quarter=Q1&status=WATCHED
+
+### 查询某年某季度47分及以上高分记录
+GET http://localhost:8080/api/records/high-score?year=2024&quarter=Q1&minScore=47
+
+### 查询某年某季度概览
+GET http://localhost:8080/api/records/stats/quarter-overview?year=2024&quarter=Q1
+
+### 查询另一个季度概览
+GET http://localhost:8080/api/records/stats/quarter-overview?year=2024&quarter=Q2
