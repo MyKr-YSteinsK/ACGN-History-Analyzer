@@ -1,5 +1,6 @@
 package com.mykr.acgnhistoryanalyzer.service;
 
+import com.mykr.acgnhistoryanalyzer.common.enums.HomeRecordSortType;
 import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import com.mykr.acgnhistoryanalyzer.response.HomeQuarterDashboardResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
@@ -7,6 +8,7 @@ import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -23,26 +25,30 @@ public class HomeService {
     }
 
     public HomeQuarterDashboardResponse getQuarterDashboard(Integer year, Integer quarter,
-                                                            String category, String status, String keyword) {
+                                                            String category, String status,
+                                                            String keyword, String recordSort) {
         String effectiveCategory = normalizeCategory(category);
         RecordStatus effectiveRecordStatus = normalizeRecordStatus(status);
         String effectiveKeyword = normalizeKeyword(keyword);
+        HomeRecordSortType effectiveRecordSort = normalizeRecordSort(recordSort);
 
         List<UserSubjectRecordResponse> allQuarterRecords =
                 userSubjectRecordService.getRecords(year, quarter, effectiveRecordStatus, null, null);
 
-        List<UserSubjectRecordResponse> recordList = allQuarterRecords.stream()
+        List<UserSubjectRecordResponse> filteredRecordList = allQuarterRecords.stream()
                 .filter(record -> effectiveCategory.equals(record.getSubjectCategory()))
                 .filter(record -> matchesKeyword(record.getSubjectTitle(), effectiveKeyword))
                 .toList();
 
-        List<UserSubjectRecordResponse> highScoreRecordList = recordList.stream()
+        List<UserSubjectRecordResponse> recordList = sortRecordList(filteredRecordList, effectiveRecordSort);
+
+        List<UserSubjectRecordResponse> highScoreRecordList = filteredRecordList.stream()
                 .filter(record -> record.getScoreValue() != null && record.getScoreValue() >= 45)
                 .sorted((a, b) -> b.getScoreValue().compareTo(a.getScoreValue()))
                 .toList();
 
         RecordQuarterOverviewResponse quarterOverview =
-                buildQuarterOverview(year, quarter, recordList);
+                buildQuarterOverview(year, quarter, filteredRecordList);
 
         List<SubjectResponse> subjectLibraryList =
                 subjectService.getSubjects(year, quarter, effectiveCategory, effectiveKeyword, "NORMAL");
@@ -53,6 +59,7 @@ public class HomeService {
                 effectiveCategory,
                 effectiveRecordStatus == null ? null : effectiveRecordStatus.name(),
                 effectiveKeyword,
+                effectiveRecordSort.name(),
                 quarterOverview,
                 recordList,
                 highScoreRecordList,
@@ -81,6 +88,13 @@ public class HomeService {
         return keyword.trim();
     }
 
+    private HomeRecordSortType normalizeRecordSort(String recordSort) {
+        if (recordSort == null || recordSort.isBlank()) {
+            return HomeRecordSortType.TITLE_ASC;
+        }
+        return HomeRecordSortType.valueOf(recordSort.toUpperCase(Locale.ROOT));
+    }
+
     private boolean matchesKeyword(String text, String keyword) {
         if (keyword == null) {
             return true;
@@ -89,6 +103,34 @@ public class HomeService {
             return false;
         }
         return text.toLowerCase(Locale.ROOT).contains(keyword.toLowerCase(Locale.ROOT));
+    }
+
+    private List<UserSubjectRecordResponse> sortRecordList(List<UserSubjectRecordResponse> records,
+                                                           HomeRecordSortType sortType) {
+        Comparator<UserSubjectRecordResponse> comparator = switch (sortType) {
+            case TITLE_ASC -> Comparator.comparing(
+                    record -> safeLower(record.getSubjectTitle())
+            );
+            case TITLE_DESC -> Comparator.comparing(
+                    (UserSubjectRecordResponse record) -> safeLower(record.getSubjectTitle())
+            ).reversed();
+            case SCORE_ASC -> Comparator.comparing(
+                    UserSubjectRecordResponse::getScoreValue,
+                    Comparator.nullsLast(Integer::compareTo)
+            );
+            case SCORE_DESC -> Comparator.comparing(
+                    UserSubjectRecordResponse::getScoreValue,
+                    Comparator.nullsLast(Integer::compareTo)
+            ).reversed();
+        };
+
+        return records.stream()
+                .sorted(comparator)
+                .toList();
+    }
+
+    private String safeLower(String text) {
+        return text == null ? "" : text.toLowerCase(Locale.ROOT);
     }
 
     private RecordQuarterOverviewResponse buildQuarterOverview(Integer year, Integer quarter,

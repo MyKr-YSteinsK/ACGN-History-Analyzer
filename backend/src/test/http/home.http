@@ -6,6 +6,7 @@
 # 3. 不传 category 时，后端默认按 ANIME
 # 4. 不传 status 时，后端默认不过滤记录状态
 # 5. 不传 keyword 时，后端默认不过滤关键词
+# 6. 不传 recordSort 时，后端默认 TITLE_ASC
 
 ### 1. 查询 2024 年 Q1 首页季度聚合数据（默认 ANIME）
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1
@@ -33,3 +34,18 @@ GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=2&category=COMIC&ke
 
 ### 9. 查询 2025 年 Q1 首页季度聚合数据（ANIME + WATCHED）
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2025&quarter=1&category=ANIME&status=WATCHED
+
+### 10. 记录列表按标题升序
+GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&recordSort=TITLE_ASC
+
+### 11. 记录列表按标题降序
+GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&recordSort=TITLE_DESC
+
+### 12. 记录列表按评分升序
+GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&recordSort=SCORE_ASC
+
+### 13. 记录列表按评分降序
+GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&recordSort=SCORE_DESC
+
+### 14. 组合测试：ANIME + WATCHED + keyword=巨人 + SCORE_DESC
+GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&status=WATCHED&keyword=巨人&recordSort=SCORE_DESC
