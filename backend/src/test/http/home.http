@@ -3,16 +3,23 @@
 ### 说明
 # 1. 先运行 00-seed-data.http
 # 2. 这个文件专门测试首页聚合接口
-# 3. 不传 category 时，后端默认按 ANIME 处理
+# 3. 不传 category 时，后端默认按 ANIME
+# 4. 不传 status 时，后端默认不过滤记录状态
 
 ### 1. 查询 2024 年 Q1 首页季度聚合数据（默认 ANIME）
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1
 
-### 2. 查询 2024 年 Q1 首页季度聚合数据（显式 ANIME）
+### 2. 查询 2024 年 Q1 首页季度聚合数据（ANIME）
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME
 
-### 3. 查询 2024 年 Q2 首页季度聚合数据（显式 COMIC）
+### 3. 查询 2024 年 Q2 首页季度聚合数据（COMIC）
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=2&category=COMIC
 
-### 4. 查询 2025 年 Q1 首页季度聚合数据（ANIME）
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2025&quarter=1&category=ANIME
+### 4. 查询 2024 年 Q1 首页季度聚合数据（ANIME + WATCHED）
+GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&status=WATCHED
+
+### 5. 查询 2024 年 Q2 首页季度聚合数据（COMIC + ON_HOLD）
+GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=2&category=COMIC&status=ON_HOLD
+
+### 6. 查询 2025 年 Q1 首页季度聚合数据（ANIME + WATCHED）
+GET {{baseUrl}}/api/home/quarter-dashboard?year=2025&quarter=1&category=ANIME&status=WATCHED

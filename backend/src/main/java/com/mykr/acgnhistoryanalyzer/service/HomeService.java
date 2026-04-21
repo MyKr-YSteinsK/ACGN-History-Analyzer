@@ -1,5 +1,6 @@
 package com.mykr.acgnhistoryanalyzer.service;
 
+import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import com.mykr.acgnhistoryanalyzer.response.HomeQuarterDashboardResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
@@ -20,11 +21,13 @@ public class HomeService {
         this.subjectService = subjectService;
     }
 
-    public HomeQuarterDashboardResponse getQuarterDashboard(Integer year, Integer quarter, String category) {
+    public HomeQuarterDashboardResponse getQuarterDashboard(Integer year, Integer quarter,
+                                                            String category, String status) {
         String effectiveCategory = normalizeCategory(category);
+        RecordStatus effectiveRecordStatus = normalizeRecordStatus(status);
 
         List<UserSubjectRecordResponse> allQuarterRecords =
-                userSubjectRecordService.getRecords(year, quarter, null, null, null);
+                userSubjectRecordService.getRecords(year, quarter, effectiveRecordStatus, null, null);
 
         List<UserSubjectRecordResponse> recordList = allQuarterRecords.stream()
                 .filter(record -> effectiveCategory.equals(record.getSubjectCategory()))
@@ -45,6 +48,7 @@ public class HomeService {
                 year,
                 quarter,
                 effectiveCategory,
+                effectiveRecordStatus == null ? null : effectiveRecordStatus.name(),
                 quarterOverview,
                 recordList,
                 highScoreRecordList,
@@ -57,6 +61,13 @@ public class HomeService {
             return "ANIME";
         }
         return category.toUpperCase();
+    }
+
+    private RecordStatus normalizeRecordStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        return RecordStatus.valueOf(status.toUpperCase());
     }
 
     private RecordQuarterOverviewResponse buildQuarterOverview(Integer year, Integer quarter,

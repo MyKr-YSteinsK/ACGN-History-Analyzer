@@ -22,10 +22,11 @@ public class HomeController {
     public ApiResponse<HomeQuarterDashboardResponse> getQuarterDashboard(
             @RequestParam Integer year,
             @RequestParam Integer quarter,
-            @RequestParam(required = false) String category
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String status
     ) {
         HomeQuarterDashboardResponse dashboard =
-                homeService.getQuarterDashboard(year, quarter, category);
+                homeService.getQuarterDashboard(year, quarter, category, status);
         return ApiResponse.success(dashboard);
     }
 }
