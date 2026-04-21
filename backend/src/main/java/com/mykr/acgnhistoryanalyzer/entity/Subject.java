@@ -16,7 +16,7 @@ public class Subject {
     @Column(name = "subtitle", length = 255)
     private String subtitle;
 
-    @Column(name = "display_title", length = 500)
+    @Column(name = "display_title", nullable = false, length = 500)
     private String displayTitle;
 
     @Column(name = "season_index")
@@ -34,11 +34,11 @@ public class Subject {
     @Column(name = "summary", length = 2000)
     private String summary;
 
-    @Column(name = "release_year")
+    @Column(name = "release_year", nullable = false)
     private Integer releaseYear;
 
-    @Column(name = "release_month")
-    private Integer releaseMonth;
+    @Column(name = "release_quarter", nullable = false)
+    private Integer releaseQuarter;
 
     @Column(name = "category", nullable = false, length = 32)
     private String category;
@@ -58,7 +58,7 @@ public class Subject {
     public Subject(String titleCn, String subtitle, String displayTitle,
                    Integer seasonIndex, Integer partIndex, Long franchiseId,
                    String coverUrl, String summary, Integer releaseYear,
-                   Integer releaseMonth, String category, String studioName,
+                   Integer releaseQuarter, String category, String studioName,
                    String platformLink, String status) {
         this.titleCn = titleCn;
         this.subtitle = subtitle;
@@ -69,7 +69,7 @@ public class Subject {
         this.coverUrl = coverUrl;
         this.summary = summary;
         this.releaseYear = releaseYear;
-        this.releaseMonth = releaseMonth;
+        this.releaseQuarter = releaseQuarter;
         this.category = category;
         this.studioName = studioName;
         this.platformLink = platformLink;
@@ -116,8 +116,8 @@ public class Subject {
         return releaseYear;
     }
 
-    public Integer getReleaseMonth() {
-        return releaseMonth;
+    public Integer getReleaseQuarter() {
+        return releaseQuarter;
     }
 
     public String getCategory() {
@@ -172,8 +172,8 @@ public class Subject {
         this.releaseYear = releaseYear;
     }
 
-    public void setReleaseMonth(Integer releaseMonth) {
-        this.releaseMonth = releaseMonth;
+    public void setReleaseQuarter(Integer releaseQuarter) {
+        this.releaseQuarter = releaseQuarter;
     }
 
     public void setCategory(String category) {

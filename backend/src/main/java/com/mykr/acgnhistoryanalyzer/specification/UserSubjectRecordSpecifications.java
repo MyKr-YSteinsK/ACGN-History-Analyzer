@@ -15,9 +15,9 @@ public class UserSubjectRecordSpecifications {
         };
     }
 
-    public static Specification<UserSubjectRecord> hasRecordQuarter(String quarter) {
+    public static Specification<UserSubjectRecord> hasRecordQuarter(Integer quarter) {
         return (root, query, criteriaBuilder) -> {
-            if (quarter == null || quarter.isBlank()) {
+            if (quarter == null) {
                 return null;
             }
             return criteriaBuilder.equal(root.get("recordQuarter"), quarter);

@@ -3,7 +3,7 @@ package com.mykr.acgnhistoryanalyzer.response;
 public class RecordQuarterOverviewResponse {
 
     private Integer year;
-    private String quarter;
+    private Integer quarter;
     private int totalCount;
     private int highScoreCount;
     private int watchedCount;
@@ -14,7 +14,7 @@ public class RecordQuarterOverviewResponse {
     private int badCount;
     private int unratedCount;
 
-    public RecordQuarterOverviewResponse(Integer year, String quarter,
+    public RecordQuarterOverviewResponse(Integer year, Integer quarter,
                                          int totalCount, int highScoreCount,
                                          int watchedCount, int onHoldCount, int wantToWatchCount,
                                          int excellentCount, int normalCount,
@@ -36,7 +36,7 @@ public class RecordQuarterOverviewResponse {
         return year;
     }
 
-    public String getQuarter() {
+    public Integer getQuarter() {
         return quarter;
     }
 

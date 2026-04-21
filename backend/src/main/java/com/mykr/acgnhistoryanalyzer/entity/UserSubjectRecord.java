@@ -24,11 +24,11 @@ public class UserSubjectRecord {
     @Column(name = "score_value")
     private Integer scoreValue;
 
-    @Column(name = "record_year")
+    @Column(name = "record_year", nullable = false)
     private Integer recordYear;
 
-    @Column(name = "record_quarter", length = 8)
-    private String recordQuarter;
+    @Column(name = "record_quarter", nullable = false)
+    private Integer recordQuarter;
 
     @Column(name = "note", length = 500)
     private String note;
@@ -37,7 +37,7 @@ public class UserSubjectRecord {
     }
 
     public UserSubjectRecord(Long subjectId, String subjectTitle, RecordStatus recordStatus,
-                             Integer scoreValue, Integer recordYear, String recordQuarter, String note) {
+                             Integer scoreValue, Integer recordYear, Integer recordQuarter, String note) {
         this.subjectId = subjectId;
         this.subjectTitle = subjectTitle;
         this.recordStatus = recordStatus;
@@ -71,7 +71,7 @@ public class UserSubjectRecord {
         return recordYear;
     }
 
-    public String getRecordQuarter() {
+    public Integer getRecordQuarter() {
         return recordQuarter;
     }
 
@@ -99,7 +99,7 @@ public class UserSubjectRecord {
         this.recordYear = recordYear;
     }
 
-    public void setRecordQuarter(String recordQuarter) {
+    public void setRecordQuarter(Integer recordQuarter) {
         this.recordQuarter = recordQuarter;
     }
 

@@ -6,10 +6,10 @@ import com.mykr.acgnhistoryanalyzer.entity.UserSubjectRecord;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
-import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
-import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
+import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordYearOverviewResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.specification.UserSubjectRecordSpecifications;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -53,7 +53,7 @@ public class UserSubjectRecordService {
         return toResponse(savedRecord);
     }
 
-    public List<UserSubjectRecordResponse> getRecords(Integer year, String quarter,
+    public List<UserSubjectRecordResponse> getRecords(Integer year, Integer quarter,
                                                       RecordStatus status, Integer minScore, Integer maxScore) {
 
         Specification<UserSubjectRecord> specification =
@@ -66,37 +66,7 @@ public class UserSubjectRecordService {
                 .toList();
     }
 
-    public List<UserSubjectRecordResponse> getHighScoreRecords(Integer year, String quarter,
-                                                               RecordStatus status, Integer minScore) {
-
-        int effectiveMinScore = (minScore == null) ? 45 : minScore;
-
-        Specification<UserSubjectRecord> specification =
-                buildRecordSpecification(year, quarter, status, effectiveMinScore, 50);
-
-        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(specification);
-
-        return records.stream()
-                .map(this::toResponse)
-                .sorted((a, b) -> {
-                    Integer scoreA = a.getScoreValue();
-                    Integer scoreB = b.getScoreValue();
-
-                    if (scoreA == null && scoreB == null) {
-                        return 0;
-                    }
-                    if (scoreA == null) {
-                        return 1;
-                    }
-                    if (scoreB == null) {
-                        return -1;
-                    }
-                    return scoreB.compareTo(scoreA);
-                })
-                .toList();
-    }
-
-    public RecordScoreBandStatsResponse getScoreBandStats(Integer year, String quarter, RecordStatus status) {
+    public RecordScoreBandStatsResponse getScoreBandStats(Integer year, Integer quarter, RecordStatus status) {
         Specification<UserSubjectRecord> specification =
                 buildRecordSpecification(year, quarter, status, null, null);
 
@@ -130,7 +100,7 @@ public class UserSubjectRecordService {
         );
     }
 
-    public RecordQuarterOverviewResponse getQuarterOverview(Integer year, String quarter) {
+    public RecordQuarterOverviewResponse getQuarterOverview(Integer year, Integer quarter) {
         Specification<UserSubjectRecord> specification =
                 buildRecordSpecification(year, quarter, null, null, null);
 
@@ -220,10 +190,10 @@ public class UserSubjectRecordService {
 
             if (record.getRecordQuarter() != null) {
                 switch (record.getRecordQuarter()) {
-                    case "Q1" -> q1Count++;
-                    case "Q2" -> q2Count++;
-                    case "Q3" -> q3Count++;
-                    case "Q4" -> q4Count++;
+                    case 1 -> q1Count++;
+                    case 2 -> q2Count++;
+                    case 3 -> q3Count++;
+                    case 4 -> q4Count++;
                 }
             }
 
@@ -262,6 +232,36 @@ public class UserSubjectRecordService {
                 q3Count,
                 q4Count
         );
+    }
+
+    public List<UserSubjectRecordResponse> getHighScoreRecords(Integer year, Integer quarter,
+                                                               RecordStatus status, Integer minScore) {
+
+        int effectiveMinScore = (minScore == null) ? 45 : minScore;
+
+        Specification<UserSubjectRecord> specification =
+                buildRecordSpecification(year, quarter, status, effectiveMinScore, 50);
+
+        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(specification);
+
+        return records.stream()
+                .map(this::toResponse)
+                .sorted((a, b) -> {
+                    Integer scoreA = a.getScoreValue();
+                    Integer scoreB = b.getScoreValue();
+
+                    if (scoreA == null && scoreB == null) {
+                        return 0;
+                    }
+                    if (scoreA == null) {
+                        return 1;
+                    }
+                    if (scoreB == null) {
+                        return -1;
+                    }
+                    return scoreB.compareTo(scoreA);
+                })
+                .toList();
     }
 
     public UserSubjectRecordResponse getRecordById(Long id) {
@@ -308,7 +308,7 @@ public class UserSubjectRecordService {
         return true;
     }
 
-    private Specification<UserSubjectRecord> buildRecordSpecification(Integer year, String quarter,
+    private Specification<UserSubjectRecord> buildRecordSpecification(Integer year, Integer quarter,
                                                                       RecordStatus status,
                                                                       Integer minScore, Integer maxScore) {
         return Specification.allOf(
@@ -324,7 +324,7 @@ public class UserSubjectRecordService {
         String subjectTitle = record.getSubjectTitle();
         String subjectCategory = null;
         Integer subjectReleaseYear = null;
-        Integer subjectReleaseMonth = null;
+        Integer subjectReleaseQuarter = null;
         String subjectCoverUrl = null;
 
         if (record.getSubjectId() != null) {
@@ -333,7 +333,7 @@ public class UserSubjectRecordService {
                 subjectTitle = subject.getDisplayTitle();
                 subjectCategory = subject.getCategory();
                 subjectReleaseYear = subject.getReleaseYear();
-                subjectReleaseMonth = subject.getReleaseMonth();
+                subjectReleaseQuarter = subject.getReleaseQuarter();
                 subjectCoverUrl = subject.getCoverUrl();
             }
         }
@@ -344,7 +344,7 @@ public class UserSubjectRecordService {
                 subjectTitle,
                 subjectCategory,
                 subjectReleaseYear,
-                subjectReleaseMonth,
+                subjectReleaseQuarter,
                 subjectCoverUrl,
                 record.getRecordStatus().name(),
                 record.getRecordStatus().getLabel(),

@@ -2,14 +2,8 @@ package com.mykr.acgnhistoryanalyzer.repository;
 
 import com.mykr.acgnhistoryanalyzer.entity.Subject;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-import java.util.List;
-
-public interface SubjectRepository extends JpaRepository<Subject, Long> {
-
-    List<Subject> findByCategory(String category);
-
-    List<Subject> findByDisplayTitleContainingIgnoreCase(String keyword);
-
-    List<Subject> findByCategoryAndDisplayTitleContainingIgnoreCase(String category, String keyword);
+public interface SubjectRepository
+        extends JpaRepository<Subject, Long>, JpaSpecificationExecutor<Subject> {
 }

@@ -7,27 +7,27 @@ public class UserSubjectRecordResponse {
     private String subjectTitle;
     private String subjectCategory;
     private Integer subjectReleaseYear;
-    private Integer subjectReleaseMonth;
+    private Integer subjectReleaseQuarter;
     private String subjectCoverUrl;
     private String recordStatus;
     private String recordStatusLabel;
     private Integer scoreValue;
     private Integer recordYear;
-    private String recordQuarter;
+    private Integer recordQuarter;
     private String note;
 
     public UserSubjectRecordResponse(Long id, Long subjectId, String subjectTitle,
                                      String subjectCategory, Integer subjectReleaseYear,
-                                     Integer subjectReleaseMonth, String subjectCoverUrl,
+                                     Integer subjectReleaseQuarter, String subjectCoverUrl,
                                      String recordStatus, String recordStatusLabel,
                                      Integer scoreValue, Integer recordYear,
-                                     String recordQuarter, String note) {
+                                     Integer recordQuarter, String note) {
         this.id = id;
         this.subjectId = subjectId;
         this.subjectTitle = subjectTitle;
         this.subjectCategory = subjectCategory;
         this.subjectReleaseYear = subjectReleaseYear;
-        this.subjectReleaseMonth = subjectReleaseMonth;
+        this.subjectReleaseQuarter = subjectReleaseQuarter;
         this.subjectCoverUrl = subjectCoverUrl;
         this.recordStatus = recordStatus;
         this.recordStatusLabel = recordStatusLabel;
@@ -57,8 +57,8 @@ public class UserSubjectRecordResponse {
         return subjectReleaseYear;
     }
 
-    public Integer getSubjectReleaseMonth() {
-        return subjectReleaseMonth;
+    public Integer getSubjectReleaseQuarter() {
+        return subjectReleaseQuarter;
     }
 
     public String getSubjectCoverUrl() {
@@ -81,7 +81,7 @@ public class UserSubjectRecordResponse {
         return recordYear;
     }
 
-    public String getRecordQuarter() {
+    public Integer getRecordQuarter() {
         return recordQuarter;
     }
 

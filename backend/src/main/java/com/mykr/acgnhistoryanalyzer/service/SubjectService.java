@@ -5,6 +5,8 @@ import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
+import com.mykr.acgnhistoryanalyzer.specification.SubjectSpecifications;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -32,7 +34,7 @@ public class SubjectService {
                 request.getCoverUrl(),
                 request.getSummary(),
                 request.getReleaseYear(),
-                request.getReleaseMonth(),
+                request.getReleaseQuarter(),
                 request.getCategory(),
                 request.getStudioName(),
                 request.getPlatformLink(),
@@ -43,21 +45,12 @@ public class SubjectService {
         return toResponse(savedSubject);
     }
 
-    public List<SubjectResponse> getSubjects(String category, String keyword) {
-        List<Subject> subjects;
+    public List<SubjectResponse> getSubjects(Integer year, Integer quarter,
+                                             String category, String keyword, String status) {
+        Specification<Subject> specification =
+                buildSubjectSpecification(year, quarter, category, keyword, status);
 
-        boolean hasCategory = category != null && !category.isBlank();
-        boolean hasKeyword = keyword != null && !keyword.isBlank();
-
-        if (!hasCategory && !hasKeyword) {
-            subjects = subjectRepository.findAll();
-        } else if (hasCategory && !hasKeyword) {
-            subjects = subjectRepository.findByCategory(category);
-        } else if (!hasCategory) {
-            subjects = subjectRepository.findByDisplayTitleContainingIgnoreCase(keyword);
-        } else {
-            subjects = subjectRepository.findByCategoryAndDisplayTitleContainingIgnoreCase(category, keyword);
-        }
+        List<Subject> subjects = subjectRepository.findAll(specification);
 
         return subjects.stream()
                 .map(this::toResponse)
@@ -90,7 +83,7 @@ public class SubjectService {
         existingSubject.setCoverUrl(request.getCoverUrl());
         existingSubject.setSummary(request.getSummary());
         existingSubject.setReleaseYear(request.getReleaseYear());
-        existingSubject.setReleaseMonth(request.getReleaseMonth());
+        existingSubject.setReleaseQuarter(request.getReleaseQuarter());
         existingSubject.setCategory(request.getCategory());
         existingSubject.setStudioName(request.getStudioName());
         existingSubject.setPlatformLink(request.getPlatformLink());
@@ -112,6 +105,17 @@ public class SubjectService {
         subjectRepository.deleteById(id);
     }
 
+    private Specification<Subject> buildSubjectSpecification(Integer year, Integer quarter,
+                                                             String category, String keyword, String status) {
+        return Specification.allOf(
+                SubjectSpecifications.hasReleaseYear(year),
+                SubjectSpecifications.hasReleaseQuarter(quarter),
+                SubjectSpecifications.hasCategory(category),
+                SubjectSpecifications.titleContainsKeyword(keyword),
+                SubjectSpecifications.hasStatus(status)
+        );
+    }
+
     private SubjectResponse toResponse(Subject subject) {
         return new SubjectResponse(
                 subject.getId(),
@@ -124,7 +128,7 @@ public class SubjectService {
                 subject.getCoverUrl(),
                 subject.getSummary(),
                 subject.getReleaseYear(),
-                subject.getReleaseMonth(),
+                subject.getReleaseQuarter(),
                 subject.getCategory(),
                 subject.getStudioName(),
                 subject.getPlatformLink(),

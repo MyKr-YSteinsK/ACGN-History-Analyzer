@@ -3,10 +3,10 @@ package com.mykr.acgnhistoryanalyzer.controller;
 import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
-import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
-import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
-import com.mykr.acgnhistoryanalyzer.response.RecordYearOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
+import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
+import com.mykr.acgnhistoryanalyzer.response.RecordYearOverviewResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.service.UserSubjectRecordService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -36,7 +36,7 @@ public class UserSubjectRecordController {
     @GetMapping
     public ApiResponse<List<UserSubjectRecordResponse>> getRecords(
             @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) String quarter,
+            @RequestParam(required = false) Integer quarter,
             @RequestParam(required = false) RecordStatus status,
             @RequestParam(required = false) Integer minScore,
             @RequestParam(required = false) Integer maxScore
@@ -49,7 +49,7 @@ public class UserSubjectRecordController {
     @GetMapping("/stats/score-bands")
     public ApiResponse<RecordScoreBandStatsResponse> getScoreBandStats(
             @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) String quarter,
+            @RequestParam(required = false) Integer quarter,
             @RequestParam(required = false) RecordStatus status
     ) {
         RecordScoreBandStatsResponse stats =
@@ -60,7 +60,7 @@ public class UserSubjectRecordController {
     @GetMapping("/stats/quarter-overview")
     public ApiResponse<RecordQuarterOverviewResponse> getQuarterOverview(
             @RequestParam Integer year,
-            @RequestParam String quarter
+            @RequestParam Integer quarter
     ) {
         RecordQuarterOverviewResponse overview =
                 userSubjectRecordService.getQuarterOverview(year, quarter);
@@ -79,7 +79,7 @@ public class UserSubjectRecordController {
     @GetMapping("/high-score")
     public ApiResponse<List<UserSubjectRecordResponse>> getHighScoreRecords(
             @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) String quarter,
+            @RequestParam(required = false) Integer quarter,
             @RequestParam(required = false) RecordStatus status,
             @RequestParam(required = false) Integer minScore
     ) {

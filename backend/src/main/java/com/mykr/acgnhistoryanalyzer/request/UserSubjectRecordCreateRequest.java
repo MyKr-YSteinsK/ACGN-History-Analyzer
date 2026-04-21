@@ -12,7 +12,7 @@ public class UserSubjectRecordCreateRequest {
     @NotNull(message = "记录状态不能为空")
     private RecordStatus recordStatus;
 
-    @Min(value = 10, message = "评分不能小于10")
+    @Min(value = 20, message = "评分不能小于20")
     @Max(value = 50, message = "评分不能大于50")
     private Integer scoreValue;
 
@@ -21,9 +21,10 @@ public class UserSubjectRecordCreateRequest {
     @Max(value = 2100, message = "记录年份不合法")
     private Integer recordYear;
 
-    @NotBlank(message = "记录季度不能为空")
-    @Pattern(regexp = "Q[1-4]", message = "记录季度只能是 Q1、Q2、Q3 或 Q4")
-    private String recordQuarter;
+    @NotNull(message = "记录季度不能为空")
+    @Min(value = 1, message = "记录季度只能是1到4")
+    @Max(value = 4, message = "记录季度只能是1到4")
+    private Integer recordQuarter;
 
     @Size(max = 500, message = "备注不能超过500个字符")
     private String note;
@@ -47,7 +48,7 @@ public class UserSubjectRecordCreateRequest {
         return recordYear;
     }
 
-    public String getRecordQuarter() {
+    public Integer getRecordQuarter() {
         return recordQuarter;
     }
 
@@ -71,7 +72,7 @@ public class UserSubjectRecordCreateRequest {
         this.recordYear = recordYear;
     }
 
-    public void setRecordQuarter(String recordQuarter) {
+    public void setRecordQuarter(Integer recordQuarter) {
         this.recordQuarter = recordQuarter;
     }
 

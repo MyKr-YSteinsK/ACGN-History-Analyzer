@@ -12,7 +12,7 @@ public class SubjectResponse {
     private String coverUrl;
     private String summary;
     private Integer releaseYear;
-    private Integer releaseMonth;
+    private Integer releaseQuarter;
     private String category;
     private String studioName;
     private String platformLink;
@@ -21,7 +21,7 @@ public class SubjectResponse {
     public SubjectResponse(Long id, String titleCn, String subtitle, String displayTitle,
                            Integer seasonIndex, Integer partIndex, Long franchiseId,
                            String coverUrl, String summary, Integer releaseYear,
-                           Integer releaseMonth, String category, String studioName,
+                           Integer releaseQuarter, String category, String studioName,
                            String platformLink, String status) {
         this.id = id;
         this.titleCn = titleCn;
@@ -33,7 +33,7 @@ public class SubjectResponse {
         this.coverUrl = coverUrl;
         this.summary = summary;
         this.releaseYear = releaseYear;
-        this.releaseMonth = releaseMonth;
+        this.releaseQuarter = releaseQuarter;
         this.category = category;
         this.studioName = studioName;
         this.platformLink = platformLink;
@@ -80,8 +80,8 @@ public class SubjectResponse {
         return releaseYear;
     }
 
-    public Integer getReleaseMonth() {
-        return releaseMonth;
+    public Integer getReleaseQuarter() {
+        return releaseQuarter;
     }
 
     public String getCategory() {

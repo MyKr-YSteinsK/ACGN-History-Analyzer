@@ -1,0 +1,275 @@
+@baseUrl = http://localhost:8080
+### 1. 进击的巨人 The Final Season Part 1（2020 Q4，ANIME，NORMAL）
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "进击的巨人",
+  "subtitle": "The Final Season Part 1",
+  "displayTitle": "进击的巨人 The Final Season Part 1",
+  "seasonIndex": 4,
+  "partIndex": 1,
+  "coverUrl": "https://example.com/aot-final-part1.jpg",
+  "summary": "样例：巨人最终季前半部分",
+  "releaseYear": 2020,
+  "releaseQuarter": 4,
+  "category": "ANIME",
+  "studioName": "MAPPA",
+  "platformLink": "https://bgm.tv/subject/aot-final-part1",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("subject_aot_p1_id", response.body.data.id);
+%}
+
+### 2. 进击的巨人 The Final Season Part 2（2021 Q1，ANIME，NORMAL）
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "进击的巨人",
+  "subtitle": "The Final Season Part 2",
+  "displayTitle": "进击的巨人 The Final Season Part 2",
+  "seasonIndex": 4,
+  "partIndex": 2,
+  "coverUrl": "https://example.com/aot-final-part2.jpg",
+  "summary": "样例：巨人最终季后半部分",
+  "releaseYear": 2021,
+  "releaseQuarter": 1,
+  "category": "ANIME",
+  "studioName": "MAPPA",
+  "platformLink": "https://bgm.tv/subject/aot-final-part2",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("subject_aot_p2_id", response.body.data.id);
+%}
+
+### 3. 孤独摇滚！（2022 Q4，ANIME，NORMAL）
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "孤独摇滚！",
+  "displayTitle": "孤独摇滚！",
+  "coverUrl": "https://example.com/bocchi.jpg",
+  "summary": "样例：普通单作品动画",
+  "releaseYear": 2022,
+  "releaseQuarter": 4,
+  "category": "ANIME",
+  "studioName": "CloverWorks",
+  "platformLink": "https://bgm.tv/subject/bocchi",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("subject_bocchi_id", response.body.data.id);
+%}
+
+### 4. 葬送的芙莉莲（2023 Q4，ANIME，NORMAL）
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "葬送的芙莉莲",
+  "displayTitle": "葬送的芙莉莲",
+  "coverUrl": "https://example.com/frieren.jpg",
+  "summary": "样例：2023 Q4 新番",
+  "releaseYear": 2023,
+  "releaseQuarter": 4,
+  "category": "ANIME",
+  "studioName": "MADHOUSE",
+  "platformLink": "https://bgm.tv/subject/frieren",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("subject_frieren_id", response.body.data.id);
+%}
+
+### 5. 蓝色监狱（2024 Q2，COMIC，NORMAL）
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "蓝色监狱",
+  "displayTitle": "蓝色监狱",
+  "coverUrl": "https://example.com/bluelock-comic.jpg",
+  "summary": "样例：漫画类型作品",
+  "releaseYear": 2024,
+  "releaseQuarter": 2,
+  "category": "COMIC",
+  "studioName": "讲谈社",
+  "platformLink": "https://bgm.tv/subject/bluelock-comic",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("subject_bluelock_comic_id", response.body.data.id);
+%}
+
+### 6. 测试隐藏作品（2024 Q1，ANIME，HIDDEN）
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "测试隐藏作品",
+  "displayTitle": "测试隐藏作品",
+  "coverUrl": "https://example.com/hidden.jpg",
+  "summary": "样例：用于测试 HIDDEN 状态",
+  "releaseYear": 2024,
+  "releaseQuarter": 1,
+  "category": "ANIME",
+  "studioName": "Test Studio",
+  "platformLink": "https://bgm.tv/subject/hidden",
+  "status": "HIDDEN"
+}
+> {%
+    client.global.set("subject_hidden_id", response.body.data.id);
+%}
+
+### 7. 删除专用未引用作品（2025 Q3，NOVEL，NORMAL）
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "删除专用未引用作品",
+  "displayTitle": "删除专用未引用作品",
+  "coverUrl": "https://example.com/delete-me.jpg",
+  "summary": "样例：专门给 subject 删除成功测试使用，不会被任何记录引用",
+  "releaseYear": 2025,
+  "releaseQuarter": 3,
+  "category": "NOVEL",
+  "studioName": "Test Publisher",
+  "platformLink": "https://bgm.tv/subject/delete-me",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("subject_delete_ok_id", response.body.data.id);
+%}
+
+### ========== 创建记录样例 ==========
+
+### 8. 记录 A：2024 Q1，WATCHED，48（优秀，高分）
+POST {{baseUrl}}/api/records
+Content-Type: application/json
+
+{
+  "subjectId": {{subject_aot_p1_id}},
+  "recordStatus": "WATCHED",
+  "scoreValue": 48,
+  "recordYear": 2024,
+  "recordQuarter": 1,
+  "note": "样例记录A"
+}
+> {%
+    client.global.set("record_a_id", response.body.data.id);
+%}
+
+### 9. 记录 B：2024 Q1，WATCHED，45（优秀，高分）
+POST {{baseUrl}}/api/records
+Content-Type: application/json
+
+{
+  "subjectId": {{subject_bocchi_id}},
+  "recordStatus": "WATCHED",
+  "scoreValue": 45,
+  "recordYear": 2024,
+  "recordQuarter": 1,
+  "note": "样例记录B"
+}
+> {%
+    client.global.set("record_b_id", response.body.data.id);
+%}
+
+### 10. 记录 C：2024 Q2，WATCHED，49（优秀，高分）
+POST {{baseUrl}}/api/records
+Content-Type: application/json
+
+{
+  "subjectId": {{subject_aot_p2_id}},
+  "recordStatus": "WATCHED",
+  "scoreValue": 49,
+  "recordYear": 2024,
+  "recordQuarter": 2,
+  "note": "样例记录C"
+}
+> {%
+    client.global.set("record_c_id", response.body.data.id);
+%}
+
+### 11. 记录 D：2024 Q2，ON_HOLD，35（一般）
+POST {{baseUrl}}/api/records
+Content-Type: application/json
+
+{
+  "subjectId": {{subject_bluelock_comic_id}},
+  "recordStatus": "ON_HOLD",
+  "scoreValue": 35,
+  "recordYear": 2024,
+  "recordQuarter": 2,
+  "note": "样例记录D"
+}
+> {%
+    client.global.set("record_d_id", response.body.data.id);
+%}
+
+### 12. 记录 E：2024 Q3，WANT_TO_WATCH，null（未评分）
+POST {{baseUrl}}/api/records
+Content-Type: application/json
+
+{
+  "subjectId": {{subject_frieren_id}},
+  "recordStatus": "WANT_TO_WATCH",
+  "recordYear": 2024,
+  "recordQuarter": 3,
+  "note": "样例记录E"
+}
+> {%
+    client.global.set("record_e_id", response.body.data.id);
+%}
+
+### 13. 记录 F：2025 Q1，WATCHED，20（难看）
+POST {{baseUrl}}/api/records
+Content-Type: application/json
+
+{
+  "subjectId": {{subject_bluelock_comic_id}},
+  "recordStatus": "WATCHED",
+  "scoreValue": 20,
+  "recordYear": 2025,
+  "recordQuarter": 1,
+  "note": "样例记录F"
+}
+> {%
+    client.global.set("record_f_id", response.body.data.id);
+%}
+
+### 14. 记录 G：2025 Q4，ON_HOLD，42（优秀但不是高分45+）
+POST {{baseUrl}}/api/records
+Content-Type: application/json
+
+{
+  "subjectId": {{subject_frieren_id}},
+  "recordStatus": "ON_HOLD",
+  "scoreValue": 42,
+  "recordYear": 2025,
+  "recordQuarter": 4,
+  "note": "样例记录G"
+}
+> {%
+    client.global.set("record_g_id", response.body.data.id);
+%}
+
+### 15. 记录删除专用（后面 user-record.http 里更新/删除用）
+POST {{baseUrl}}/api/records
+Content-Type: application/json
+
+{
+  "subjectId": {{subject_frieren_id}},
+  "recordStatus": "WATCHED",
+  "scoreValue": 47,
+  "recordYear": 2025,
+  "recordQuarter": 2,
+  "note": "删除与更新专用记录"
+}
+> {%
+    client.global.set("record_temp_id", response.body.data.id);
+%}

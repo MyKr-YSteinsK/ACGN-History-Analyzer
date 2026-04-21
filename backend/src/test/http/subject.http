@@ -1,80 +1,102 @@
-### 新增一个多季多部分示例作品
-POST http://localhost:8080/api/subjects
+@baseUrl = http://localhost:8080
+
+### 说明
+# 1. 先运行 00-seed-data.http
+# 2. 如果 {{subject_xxx_id}} 变量解析失败，就重新运行 00-seed-data.http
+# 3. 本文件后半段有更新/删除这类破坏性测试，建议最后再执行
+
+### ========== 非破坏性测试：查询与筛选 ==========
+
+### 1. 查询全部作品
+GET {{baseUrl}}/api/subjects
+
+### 2. 查询 2020 年 Q4 动画作品
+GET {{baseUrl}}/api/subjects?year=2020&quarter=4&category=ANIME
+
+### 3. 查询 2021 年 Q1 动画作品
+GET {{baseUrl}}/api/subjects?year=2021&quarter=1&category=ANIME
+
+### 4. 查询 2022 年 Q4 动画作品
+GET {{baseUrl}}/api/subjects?year=2022&quarter=4&category=ANIME
+
+### 5. 查询 2024 年 Q2 漫画作品
+GET {{baseUrl}}/api/subjects?year=2024&quarter=2&category=COMIC
+
+### 6. 按关键词搜索：巨人
+GET {{baseUrl}}/api/subjects?keyword=巨人
+
+### 7. 按关键词搜索：Final
+GET {{baseUrl}}/api/subjects?keyword=Final
+
+### 8. 按类型 + 关键词搜索
+GET {{baseUrl}}/api/subjects?category=ANIME&keyword=Final
+
+### 9. 查询 NORMAL 状态作品
+GET {{baseUrl}}/api/subjects?status=NORMAL
+
+### 10. 查询 HIDDEN 状态作品
+GET {{baseUrl}}/api/subjects?status=HIDDEN
+
+### 11. 按 id 查询：孤独摇滚
+GET {{baseUrl}}/api/subjects/{{subject_bocchi_id}}
+
+### 12. 按 id 查询：芙莉莲
+GET {{baseUrl}}/api/subjects/{{subject_frieren_id}}
+
+### 13. 查询不存在的作品
+GET {{baseUrl}}/api/subjects/999999
+
+### ========== 校验失败测试 ==========
+
+### 14. 非法新增：发行季度非法
+POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 
 {
-  "titleCn": "垃圾",
-  "subtitle": "",
-  "displayTitle": "垃圾",
-  "seasonIndex": 1,
-  "partIndex": 2,
-  "coverUrl": "",
-  "summary": "",
-  "releaseYear": 2026,
-  "releaseMonth": 1,
+  "titleCn": "非法作品",
+  "displayTitle": "非法作品",
+  "releaseYear": 2024,
+  "releaseQuarter": 5,
   "category": "ANIME",
-  "studioName": "MAPPA",
-  "platformLink": "https://bgm.tv/subject/example",
   "status": "NORMAL"
 }
 
-### 新增一个不带季和部分的普通作品
-POST http://localhost:8080/api/subjects
+### 15. 非法新增：缺少展示标题
+POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 
 {
-  "titleCn": "孤独摇滚！",
-  "displayTitle": "孤独摇滚！",
-  "coverUrl": "https://example.com/bocchi.jpg",
-  "summary": "用于测试的普通单作品示例数据",
-  "releaseYear": 2022,
-  "releaseMonth": 10,
+  "titleCn": "非法作品2",
+  "releaseYear": 2024,
+  "releaseQuarter": 1,
   "category": "ANIME",
-  "studioName": "CloverWorks",
-  "platformLink": "https://bgm.tv/subject/example2",
   "status": "NORMAL"
 }
 
-### 查询全部作品
-GET http://localhost:8080/api/subjects
+### ========== 破坏性测试：更新与删除（建议最后执行） ==========
 
-### 按主类型查询作品
-GET http://localhost:8080/api/subjects?category=ANIME
-
-### 按 id 查询作品
-GET http://localhost:8080/api/subjects/1
-
-### 按 id 更新作品
-PUT http://localhost:8080/api/subjects/1
+### 16. 更新删除专用未引用作品
+PUT {{baseUrl}}/api/subjects/{{subject_delete_ok_id}}
 Content-Type: application/json
 
 {
-  "titleCn": "进击的巨人",
-  "subtitle": "The Final Season Part 2",
-  "displayTitle": "进击的巨人 The Final Season Part 2",
-  "seasonIndex": 4,
-  "partIndex": 2,
-  "coverUrl": "https://example.com/aot-final-part2.jpg",
-  "summary": "用于测试的最终季后半部分示例数据",
-  "releaseYear": 2021,
-  "releaseMonth": 1,
-  "category": "ANIME",
-  "studioName": "MAPPA",
-  "platformLink": "https://bgm.tv/subject/example-updated",
+  "titleCn": "删除专用未引用作品",
+  "subtitle": "已更新",
+  "displayTitle": "删除专用未引用作品（已更新）",
+  "releaseYear": 2025,
+  "releaseQuarter": 4,
+  "category": "NOVEL",
   "status": "NORMAL"
 }
 
-### 删除一个未被引用的作品
-DELETE http://localhost:8080/api/subjects/2
+### 17. 再次查询刚更新的作品
+GET {{baseUrl}}/api/subjects/{{subject_delete_ok_id}}
 
-### 删除一个已被引用的作品
-DELETE http://localhost:8080/api/subjects/1
+### 18. 删除一个未被引用的作品（应成功）
+DELETE {{baseUrl}}/api/subjects/{{subject_delete_ok_id}}
 
-### 按关键词搜索作品
-GET http://localhost:8080/api/subjects?keyword=巨人
+### 19. 删除后再次查询（应 4043）
+GET {{baseUrl}}/api/subjects/{{subject_delete_ok_id}}
 
-### 按关键词搜索 Final
-GET http://localhost:8080/api/subjects?keyword=Final
-
-### 按类型 + 关键词搜索
-GET http://localhost:8080/api/subjects?category=ANIME&keyword=Final
+### 20. 删除一个已被记录引用的作品（应 4092）
+DELETE {{baseUrl}}/api/subjects/{{subject_bocchi_id}}

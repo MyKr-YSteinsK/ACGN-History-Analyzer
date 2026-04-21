@@ -30,13 +30,15 @@ public class SubjectCreateRequest {
     @Size(max = 2000, message = "简介不能超过2000个字符")
     private String summary;
 
-    @Min(value = 1900, message = "首播年份不合法")
-    @Max(value = 2100, message = "首播年份不合法")
+    @NotNull(message = "发行年份不能为空")
+    @Min(value = 1900, message = "发行年份不合法")
+    @Max(value = 2100, message = "发行年份不合法")
     private Integer releaseYear;
 
-    @Min(value = 1, message = "首播月份必须在1到12之间")
-    @Max(value = 12, message = "首播月份必须在1到12之间")
-    private Integer releaseMonth;
+    @NotNull(message = "发行季度不能为空")
+    @Min(value = 1, message = "发行季度只能是1到4")
+    @Max(value = 4, message = "发行季度只能是1到4")
+    private Integer releaseQuarter;
 
     @NotBlank(message = "主类型不能为空")
     @Pattern(regexp = "ANIME|COMIC|NOVEL|GAME", message = "主类型只能是 ANIME、COMIC、NOVEL 或 GAME")
@@ -91,8 +93,8 @@ public class SubjectCreateRequest {
         return releaseYear;
     }
 
-    public Integer getReleaseMonth() {
-        return releaseMonth;
+    public Integer getReleaseQuarter() {
+        return releaseQuarter;
     }
 
     public String getCategory() {
@@ -147,8 +149,8 @@ public class SubjectCreateRequest {
         this.releaseYear = releaseYear;
     }
 
-    public void setReleaseMonth(Integer releaseMonth) {
-        this.releaseMonth = releaseMonth;
+    public void setReleaseQuarter(Integer releaseQuarter) {
+        this.releaseQuarter = releaseQuarter;
     }
 
     public void setCategory(String category) {
