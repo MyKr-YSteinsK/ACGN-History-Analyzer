@@ -8,13 +8,14 @@ public class HomeQuarterDashboardResponse {
     private Integer quarter;
     private String category;
     private String recordStatus;
+    private String keyword;
     private RecordQuarterOverviewResponse quarterOverview;
     private List<UserSubjectRecordResponse> recordList;
     private List<UserSubjectRecordResponse> highScoreRecordList;
     private List<SubjectResponse> subjectLibraryList;
 
     public HomeQuarterDashboardResponse(Integer year, Integer quarter, String category,
-                                        String recordStatus,
+                                        String recordStatus, String keyword,
                                         RecordQuarterOverviewResponse quarterOverview,
                                         List<UserSubjectRecordResponse> recordList,
                                         List<UserSubjectRecordResponse> highScoreRecordList,
@@ -23,6 +24,7 @@ public class HomeQuarterDashboardResponse {
         this.quarter = quarter;
         this.category = category;
         this.recordStatus = recordStatus;
+        this.keyword = keyword;
         this.quarterOverview = quarterOverview;
         this.recordList = recordList;
         this.highScoreRecordList = highScoreRecordList;
@@ -43,6 +45,10 @@ public class HomeQuarterDashboardResponse {
 
     public String getRecordStatus() {
         return recordStatus;
+    }
+
+    public String getKeyword() {
+        return keyword;
     }
 
     public RecordQuarterOverviewResponse getQuarterOverview() {

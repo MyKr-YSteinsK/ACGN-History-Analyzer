@@ -8,6 +8,7 @@ import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class HomeService {
@@ -22,15 +23,17 @@ public class HomeService {
     }
 
     public HomeQuarterDashboardResponse getQuarterDashboard(Integer year, Integer quarter,
-                                                            String category, String status) {
+                                                            String category, String status, String keyword) {
         String effectiveCategory = normalizeCategory(category);
         RecordStatus effectiveRecordStatus = normalizeRecordStatus(status);
+        String effectiveKeyword = normalizeKeyword(keyword);
 
         List<UserSubjectRecordResponse> allQuarterRecords =
                 userSubjectRecordService.getRecords(year, quarter, effectiveRecordStatus, null, null);
 
         List<UserSubjectRecordResponse> recordList = allQuarterRecords.stream()
                 .filter(record -> effectiveCategory.equals(record.getSubjectCategory()))
+                .filter(record -> matchesKeyword(record.getSubjectTitle(), effectiveKeyword))
                 .toList();
 
         List<UserSubjectRecordResponse> highScoreRecordList = recordList.stream()
@@ -42,13 +45,14 @@ public class HomeService {
                 buildQuarterOverview(year, quarter, recordList);
 
         List<SubjectResponse> subjectLibraryList =
-                subjectService.getSubjects(year, quarter, effectiveCategory, null, "NORMAL");
+                subjectService.getSubjects(year, quarter, effectiveCategory, effectiveKeyword, "NORMAL");
 
         return new HomeQuarterDashboardResponse(
                 year,
                 quarter,
                 effectiveCategory,
                 effectiveRecordStatus == null ? null : effectiveRecordStatus.name(),
+                effectiveKeyword,
                 quarterOverview,
                 recordList,
                 highScoreRecordList,
@@ -60,14 +64,31 @@ public class HomeService {
         if (category == null || category.isBlank()) {
             return "ANIME";
         }
-        return category.toUpperCase();
+        return category.toUpperCase(Locale.ROOT);
     }
 
     private RecordStatus normalizeRecordStatus(String status) {
         if (status == null || status.isBlank()) {
             return null;
         }
-        return RecordStatus.valueOf(status.toUpperCase());
+        return RecordStatus.valueOf(status.toUpperCase(Locale.ROOT));
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return null;
+        }
+        return keyword.trim();
+    }
+
+    private boolean matchesKeyword(String text, String keyword) {
+        if (keyword == null) {
+            return true;
+        }
+        if (text == null) {
+            return false;
+        }
+        return text.toLowerCase(Locale.ROOT).contains(keyword.toLowerCase(Locale.ROOT));
     }
 
     private RecordQuarterOverviewResponse buildQuarterOverview(Integer year, Integer quarter,
