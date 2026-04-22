@@ -137,3 +137,40 @@ DELETE {{baseUrl}}/api/records/{{record_temp_id}}
 
 ### 27. 删除后再次查询（应 4041）
 GET {{baseUrl}}/api/records/{{record_temp_id}}
+
+### =========================
+### 已记录页分页接口测试
+### =========================
+
+### 28. 默认分页查询（第一页，每页默认10条，默认按记录时间倒序）
+GET {{baseUrl}}/api/records/page
+
+### 29. 指定分页：第一页，每页2条
+GET {{baseUrl}}/api/records/page?page=0&size=2
+
+### 30. 指定分页：第二页，每页2条
+GET {{baseUrl}}/api/records/page?page=1&size=2
+
+### 31. 查询 2024 年 Q1 的动画记录
+GET {{baseUrl}}/api/records/page?year=2024&quarter=1&category=ANIME&page=0&size=10
+
+### 32. 查询 WATCHED 且 45分及以上，按评分倒序
+GET {{baseUrl}}/api/records/page?status=WATCHED&minScore=45&page=0&size=10&sort=SCORE_DESC
+
+### 33. 查询标题包含“巨人”的记录
+GET {{baseUrl}}/api/records/page?keyword=巨人&page=0&size=10
+
+### 34. 查询漫画记录，按标题升序
+GET {{baseUrl}}/api/records/page?category=COMIC&page=0&size=10&sort=TITLE_ASC
+
+### 35. 查询 2025 年记录，按记录时间升序
+GET {{baseUrl}}/api/records/page?year=2025&page=0&size=10&sort=RECORD_TIME_ASC
+
+### 36. size 边界测试：传 0（应收口到1）
+GET {{baseUrl}}/api/records/page?page=0&size=0
+
+### 37. size 边界测试：传很大（应收口到50）
+GET {{baseUrl}}/api/records/page?page=0&size=999
+
+### 38. 非法排序值（会报错，当前先观察）
+GET {{baseUrl}}/api/records/page?sort=XXX

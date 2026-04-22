@@ -7,6 +7,7 @@ import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordYearOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
+import com.mykr.acgnhistoryanalyzer.response.PageResponse;
 import com.mykr.acgnhistoryanalyzer.service.UserSubjectRecordService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -44,6 +45,27 @@ public class UserSubjectRecordController {
         List<UserSubjectRecordResponse> records =
                 userSubjectRecordService.getRecords(year, quarter, status, minScore, maxScore);
         return ApiResponse.success(records);
+    }
+
+    @GetMapping("/page")
+    public ApiResponse<PageResponse<UserSubjectRecordResponse>> getRecordPage(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer quarter,
+            @RequestParam(required = false) RecordStatus status,
+            @RequestParam(required = false) Integer minScore,
+            @RequestParam(required = false) Integer maxScore,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort
+    ) {
+        PageResponse<UserSubjectRecordResponse> response =
+                userSubjectRecordService.getRecordPage(
+                        year, quarter, status, minScore, maxScore,
+                        category, keyword, page, size, sort
+                );
+        return ApiResponse.success(response);
     }
 
     @GetMapping("/stats/score-bands")

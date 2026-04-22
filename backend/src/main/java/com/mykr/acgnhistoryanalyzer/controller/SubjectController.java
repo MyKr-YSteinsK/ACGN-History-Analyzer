@@ -3,6 +3,7 @@ package com.mykr.acgnhistoryanalyzer.controller;
 import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
+import com.mykr.acgnhistoryanalyzer.response.PageResponse;
 import com.mykr.acgnhistoryanalyzer.service.SubjectService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -36,6 +37,24 @@ public class SubjectController {
         List<SubjectResponse> subjects =
                 subjectService.getSubjects(year, quarter, category, keyword, status);
         return ApiResponse.success(subjects);
+    }
+
+    @GetMapping("/page")
+    public ApiResponse<PageResponse<SubjectResponse>> getSubjectPage(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer quarter,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort
+    ) {
+        PageResponse<SubjectResponse> response =
+                subjectService.getSubjectPage(
+                        year, quarter, category, keyword, status, page, size, sort
+                );
+        return ApiResponse.success(response);
     }
 
     @GetMapping("/{id}")

@@ -1,12 +1,17 @@
 package com.mykr.acgnhistoryanalyzer.service;
 
 import com.mykr.acgnhistoryanalyzer.common.enums.HomeLibrarySortType;
+import com.mykr.acgnhistoryanalyzer.common.enums.SubjectPageSortType;
 import com.mykr.acgnhistoryanalyzer.entity.Subject;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
+import com.mykr.acgnhistoryanalyzer.response.PageResponse;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
 import com.mykr.acgnhistoryanalyzer.specification.SubjectSpecifications;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -60,13 +65,47 @@ public class SubjectService {
                 buildSubjectSpecification(year, quarter, category, keyword, status);
 
         HomeLibrarySortType effectiveSortType = normalizeLibrarySort(sortType);
-        Sort sort = buildSubjectSort(effectiveSortType);
+        Sort sort = buildHomeSubjectSort(effectiveSortType);
 
         List<Subject> subjects = subjectRepository.findAll(specification, sort);
 
         return subjects.stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    public PageResponse<SubjectResponse> getSubjectPage(Integer year, Integer quarter,
+                                                        String category, String keyword,
+                                                        String status, Integer page,
+                                                        Integer size, String sortType) {
+        int effectivePage = normalizePage(page);
+        int effectiveSize = normalizeSize(size);
+        SubjectPageSortType effectiveSortType = normalizeSubjectPageSort(sortType);
+
+        Specification<Subject> specification =
+                buildSubjectSpecification(year, quarter, category, keyword, status);
+
+        Pageable pageable = PageRequest.of(
+                effectivePage,
+                effectiveSize,
+                buildSubjectPageSort(effectiveSortType)
+        );
+
+        Page<Subject> subjectPage = subjectRepository.findAll(specification, pageable);
+
+        List<SubjectResponse> content = subjectPage.getContent().stream()
+                .map(this::toResponse)
+                .toList();
+
+        return new PageResponse<>(
+                content,
+                subjectPage.getNumber(),
+                subjectPage.getSize(),
+                subjectPage.getTotalElements(),
+                subjectPage.getTotalPages(),
+                subjectPage.isFirst(),
+                subjectPage.isLast()
+        );
     }
 
     public SubjectResponse getSubjectById(Long id) {
@@ -117,6 +156,23 @@ public class SubjectService {
         subjectRepository.deleteById(id);
     }
 
+    private int normalizePage(Integer page) {
+        if (page == null || page < 0) {
+            return 0;
+        }
+        return page;
+    }
+
+    private int normalizeSize(Integer size) {
+        if (size == null) {
+            return 12;
+        }
+        if (size < 1) {
+            return 1;
+        }
+        return Math.min(size, 50);
+    }
+
     private HomeLibrarySortType normalizeLibrarySort(String sortType) {
         if (sortType == null || sortType.isBlank()) {
             return HomeLibrarySortType.TITLE_ASC;
@@ -124,10 +180,32 @@ public class SubjectService {
         return HomeLibrarySortType.valueOf(sortType.toUpperCase(Locale.ROOT));
     }
 
-    private Sort buildSubjectSort(HomeLibrarySortType sortType) {
+    private SubjectPageSortType normalizeSubjectPageSort(String sortType) {
+        if (sortType == null || sortType.isBlank()) {
+            return SubjectPageSortType.RELEASE_NEWEST;
+        }
+        return SubjectPageSortType.valueOf(sortType.toUpperCase(Locale.ROOT));
+    }
+
+    private Sort buildHomeSubjectSort(HomeLibrarySortType sortType) {
         return switch (sortType) {
             case TITLE_ASC -> Sort.by("displayTitle").ascending();
             case TITLE_DESC -> Sort.by("displayTitle").descending();
+            case RELEASE_NEWEST -> Sort.by("releaseYear").descending()
+                    .and(Sort.by("releaseQuarter").descending())
+                    .and(Sort.by("displayTitle").ascending());
+            case RELEASE_OLDEST -> Sort.by("releaseYear").ascending()
+                    .and(Sort.by("releaseQuarter").ascending())
+                    .and(Sort.by("displayTitle").ascending());
+        };
+    }
+
+    private Sort buildSubjectPageSort(SubjectPageSortType sortType) {
+        return switch (sortType) {
+            case TITLE_ASC -> Sort.by("displayTitle").ascending()
+                    .and(Sort.by("id").ascending());
+            case TITLE_DESC -> Sort.by("displayTitle").descending()
+                    .and(Sort.by("id").descending());
             case RELEASE_NEWEST -> Sort.by("releaseYear").descending()
                     .and(Sort.by("releaseQuarter").descending())
                     .and(Sort.by("displayTitle").ascending());

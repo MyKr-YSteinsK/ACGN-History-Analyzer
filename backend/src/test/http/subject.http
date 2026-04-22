@@ -100,3 +100,46 @@ GET {{baseUrl}}/api/subjects/{{subject_delete_ok_id}}
 
 ### 20. 删除一个已被记录引用的作品（应 4092）
 DELETE {{baseUrl}}/api/subjects/{{subject_bocchi_id}}
+
+### =========================
+### 作品库页分页接口测试
+### =========================
+
+### 21. 默认分页查询（第一页，每页默认12条，默认按发行时间新到旧）
+GET {{baseUrl}}/api/subjects/page
+
+### 22. 指定分页：第一页，每页2条
+GET {{baseUrl}}/api/subjects/page?page=0&size=2
+
+### 23. 指定分页：第二页，每页2条
+GET {{baseUrl}}/api/subjects/page?page=1&size=2
+
+### 24. 查询 2024 年 Q2 的漫画作品库
+GET {{baseUrl}}/api/subjects/page?year=2024&quarter=2&category=COMIC&page=0&size=10
+
+### 25. 查询 2022 年 Q4 的动画作品库
+GET {{baseUrl}}/api/subjects/page?year=2022&quarter=4&category=ANIME&page=0&size=10
+
+### 26. 按关键词搜索：巨人
+GET {{baseUrl}}/api/subjects/page?category=ANIME&keyword=巨人&page=0&size=10
+
+### 27. 查询 NORMAL 状态作品，按标题升序
+GET {{baseUrl}}/api/subjects/page?status=NORMAL&page=0&size=10&sort=TITLE_ASC
+
+### 28. 查询作品库，按标题倒序
+GET {{baseUrl}}/api/subjects/page?page=0&size=10&sort=TITLE_DESC
+
+### 29. 查询作品库，按发行时间新到旧
+GET {{baseUrl}}/api/subjects/page?page=0&size=10&sort=RELEASE_NEWEST
+
+### 30. 查询作品库，按发行时间旧到新
+GET {{baseUrl}}/api/subjects/page?page=0&size=10&sort=RELEASE_OLDEST
+
+### 31. size 边界测试：传 0（应收口到1）
+GET {{baseUrl}}/api/subjects/page?page=0&size=0
+
+### 32. size 边界测试：传很大（应收口到50）
+GET {{baseUrl}}/api/subjects/page?page=0&size=999
+
+### 33. 非法排序值（当前先观察）
+GET {{baseUrl}}/api/subjects/page?sort=XXX

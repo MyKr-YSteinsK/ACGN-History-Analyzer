@@ -1,6 +1,7 @@
 package com.mykr.acgnhistoryanalyzer.service;
 
 import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
+import com.mykr.acgnhistoryanalyzer.common.enums.RecordPageSortType;
 import com.mykr.acgnhistoryanalyzer.entity.Subject;
 import com.mykr.acgnhistoryanalyzer.entity.UserSubjectRecord;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
@@ -10,8 +11,13 @@ import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordYearOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
+import com.mykr.acgnhistoryanalyzer.response.PageResponse;
 import com.mykr.acgnhistoryanalyzer.specification.UserSubjectRecordSpecifications;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -64,6 +70,100 @@ public class UserSubjectRecordService {
         return records.stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    public PageResponse<UserSubjectRecordResponse> getRecordPage(Integer year, Integer quarter,
+                                                                 RecordStatus status,
+                                                                 Integer minScore, Integer maxScore,
+                                                                 String category, String keyword,
+                                                                 Integer page, Integer size,
+                                                                 String sortType) {
+
+        int effectivePage = normalizePage(page);
+        int effectiveSize = normalizeSize(size);
+        RecordPageSortType effectiveSortType = normalizeRecordPageSort(sortType);
+
+        Specification<UserSubjectRecord> specification =
+                buildRecordSpecification(year, quarter, status, minScore, maxScore);
+
+        Pageable pageable = PageRequest.of(
+                effectivePage,
+                effectiveSize,
+                buildRecordPageSort(effectiveSortType)
+        );
+
+        Page<UserSubjectRecord> recordPage = userSubjectRecordRepository.findAll(specification, pageable);
+
+        List<UserSubjectRecordResponse> content = recordPage.getContent().stream()
+                .map(this::toResponse)
+                .filter(record -> category == null || category.isBlank()
+                        || category.equalsIgnoreCase(record.getSubjectCategory()))
+                .filter(record -> keyword == null || keyword.isBlank()
+                        || matchesKeyword(record.getSubjectTitle(), keyword))
+                .toList();
+
+        return new PageResponse<>(
+                content,
+                recordPage.getNumber(),
+                recordPage.getSize(),
+                recordPage.getTotalElements(),
+                recordPage.getTotalPages(),
+                recordPage.isFirst(),
+                recordPage.isLast()
+        );
+    }
+
+    private int normalizePage(Integer page) {
+        if (page == null || page < 0) {
+            return 0;
+        }
+        return page;
+    }
+
+    private int normalizeSize(Integer size) {
+        if (size == null) {
+            return 10;
+        }
+        if (size < 1) {
+            return 1;
+        }
+        return Math.min(size, 50);
+    }
+
+    private RecordPageSortType normalizeRecordPageSort(String sortType) {
+        if (sortType == null || sortType.isBlank()) {
+            return RecordPageSortType.RECORD_TIME_DESC;
+        }
+        return RecordPageSortType.valueOf(sortType.toUpperCase());
+    }
+
+    private Sort buildRecordPageSort(RecordPageSortType sortType) {
+        return switch (sortType) {
+            case RECORD_TIME_DESC -> Sort.by("recordYear").descending()
+                    .and(Sort.by("recordQuarter").descending())
+                    .and(Sort.by("id").descending());
+            case RECORD_TIME_ASC -> Sort.by("recordYear").ascending()
+                    .and(Sort.by("recordQuarter").ascending())
+                    .and(Sort.by("id").ascending());
+            case SCORE_DESC -> Sort.by("scoreValue").descending()
+                    .and(Sort.by("id").descending());
+            case SCORE_ASC -> Sort.by("scoreValue").ascending()
+                    .and(Sort.by("id").ascending());
+            case TITLE_ASC -> Sort.by("subjectTitle").ascending()
+                    .and(Sort.by("id").ascending());
+            case TITLE_DESC -> Sort.by("subjectTitle").descending()
+                    .and(Sort.by("id").descending());
+        };
+    }
+
+    private boolean matchesKeyword(String text, String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return true;
+        }
+        if (text == null) {
+            return false;
+        }
+        return text.toLowerCase().contains(keyword.toLowerCase());
     }
 
     public RecordScoreBandStatsResponse getScoreBandStats(Integer year, Integer quarter, RecordStatus status) {
