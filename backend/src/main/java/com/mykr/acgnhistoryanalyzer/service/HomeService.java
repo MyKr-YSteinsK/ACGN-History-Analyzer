@@ -1,9 +1,14 @@
 package com.mykr.acgnhistoryanalyzer.service;
 
+import com.mykr.acgnhistoryanalyzer.common.enums.HomeLibrarySortType;
 import com.mykr.acgnhistoryanalyzer.common.enums.HomeRecordSortType;
 import com.mykr.acgnhistoryanalyzer.common.enums.HomeSearchScope;
 import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
-import com.mykr.acgnhistoryanalyzer.response.*;
+import com.mykr.acgnhistoryanalyzer.response.HomeQuarterDashboardResponse;
+import com.mykr.acgnhistoryanalyzer.response.HomeSearchResponse;
+import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
+import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -24,11 +29,13 @@ public class HomeService {
 
     public HomeQuarterDashboardResponse getQuarterDashboard(Integer year, Integer quarter,
                                                             String category, String status,
-                                                            String keyword, String recordSort) {
+                                                            String keyword, String recordSort,
+                                                            String librarySort) {
         String effectiveCategory = normalizeCategory(category);
         RecordStatus effectiveRecordStatus = normalizeRecordStatus(status);
         String effectiveKeyword = normalizeKeyword(keyword);
         HomeRecordSortType effectiveRecordSort = normalizeRecordSort(recordSort);
+        HomeLibrarySortType effectiveLibrarySort = normalizeLibrarySort(librarySort);
 
         List<UserSubjectRecordResponse> allQuarterRecords =
                 userSubjectRecordService.getRecords(year, quarter, null, null, null);
@@ -57,7 +64,14 @@ public class HomeService {
                 buildQuarterOverview(year, quarter, filteredRecordList);
 
         List<SubjectResponse> subjectLibraryList =
-                subjectService.getSubjects(year, quarter, effectiveCategory, effectiveKeyword, "NORMAL");
+                subjectService.getSubjects(
+                        year,
+                        quarter,
+                        effectiveCategory,
+                        effectiveKeyword,
+                        "NORMAL",
+                        effectiveLibrarySort.name()
+                );
 
         return new HomeQuarterDashboardResponse(
                 year,
@@ -66,6 +80,7 @@ public class HomeService {
                 effectiveRecordStatus == null ? null : effectiveRecordStatus.name(),
                 effectiveKeyword,
                 effectiveRecordSort.name(),
+                effectiveLibrarySort.name(),
                 baseQuarterOverview,
                 viewQuarterOverview,
                 recordList,
@@ -141,6 +156,13 @@ public class HomeService {
             return HomeRecordSortType.TITLE_ASC;
         }
         return HomeRecordSortType.valueOf(recordSort.toUpperCase(Locale.ROOT));
+    }
+
+    private HomeLibrarySortType normalizeLibrarySort(String librarySort) {
+        if (librarySort == null || librarySort.isBlank()) {
+            return HomeLibrarySortType.TITLE_ASC;
+        }
+        return HomeLibrarySortType.valueOf(librarySort.toUpperCase(Locale.ROOT));
     }
 
     private HomeSearchScope normalizeSearchScope(HomeSearchScope scope) {

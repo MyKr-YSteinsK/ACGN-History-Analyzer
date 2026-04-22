@@ -27,10 +27,11 @@ public class HomeController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String recordSort
+            @RequestParam(required = false) String recordSort,
+            @RequestParam(required = false) String librarySort
     ) {
         HomeQuarterDashboardResponse dashboard =
-                homeService.getQuarterDashboard(year, quarter, category, status, keyword, recordSort);
+                homeService.getQuarterDashboard(year, quarter, category, status, keyword, recordSort, librarySort);
         return ApiResponse.success(dashboard);
     }
 

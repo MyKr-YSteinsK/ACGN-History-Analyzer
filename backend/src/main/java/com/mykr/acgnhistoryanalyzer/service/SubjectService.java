@@ -1,15 +1,18 @@
 package com.mykr.acgnhistoryanalyzer.service;
 
+import com.mykr.acgnhistoryanalyzer.common.enums.HomeLibrarySortType;
 import com.mykr.acgnhistoryanalyzer.entity.Subject;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
 import com.mykr.acgnhistoryanalyzer.specification.SubjectSpecifications;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class SubjectService {
@@ -47,10 +50,19 @@ public class SubjectService {
 
     public List<SubjectResponse> getSubjects(Integer year, Integer quarter,
                                              String category, String keyword, String status) {
+        return getSubjects(year, quarter, category, keyword, status, null);
+    }
+
+    public List<SubjectResponse> getSubjects(Integer year, Integer quarter,
+                                             String category, String keyword,
+                                             String status, String sortType) {
         Specification<Subject> specification =
                 buildSubjectSpecification(year, quarter, category, keyword, status);
 
-        List<Subject> subjects = subjectRepository.findAll(specification);
+        HomeLibrarySortType effectiveSortType = normalizeLibrarySort(sortType);
+        Sort sort = buildSubjectSort(effectiveSortType);
+
+        List<Subject> subjects = subjectRepository.findAll(specification, sort);
 
         return subjects.stream()
                 .map(this::toResponse)
@@ -103,6 +115,26 @@ public class SubjectService {
 
     public void deleteSubject(Long id) {
         subjectRepository.deleteById(id);
+    }
+
+    private HomeLibrarySortType normalizeLibrarySort(String sortType) {
+        if (sortType == null || sortType.isBlank()) {
+            return HomeLibrarySortType.TITLE_ASC;
+        }
+        return HomeLibrarySortType.valueOf(sortType.toUpperCase(Locale.ROOT));
+    }
+
+    private Sort buildSubjectSort(HomeLibrarySortType sortType) {
+        return switch (sortType) {
+            case TITLE_ASC -> Sort.by("displayTitle").ascending();
+            case TITLE_DESC -> Sort.by("displayTitle").descending();
+            case RELEASE_NEWEST -> Sort.by("releaseYear").descending()
+                    .and(Sort.by("releaseQuarter").descending())
+                    .and(Sort.by("displayTitle").ascending());
+            case RELEASE_OLDEST -> Sort.by("releaseYear").ascending()
+                    .and(Sort.by("releaseQuarter").ascending())
+                    .and(Sort.by("displayTitle").ascending());
+        };
     }
 
     private Specification<Subject> buildSubjectSpecification(Integer year, Integer quarter,
