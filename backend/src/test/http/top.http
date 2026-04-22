@@ -1,0 +1,29 @@
+@baseUrl = http://localhost:8080
+
+### 说明
+# 1. 先运行 00-seed-data.http
+# 2. 这个文件专门测试 TOP 页接口
+# 3. year-high-score 不传 year 时，会默认取“最新记录所在的年份”
+
+### =========================
+### 年度四季度高分区
+### =========================
+
+### 1. 默认年份（取最新记录年份）
+GET {{baseUrl}}/api/top/year-high-score
+
+### 2. 查询 2024 年四季度高分区
+GET {{baseUrl}}/api/top/year-high-score?year=2024
+
+### 3. 查询 2025 年四季度高分区
+GET {{baseUrl}}/api/top/year-high-score?year=2025
+
+### 4. 查询一个理论上没数据的年份
+GET {{baseUrl}}/api/top/year-high-score?year=2030
+
+### =========================
+### 神作总榜
+### =========================
+
+### 5. 查询所有 >=48 分的作品
+GET {{baseUrl}}/api/top/masterpieces

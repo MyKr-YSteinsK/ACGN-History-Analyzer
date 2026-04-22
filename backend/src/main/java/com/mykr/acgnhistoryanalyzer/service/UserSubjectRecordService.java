@@ -113,6 +113,24 @@ public class UserSubjectRecordService {
         );
     }
 
+    public Integer getLatestRecordYear() {
+        PageRequest pageRequest = PageRequest.of(
+                0,
+                1,
+                Sort.by("recordYear").descending()
+                        .and(Sort.by("recordQuarter").descending())
+                        .and(Sort.by("id").descending())
+        );
+
+        Page<UserSubjectRecord> page = userSubjectRecordRepository.findAll(pageRequest);
+
+        if (page.isEmpty()) {
+            return null;
+        }
+
+        return page.getContent().get(0).getRecordYear();
+    }
+
     private int normalizePage(Integer page) {
         if (page == null || page < 0) {
             return 0;
