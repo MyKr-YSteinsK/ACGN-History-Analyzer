@@ -10,14 +10,16 @@ public class HomeQuarterDashboardResponse {
     private String recordStatus;
     private String keyword;
     private String recordSort;
-    private RecordQuarterOverviewResponse quarterOverview;
+    private RecordQuarterOverviewResponse baseQuarterOverview;
+    private RecordQuarterOverviewResponse viewQuarterOverview;
     private List<UserSubjectRecordResponse> recordList;
     private List<UserSubjectRecordResponse> highScoreRecordList;
     private List<SubjectResponse> subjectLibraryList;
 
     public HomeQuarterDashboardResponse(Integer year, Integer quarter, String category,
                                         String recordStatus, String keyword, String recordSort,
-                                        RecordQuarterOverviewResponse quarterOverview,
+                                        RecordQuarterOverviewResponse baseQuarterOverview,
+                                        RecordQuarterOverviewResponse viewQuarterOverview,
                                         List<UserSubjectRecordResponse> recordList,
                                         List<UserSubjectRecordResponse> highScoreRecordList,
                                         List<SubjectResponse> subjectLibraryList) {
@@ -27,7 +29,8 @@ public class HomeQuarterDashboardResponse {
         this.recordStatus = recordStatus;
         this.keyword = keyword;
         this.recordSort = recordSort;
-        this.quarterOverview = quarterOverview;
+        this.baseQuarterOverview = baseQuarterOverview;
+        this.viewQuarterOverview = viewQuarterOverview;
         this.recordList = recordList;
         this.highScoreRecordList = highScoreRecordList;
         this.subjectLibraryList = subjectLibraryList;
@@ -57,8 +60,12 @@ public class HomeQuarterDashboardResponse {
         return recordSort;
     }
 
-    public RecordQuarterOverviewResponse getQuarterOverview() {
-        return quarterOverview;
+    public RecordQuarterOverviewResponse getBaseQuarterOverview() {
+        return baseQuarterOverview;
+    }
+
+    public RecordQuarterOverviewResponse getViewQuarterOverview() {
+        return viewQuarterOverview;
     }
 
     public List<UserSubjectRecordResponse> getRecordList() {

@@ -2,72 +2,51 @@
 
 ### 说明
 # 1. 先运行 00-seed-data.http
-# 2. 这个文件专门测试首页聚合接口
-# 3. 不传 category 时，后端默认按 ANIME
-# 4. 不传 status 时，后端默认不过滤记录状态
-# 5. 不传 keyword 时，后端默认不过滤关键词
-# 6. 不传 recordSort 时，后端默认 TITLE_ASC
+# 2. 这个文件专门测试首页聚合接口和首页搜索接口
+# 3. 重点观察：
+#    - baseQuarterOverview：只受 year + quarter + category 影响
+#    - viewQuarterOverview：受 category + status + keyword 等当前筛选影响
 
-### 1. 查询 2024 年 Q1 首页季度聚合数据（默认 ANIME）
+### =========================
+### quarter-dashboard 测试
+### =========================
+
+### 1. 默认 ANIME，观察 base / view 概览是否一致
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1
 
-### 2. 查询 2024 年 Q1 首页季度聚合数据（ANIME）
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME
-
-### 3. 查询 2024 年 Q2 首页季度聚合数据（COMIC）
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=2&category=COMIC
-
-### 4. 查询 2024 年 Q1 首页季度聚合数据（ANIME + WATCHED）
+### 2. ANIME + WATCHED，观察 base 不变、view 缩小
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&status=WATCHED
 
-### 5. 查询 2024 年 Q2 首页季度聚合数据（COMIC + ON_HOLD）
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=2&category=COMIC&status=ON_HOLD
-
-### 6. 查询 2024 年 Q1 首页季度聚合数据（ANIME + keyword=巨人）
+### 3. ANIME + keyword=巨人，观察 base 不变、view 缩小
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&keyword=巨人
 
-### 7. 查询 2024 年 Q1 首页季度聚合数据（ANIME + WATCHED + keyword=巨人）
+### 4. ANIME + WATCHED + keyword=巨人，观察 view 进一步缩小
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&status=WATCHED&keyword=巨人
 
-### 8. 查询 2024 年 Q2 首页季度聚合数据（COMIC + keyword=蓝色）
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=2&category=COMIC&keyword=蓝色
+### 5. COMIC 侧首页，观察 base / view
+GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=2&category=COMIC
 
-### 9. 查询 2025 年 Q1 首页季度聚合数据（ANIME + WATCHED）
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2025&quarter=1&category=ANIME&status=WATCHED
+### 6. COMIC + ON_HOLD
+GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=2&category=COMIC&status=ON_HOLD
 
-### 10. 记录列表按标题升序
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&recordSort=TITLE_ASC
-
-### 11. 记录列表按标题降序
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&recordSort=TITLE_DESC
-
-### 12. 记录列表按评分升序
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&recordSort=SCORE_ASC
-
-### 13. 记录列表按评分降序
+### 7. ANIME + 评分降序
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&recordSort=SCORE_DESC
 
-### 14. 组合测试：ANIME + WATCHED + keyword=巨人 + SCORE_DESC
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&status=WATCHED&keyword=巨人&recordSort=SCORE_DESC
-
 ### =========================
-### 首页搜索接口测试
+### search 测试
 ### =========================
 
-### 15. 默认在全作品库搜索（LIBRARY）
+### 8. 默认全作品库搜索（LIBRARY）
 GET {{baseUrl}}/api/home/search?year=2024&quarter=1&category=ANIME&keyword=巨人
 
-### 16. 显式在全作品库搜索（LIBRARY）
-GET {{baseUrl}}/api/home/search?year=2024&quarter=1&category=ANIME&keyword=巨人&scope=LIBRARY
-
-### 17. 在已记录库搜索（RECORDED）
+### 9. 已记录库搜索（RECORDED）
 GET {{baseUrl}}/api/home/search?year=2024&quarter=1&category=ANIME&keyword=巨人&scope=RECORDED
 
-### 18. 搜索漫画侧作品库
+### 10. 漫画作品库搜索
 GET {{baseUrl}}/api/home/search?year=2024&quarter=2&category=COMIC&keyword=蓝色&scope=LIBRARY
 
-### 19. 搜索漫画侧已记录库
+### 11. 漫画已记录库搜索
 GET {{baseUrl}}/api/home/search?year=2024&quarter=2&category=COMIC&keyword=蓝色&scope=RECORDED
 
-### 20. 非法搜索：关键词为空
+### 12. 非法搜索：关键词为空
 GET {{baseUrl}}/api/home/search?year=2024&quarter=1&category=ANIME&keyword=

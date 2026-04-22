@@ -3,11 +3,7 @@ package com.mykr.acgnhistoryanalyzer.service;
 import com.mykr.acgnhistoryanalyzer.common.enums.HomeRecordSortType;
 import com.mykr.acgnhistoryanalyzer.common.enums.HomeSearchScope;
 import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
-import com.mykr.acgnhistoryanalyzer.response.HomeQuarterDashboardResponse;
-import com.mykr.acgnhistoryanalyzer.response.HomeSearchResponse;
-import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
-import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
-import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
+import com.mykr.acgnhistoryanalyzer.response.*;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -35,10 +31,15 @@ public class HomeService {
         HomeRecordSortType effectiveRecordSort = normalizeRecordSort(recordSort);
 
         List<UserSubjectRecordResponse> allQuarterRecords =
-                userSubjectRecordService.getRecords(year, quarter, effectiveRecordStatus, null, null);
+                userSubjectRecordService.getRecords(year, quarter, null, null, null);
 
-        List<UserSubjectRecordResponse> filteredRecordList = allQuarterRecords.stream()
+        List<UserSubjectRecordResponse> categoryRecordList = allQuarterRecords.stream()
                 .filter(record -> effectiveCategory.equals(record.getSubjectCategory()))
+                .toList();
+
+        List<UserSubjectRecordResponse> filteredRecordList = categoryRecordList.stream()
+                .filter(record -> effectiveRecordStatus == null
+                        || effectiveRecordStatus.name().equals(record.getRecordStatus()))
                 .filter(record -> matchesKeyword(record.getSubjectTitle(), effectiveKeyword))
                 .toList();
 
@@ -49,7 +50,10 @@ public class HomeService {
                 .sorted((a, b) -> b.getScoreValue().compareTo(a.getScoreValue()))
                 .toList();
 
-        RecordQuarterOverviewResponse quarterOverview =
+        RecordQuarterOverviewResponse baseQuarterOverview =
+                buildQuarterOverview(year, quarter, categoryRecordList);
+
+        RecordQuarterOverviewResponse viewQuarterOverview =
                 buildQuarterOverview(year, quarter, filteredRecordList);
 
         List<SubjectResponse> subjectLibraryList =
@@ -62,7 +66,8 @@ public class HomeService {
                 effectiveRecordStatus == null ? null : effectiveRecordStatus.name(),
                 effectiveKeyword,
                 effectiveRecordSort.name(),
-                quarterOverview,
+                baseQuarterOverview,
+                viewQuarterOverview,
                 recordList,
                 highScoreRecordList,
                 subjectLibraryList
