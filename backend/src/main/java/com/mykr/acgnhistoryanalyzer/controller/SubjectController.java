@@ -4,6 +4,7 @@ import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
 import com.mykr.acgnhistoryanalyzer.response.PageResponse;
+import com.mykr.acgnhistoryanalyzer.response.SubjectDetailResponse;
 import com.mykr.acgnhistoryanalyzer.service.SubjectService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -59,7 +60,7 @@ public class SubjectController {
 
     @GetMapping("/{id}")
     public ApiResponse<?> getSubjectById(@PathVariable Long id) {
-        SubjectResponse subject = subjectService.getSubjectById(id);
+        SubjectDetailResponse subject = subjectService.getSubjectDetailById(id);
 
         if (subject == null) {
             return ApiResponse.fail(4043, "作品不存在");

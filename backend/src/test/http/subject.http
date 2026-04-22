@@ -143,3 +143,19 @@ GET {{baseUrl}}/api/subjects/page?page=0&size=999
 
 ### 33. 非法排序值（当前先观察）
 GET {{baseUrl}}/api/subjects/page?sort=XXX
+
+### =========================
+### 作品详情页增强接口测试
+### =========================
+
+### 34. 查询一个已被记录过的作品详情（应返回 recorded=true 和 records 列表）
+GET {{baseUrl}}/api/subjects/{{subject_aot_p1_id}}
+
+### 35. 查询另一个已被记录过的作品详情
+GET {{baseUrl}}/api/subjects/{{subject_frieren_id}}
+
+### 36. 查询一个未被记录过的作品详情（如果该样例仍存在）
+GET {{baseUrl}}/api/subjects/{{subject_delete_ok_id}}
+
+### 37. 查询不存在的作品详情
+GET {{baseUrl}}/api/subjects/999999

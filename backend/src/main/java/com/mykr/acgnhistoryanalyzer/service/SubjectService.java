@@ -7,7 +7,9 @@ import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.PageResponse;
+import com.mykr.acgnhistoryanalyzer.response.SubjectDetailResponse;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.specification.SubjectSpecifications;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,11 +26,14 @@ public class SubjectService {
 
     private final SubjectRepository subjectRepository;
     private final UserSubjectRecordRepository userSubjectRecordRepository;
+    private final UserSubjectRecordService userSubjectRecordService;
 
     public SubjectService(SubjectRepository subjectRepository,
-                          UserSubjectRecordRepository userSubjectRecordRepository) {
+                          UserSubjectRecordRepository userSubjectRecordRepository,
+                          UserSubjectRecordService userSubjectRecordService) {
         this.subjectRepository = subjectRepository;
         this.userSubjectRecordRepository = userSubjectRecordRepository;
+        this.userSubjectRecordService = userSubjectRecordService;
     }
 
     public SubjectResponse createSubject(SubjectCreateRequest request) {
@@ -105,6 +110,37 @@ public class SubjectService {
                 subjectPage.getTotalPages(),
                 subjectPage.isFirst(),
                 subjectPage.isLast()
+        );
+    }
+
+    public SubjectDetailResponse getSubjectDetailById(Long id) {
+        Subject subject = subjectRepository.findById(id).orElse(null);
+
+        if (subject == null) {
+            return null;
+        }
+
+        List<UserSubjectRecordResponse> records = userSubjectRecordService.getRecordsBySubjectId(id);
+
+        return new SubjectDetailResponse(
+                subject.getId(),
+                subject.getTitleCn(),
+                subject.getSubtitle(),
+                subject.getDisplayTitle(),
+                subject.getSeasonIndex(),
+                subject.getPartIndex(),
+                subject.getFranchiseId(),
+                subject.getCoverUrl(),
+                subject.getSummary(),
+                subject.getReleaseYear(),
+                subject.getReleaseQuarter(),
+                subject.getCategory(),
+                subject.getStudioName(),
+                subject.getPlatformLink(),
+                subject.getStatus(),
+                !records.isEmpty(),
+                records.size(),
+                records
         );
     }
 

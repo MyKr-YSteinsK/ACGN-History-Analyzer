@@ -392,6 +392,19 @@ public class UserSubjectRecordService {
         return toResponse(record);
     }
 
+    public List<UserSubjectRecordResponse> getRecordsBySubjectId(Long subjectId) {
+        return userSubjectRecordRepository.findBySubjectId(subjectId).stream()
+                .map(this::toResponse)
+                .sorted(
+                        java.util.Comparator.comparing(UserSubjectRecordResponse::getRecordYear,
+                                        java.util.Comparator.nullsLast(Integer::compareTo))
+                                .thenComparing(UserSubjectRecordResponse::getRecordQuarter,
+                                        java.util.Comparator.nullsLast(Integer::compareTo))
+                                .reversed()
+                )
+                .toList();
+    }
+
     public UserSubjectRecordResponse updateRecord(Long id, UserSubjectRecordCreateRequest request) {
         UserSubjectRecord existingRecord = userSubjectRecordRepository.findById(id).orElse(null);
 
