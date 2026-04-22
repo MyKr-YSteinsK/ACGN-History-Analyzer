@@ -1,8 +1,10 @@
 package com.mykr.acgnhistoryanalyzer.service;
 
 import com.mykr.acgnhistoryanalyzer.common.enums.HomeRecordSortType;
+import com.mykr.acgnhistoryanalyzer.common.enums.HomeSearchScope;
 import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import com.mykr.acgnhistoryanalyzer.response.HomeQuarterDashboardResponse;
+import com.mykr.acgnhistoryanalyzer.response.HomeSearchResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
@@ -67,6 +69,47 @@ public class HomeService {
         );
     }
 
+    public HomeSearchResponse searchHomeData(Integer year, Integer quarter,
+                                             String category, String keyword, HomeSearchScope scope) {
+        String effectiveCategory = normalizeCategory(category);
+        String effectiveKeyword = normalizeKeyword(keyword);
+        HomeSearchScope effectiveScope = normalizeSearchScope(scope);
+
+        if (effectiveScope == HomeSearchScope.RECORDED) {
+            List<UserSubjectRecordResponse> recordedResults =
+                    userSubjectRecordService.getRecords(year, quarter, null, null, null).stream()
+                            .filter(record -> effectiveCategory.equals(record.getSubjectCategory()))
+                            .filter(record -> matchesKeyword(record.getSubjectTitle(), effectiveKeyword))
+                            .sorted(Comparator.comparing(
+                                    (UserSubjectRecordResponse record) -> safeLower(record.getSubjectTitle())
+                            ))
+                            .toList();
+
+            return new HomeSearchResponse(
+                    year,
+                    quarter,
+                    effectiveCategory,
+                    effectiveKeyword,
+                    effectiveScope.name(),
+                    recordedResults,
+                    List.of()
+            );
+        }
+
+        List<SubjectResponse> libraryResults =
+                subjectService.getSubjects(year, quarter, effectiveCategory, effectiveKeyword, "NORMAL");
+
+        return new HomeSearchResponse(
+                year,
+                quarter,
+                effectiveCategory,
+                effectiveKeyword,
+                effectiveScope.name(),
+                List.of(),
+                libraryResults
+        );
+    }
+
     private String normalizeCategory(String category) {
         if (category == null || category.isBlank()) {
             return "ANIME";
@@ -93,6 +136,10 @@ public class HomeService {
             return HomeRecordSortType.TITLE_ASC;
         }
         return HomeRecordSortType.valueOf(recordSort.toUpperCase(Locale.ROOT));
+    }
+
+    private HomeSearchScope normalizeSearchScope(HomeSearchScope scope) {
+        return scope == null ? HomeSearchScope.LIBRARY : scope;
     }
 
     private boolean matchesKeyword(String text, String keyword) {

@@ -49,3 +49,25 @@ GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&re
 
 ### 14. 组合测试：ANIME + WATCHED + keyword=巨人 + SCORE_DESC
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&status=WATCHED&keyword=巨人&recordSort=SCORE_DESC
+
+### =========================
+### 首页搜索接口测试
+### =========================
+
+### 15. 默认在全作品库搜索（LIBRARY）
+GET {{baseUrl}}/api/home/search?year=2024&quarter=1&category=ANIME&keyword=巨人
+
+### 16. 显式在全作品库搜索（LIBRARY）
+GET {{baseUrl}}/api/home/search?year=2024&quarter=1&category=ANIME&keyword=巨人&scope=LIBRARY
+
+### 17. 在已记录库搜索（RECORDED）
+GET {{baseUrl}}/api/home/search?year=2024&quarter=1&category=ANIME&keyword=巨人&scope=RECORDED
+
+### 18. 搜索漫画侧作品库
+GET {{baseUrl}}/api/home/search?year=2024&quarter=2&category=COMIC&keyword=蓝色&scope=LIBRARY
+
+### 19. 搜索漫画侧已记录库
+GET {{baseUrl}}/api/home/search?year=2024&quarter=2&category=COMIC&keyword=蓝色&scope=RECORDED
+
+### 20. 非法搜索：关键词为空
+GET {{baseUrl}}/api/home/search?year=2024&quarter=1&category=ANIME&keyword=
