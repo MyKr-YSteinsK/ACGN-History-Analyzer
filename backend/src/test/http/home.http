@@ -1,20 +1,13 @@
 @baseUrl = http://localhost:8080
 
 ### 使用说明
-# 1. 这个文件对“样例数据是否重复”非常敏感
-# 2. 跑之前，建议先在 Navicat 17 清库，再运行 00-seed-data.http
-# 3. 这个文件专门测试首页聚合接口和首页搜索接口
-# 4. 不传 category 时，后端默认按 ANIME
-# 5. 不传 status 时，后端默认不过滤记录状态
-# 6. 不传 keyword 时，后端默认不过滤关键词
-# 7. 不传 recordSort 时，后端默认 TITLE_ASC
-# 8. 不传 librarySort 时，后端默认 TITLE_ASC
+# 1. 先运行 00-seed-data.http
+# 2. 这个文件主要测试首页聚合和首页搜索
+# 3. 这个文件对重复 seed 很敏感，建议每次先清库
 
-### =========================
-### quarter-dashboard 测试
-### =========================
+### ========== quarter-dashboard ==========
 
-### 1. 默认 ANIME，默认排序
+### 1. 默认 ANIME
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1
 
 ### 2. ANIME + WATCHED
@@ -23,45 +16,22 @@ GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&st
 ### 3. ANIME + keyword=巨人
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&keyword=巨人
 
-### 4. ANIME + WATCHED + keyword=巨人
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&status=WATCHED&keyword=巨人
-
-### 5. COMIC 侧首页
+### 4. COMIC 首页
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=2&category=COMIC
 
-### 6. ANIME + 记录列表按评分降序
+### 5. 记录按评分降序
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&recordSort=SCORE_DESC
 
-### 7. ANIME + 作品库按标题正序
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&librarySort=TITLE_ASC
-
-### 8. ANIME + 作品库按标题倒序
+### 6. 作品库按标题倒序
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&librarySort=TITLE_DESC
 
-### 9. ANIME + 作品库按发行时间新到旧
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&librarySort=RELEASE_NEWEST
+### ========== search ==========
 
-### 10. ANIME + 作品库按发行时间旧到新
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&librarySort=RELEASE_OLDEST
-
-### 11. 组合测试：记录排序 + 作品库排序
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&status=WATCHED&keyword=巨人&recordSort=SCORE_DESC&librarySort=TITLE_ASC
-
-### =========================
-### search 测试
-### =========================
-
-### 12. 默认全作品库搜索（LIBRARY）
+### 7. 作品库搜索
 GET {{baseUrl}}/api/home/search?year=2024&quarter=1&category=ANIME&keyword=巨人
 
-### 13. 已记录库搜索（RECORDED）
+### 8. 已记录库搜索
 GET {{baseUrl}}/api/home/search?year=2024&quarter=1&category=ANIME&keyword=巨人&scope=RECORDED
 
-### 14. 漫画作品库搜索
+### 9. 漫画作品库搜索
 GET {{baseUrl}}/api/home/search?year=2024&quarter=2&category=COMIC&keyword=蓝色&scope=LIBRARY
-
-### 15. 漫画已记录库搜索
-GET {{baseUrl}}/api/home/search?year=2024&quarter=2&category=COMIC&keyword=蓝色&scope=RECORDED
-
-### 16. 非法搜索：关键词为空
-GET {{baseUrl}}/api/home/search?year=2024&quarter=1&category=ANIME&keyword=

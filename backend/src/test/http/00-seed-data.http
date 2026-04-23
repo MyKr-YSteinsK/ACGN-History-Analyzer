@@ -1,5 +1,43 @@
 @baseUrl = http://localhost:8080
-### 1. 进击的巨人 The Final Season Part 1（2020 Q4，ANIME，NORMAL）
+
+### 使用说明
+# 1. 每次完整测试前，先在 Navicat 17 清库
+# 2. 这个文件负责创建基础业务样例，包括 franchise / subject / record
+# 3. 当前已按“一作品一记录”规则整理
+
+### ========== franchise 样例 ==========
+
+### F1. 系列：进击的巨人
+POST {{baseUrl}}/api/franchises
+Content-Type: application/json
+
+{
+  "name": "Attack on Titan",
+  "nameCn": "进击的巨人",
+  "description": "样例系列：用于承接进击的巨人多季与 Part 结构",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("franchise_aot_id", response.body.data.id);
+%}
+
+### F2. 系列：蓝色监狱
+POST {{baseUrl}}/api/franchises
+Content-Type: application/json
+
+{
+  "name": "Blue Lock",
+  "nameCn": "蓝色监狱",
+  "description": "样例系列：用于承接蓝色监狱相关作品",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("franchise_bluelock_id", response.body.data.id);
+%}
+
+### ========== subject 样例 ==========
+
+### 1. 进击的巨人 The Final Season Part 1
 POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 
@@ -9,6 +47,7 @@ Content-Type: application/json
   "displayTitle": "进击的巨人 The Final Season Part 1",
   "seasonIndex": 4,
   "partIndex": 1,
+  "franchiseId": {{franchise_aot_id}},
   "coverUrl": "https://example.com/aot-final-part1.jpg",
   "summary": "样例：巨人最终季前半部分",
   "releaseYear": 2020,
@@ -22,7 +61,7 @@ Content-Type: application/json
     client.global.set("subject_aot_p1_id", response.body.data.id);
 %}
 
-### 2. 进击的巨人 The Final Season Part 2（2021 Q1，ANIME，NORMAL）
+### 2. 进击的巨人 The Final Season Part 2
 POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 
@@ -32,6 +71,7 @@ Content-Type: application/json
   "displayTitle": "进击的巨人 The Final Season Part 2",
   "seasonIndex": 4,
   "partIndex": 2,
+  "franchiseId": {{franchise_aot_id}},
   "coverUrl": "https://example.com/aot-final-part2.jpg",
   "summary": "样例：巨人最终季后半部分",
   "releaseYear": 2021,
@@ -45,7 +85,7 @@ Content-Type: application/json
     client.global.set("subject_aot_p2_id", response.body.data.id);
 %}
 
-### 3. 孤独摇滚！（2022 Q4，ANIME，NORMAL）
+### 3. 孤独摇滚！
 POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 
@@ -65,7 +105,7 @@ Content-Type: application/json
     client.global.set("subject_bocchi_id", response.body.data.id);
 %}
 
-### 4. 葬送的芙莉莲（2023 Q4，ANIME，NORMAL）
+### 4. 葬送的芙莉莲
 POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 
@@ -85,13 +125,14 @@ Content-Type: application/json
     client.global.set("subject_frieren_id", response.body.data.id);
 %}
 
-### 5. 蓝色监狱（2024 Q2，COMIC，NORMAL）
+### 5. 蓝色监狱
 POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 
 {
   "titleCn": "蓝色监狱",
   "displayTitle": "蓝色监狱",
+  "franchiseId": {{franchise_bluelock_id}},
   "coverUrl": "https://example.com/bluelock-comic.jpg",
   "summary": "样例：漫画类型作品",
   "releaseYear": 2024,
@@ -105,7 +146,47 @@ Content-Type: application/json
     client.global.set("subject_bluelock_comic_id", response.body.data.id);
 %}
 
-### 6. 测试隐藏作品（2024 Q1，ANIME，HIDDEN）
+### 6. 测试低分作品
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "测试低分作品",
+  "displayTitle": "测试低分作品",
+  "coverUrl": "https://example.com/bad-sample.jpg",
+  "summary": "样例：用于难看分段统计",
+  "releaseYear": 2025,
+  "releaseQuarter": 1,
+  "category": "COMIC",
+  "studioName": "Test Publisher",
+  "platformLink": "https://example.com/bad-sample",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("subject_bad_sample_id", response.body.data.id);
+%}
+
+### 7. 测试42分作品
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "测试42分作品",
+  "displayTitle": "测试42分作品",
+  "coverUrl": "https://example.com/score42-sample.jpg",
+  "summary": "样例：用于 42 分优秀区间统计",
+  "releaseYear": 2025,
+  "releaseQuarter": 4,
+  "category": "ANIME",
+  "studioName": "Test Studio",
+  "platformLink": "https://example.com/score42-sample",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("subject_score42_sample_id", response.body.data.id);
+%}
+
+### 8. 测试隐藏作品
 POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 
@@ -125,10 +206,9 @@ Content-Type: application/json
     client.global.set("subject_hidden_id", response.body.data.id);
 %}
 
+### ========== 记录样例（一作品一记录） ==========
 
-### ========== 创建记录样例 ==========
-
-### 8. 记录 A：2024 Q1，WATCHED，48（优秀，高分）
+### A. 2024 Q1，WATCHED，48
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -144,7 +224,7 @@ Content-Type: application/json
     client.global.set("record_a_id", response.body.data.id);
 %}
 
-### 9. 记录 B：2024 Q1，WATCHED，45（优秀，高分）
+### B. 2024 Q1，WATCHED，45
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -160,7 +240,7 @@ Content-Type: application/json
     client.global.set("record_b_id", response.body.data.id);
 %}
 
-### 10. 记录 C：2024 Q2，WATCHED，49（优秀，高分）
+### C. 2024 Q2，WATCHED，49
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -176,7 +256,7 @@ Content-Type: application/json
     client.global.set("record_c_id", response.body.data.id);
 %}
 
-### 11. 记录 D：2024 Q2，ON_HOLD，35（一般）
+### D. 2024 Q2，ON_HOLD，35
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -192,7 +272,7 @@ Content-Type: application/json
     client.global.set("record_d_id", response.body.data.id);
 %}
 
-### 12. 记录 E：2024 Q3，WANT_TO_WATCH，null（未评分）
+### E. 2024 Q3，WANT_TO_WATCH，未评分
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -207,12 +287,12 @@ Content-Type: application/json
     client.global.set("record_e_id", response.body.data.id);
 %}
 
-### 13. 记录 F：2025 Q1，WATCHED，20（难看）
+### F. 2025 Q1，WATCHED，20
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
 {
-  "subjectId": {{subject_bluelock_comic_id}},
+  "subjectId": {{subject_bad_sample_id}},
   "recordStatus": "WATCHED",
   "scoreValue": 20,
   "recordYear": 2025,
@@ -223,12 +303,12 @@ Content-Type: application/json
     client.global.set("record_f_id", response.body.data.id);
 %}
 
-### 14. 记录 G：2025 Q4，ON_HOLD，42（优秀但不是高分45+）
+### G. 2025 Q4，ON_HOLD，42
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
 {
-  "subjectId": {{subject_frieren_id}},
+  "subjectId": {{subject_score42_sample_id}},
   "recordStatus": "ON_HOLD",
   "scoreValue": 42,
   "recordYear": 2025,

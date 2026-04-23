@@ -1,88 +1,82 @@
 @baseUrl = http://localhost:8080
 
 ### 使用说明
-# 1. 建议先在 Navicat 17 清库
-# 2. 再运行 00-seed-data.http
-# 3. 本文件测试 franchise 模块以及 subject 与 franchise 的关联关系
+# 1. 推荐先清库，再运行 00-seed-data.http
+# 2. 第一部分验证 seed 中已有 franchise
+# 3. 第二部分做临时 franchise 的更新/删除测试
 
-### 1. 创建系列：进击的巨人
+### ========== 第一部分：验证 seed 中已有 franchise ==========
+
+### 1. 查询 franchise 列表
+GET {{baseUrl}}/api/franchises
+
+### 2. 查询 seed 中的进击的巨人系列详情
+GET {{baseUrl}}/api/franchises/{{franchise_aot_id}}
+
+### 3. 查询 AOT Part 1 作品详情（应返回 franchise）
+GET {{baseUrl}}/api/subjects/{{subject_aot_p1_id}}
+
+### 4. 查询 AOT Part 2 作品详情（应返回 franchise）
+GET {{baseUrl}}/api/subjects/{{subject_aot_p2_id}}
+
+### ========== 第二部分：临时 franchise 更新与删除 ==========
+
+### 5. 创建临时系列
 POST {{baseUrl}}/api/franchises
 Content-Type: application/json
 
 {
-  "name": "Attack on Titan",
-  "nameCn": "进击的巨人",
-  "description": "测试系列：进击的巨人",
+  "name": "Temp Franchise",
+  "nameCn": "临时系列",
+  "description": "franchise.http 临时测试系列",
   "status": "NORMAL"
 }
 > {%
-    client.global.set("franchise_aot_id", response.body.data.id);
+    client.global.set("franchise_temp_id", response.body.data.id);
 %}
 
-### 2. 查询系列列表
-GET {{baseUrl}}/api/franchises
+### 6. 查询临时系列详情
+GET {{baseUrl}}/api/franchises/{{franchise_temp_id}}
 
-### 3. 查询系列详情（此时还没有关联作品）
-GET {{baseUrl}}/api/franchises/{{franchise_aot_id}}
-
-### 4. 创建一个挂到该系列下的作品
+### 7. 创建挂到临时系列下的作品
 POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 
 {
-  "titleCn": "进击的巨人 Final Season Part 1",
-  "subtitle": "Final Season Part 1",
-  "displayTitle": "进击的巨人 Final Season Part 1",
-  "seasonIndex": 4,
-  "partIndex": 1,
-  "franchiseId": {{franchise_aot_id}},
-  "releaseYear": 2020,
+  "titleCn": "临时系列作品",
+  "subtitle": "franchise-temp-subject",
+  "displayTitle": "临时系列作品 franchise-temp-subject",
+  "franchiseId": {{franchise_temp_id}},
+  "releaseYear": 2025,
   "releaseQuarter": 4,
   "category": "ANIME",
-  "studioName": "MAPPA",
-  "platformLink": "https://bgm.tv/subject/test-aot-p1",
+  "studioName": "Temp Studio",
+  "platformLink": "https://example.com/temp-franchise-subject",
   "status": "NORMAL"
 }
 > {%
-    client.global.set("subject_aot_franchise_test_id", response.body.data.id);
+    client.global.set("subject_franchise_temp_id", response.body.data.id);
 %}
 
-### 5. 再查系列详情（应看到 subjects 列表）
-GET {{baseUrl}}/api/franchises/{{franchise_aot_id}}
+### 8. 再查临时系列详情（应看到 subjects）
+GET {{baseUrl}}/api/franchises/{{franchise_temp_id}}
 
-### 6. 查询作品详情（应看到 franchise 简要信息）
-GET {{baseUrl}}/api/subjects/{{subject_aot_franchise_test_id}}
-
-### 7. 创建作品时传不存在的 franchiseId（应 4044）
-POST {{baseUrl}}/api/subjects
+### 9. 更新临时系列
+PUT {{baseUrl}}/api/franchises/{{franchise_temp_id}}
 Content-Type: application/json
 
 {
-  "titleCn": "错误系列作品",
-  "displayTitle": "错误系列作品",
-  "franchiseId": 999999,
-  "releaseYear": 2025,
-  "releaseQuarter": 1,
-  "category": "ANIME",
+  "name": "Temp Franchise Updated",
+  "nameCn": "临时系列已更新",
+  "description": "已更新的临时系列说明",
   "status": "NORMAL"
 }
 
-### 8. 更新系列
-PUT {{baseUrl}}/api/franchises/{{franchise_aot_id}}
-Content-Type: application/json
+### 10. 删除有关联作品的临时系列（应 4093）
+DELETE {{baseUrl}}/api/franchises/{{franchise_temp_id}}
 
-{
-  "name": "Attack on Titan",
-  "nameCn": "进击的巨人系列",
-  "description": "已更新的系列说明",
-  "status": "NORMAL"
-}
+### 11. 删除临时作品
+DELETE {{baseUrl}}/api/subjects/{{subject_franchise_temp_id}}
 
-### 9. 删除有关联作品的系列（应 4093）
-DELETE {{baseUrl}}/api/franchises/{{franchise_aot_id}}
-
-### 10. 删除刚才创建的作品
-DELETE {{baseUrl}}/api/subjects/{{subject_aot_franchise_test_id}}
-
-### 11. 再删除系列（应成功）
-DELETE {{baseUrl}}/api/franchises/{{franchise_aot_id}}
+### 12. 再删除临时系列（应成功）
+DELETE {{baseUrl}}/api/franchises/{{franchise_temp_id}}
