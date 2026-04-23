@@ -1,9 +1,10 @@
 @baseUrl = http://localhost:8080
 
-### 说明
-# 1. 先运行 00-seed-data.http
-# 2. 如果 {{record_xxx_id}} / {{subject_xxx_id}} 变量解析失败，就重新运行 00-seed-data.http
-# 3. 本文件后半段有更新/删除这类破坏性测试，建议最后再执行
+### 使用说明
+# 1. 建议先在 Navicat 17 清库，再运行 00-seed-data.http
+# 2. 本文件默认依赖 seed 产生的基础样例数据
+# 3. 本文件中的更新/删除测试，会自己创建临时记录，不再依赖 seed 中的临时记录
+# 4. 不要在注释里写假的 {{变量名}}，避免自己看混
 
 ### ========== 非破坏性测试：基础查询 ==========
 
@@ -114,9 +115,25 @@ Content-Type: application/json
   "note": "评分超上限"
 }
 
-### ========== 破坏性测试：更新与删除（建议最后执行） ==========
+### ========== 破坏性测试：更新与删除（自建临时记录，不污染 seed） ==========
 
-### 24. 更新删除专用记录
+### 24. 先创建一个更新/删除专用临时记录
+POST {{baseUrl}}/api/records
+Content-Type: application/json
+
+{
+  "subjectId": {{subject_frieren_id}},
+  "recordStatus": "WATCHED",
+  "scoreValue": 47,
+  "recordYear": 2025,
+  "recordQuarter": 2,
+  "note": "user-record-http 临时记录"
+}
+> {%
+    client.global.set("record_temp_id", response.body.data.id);
+%}
+
+### 25. 更新临时记录
 PUT {{baseUrl}}/api/records/{{record_temp_id}}
 Content-Type: application/json
 
@@ -129,14 +146,15 @@ Content-Type: application/json
   "note": "删除专用记录已更新"
 }
 
-### 25. 再次查询刚更新的记录
+### 26. 再次查询刚更新的记录
 GET {{baseUrl}}/api/records/{{record_temp_id}}
 
-### 26. 删除删除专用记录
+### 27. 删除临时记录
 DELETE {{baseUrl}}/api/records/{{record_temp_id}}
 
-### 27. 删除后再次查询（应 4041）
+### 28. 删除后再次查询（应 4041）
 GET {{baseUrl}}/api/records/{{record_temp_id}}
+
 
 ### =========================
 ### 已记录页分页接口测试

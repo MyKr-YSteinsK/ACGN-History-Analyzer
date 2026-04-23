@@ -12,7 +12,7 @@ public class UserSubjectRecordCreateRequest {
     @NotNull(message = "记录状态不能为空")
     private RecordStatus recordStatus;
 
-    @Min(value = 20, message = "评分不能小于20")
+    @Min(value = 0, message = "评分不能小于0")
     @Max(value = 50, message = "评分不能大于50")
     private Integer scoreValue;
 

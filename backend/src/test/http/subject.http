@@ -1,9 +1,9 @@
 @baseUrl = http://localhost:8080
-
-### 说明
-# 1. 先运行 00-seed-data.http
-# 2. 如果 {{subject_xxx_id}} 变量解析失败，就重新运行 00-seed-data.http
-# 3. 本文件后半段有更新/删除这类破坏性测试，建议最后再执行
+### 使用说明
+# 1. 建议先在 Navicat 17 清库，再运行 00-seed-data.http
+# 2. 本文件默认依赖 seed 产生的基础样例数据
+# 3. 本文件中的更新/删除测试，会自己创建临时作品，不再依赖 seed 中的删除专用样例
+# 4. 不要在注释里写假的 {{变量名}}，避免自己看混
 
 ### ========== 非破坏性测试：查询与筛选 ==========
 
@@ -73,32 +73,52 @@ Content-Type: application/json
   "status": "NORMAL"
 }
 
-### ========== 破坏性测试：更新与删除（建议最后执行） ==========
+### ========== 破坏性测试：更新与删除（自建临时作品，不污染 seed） ==========
 
-### 16. 更新删除专用未引用作品
-PUT {{baseUrl}}/api/subjects/{{subject_delete_ok_id}}
+### 16. 创建一个更新/删除专用临时作品
+POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 
 {
-  "titleCn": "删除专用未引用作品",
+  "titleCn": "临时测试作品",
+  "subtitle": "subject-http-temp",
+  "displayTitle": "临时测试作品 subject-http-temp",
+  "releaseYear": 2025,
+  "releaseQuarter": 3,
+  "category": "NOVEL",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("subject_temp_id", response.body.data.id);
+%}
+
+### 17. 查询这个未被记录过的作品详情（应 recorded=false）
+GET {{baseUrl}}/api/subjects/{{subject_temp_id}}
+
+### 18. 更新临时作品
+PUT {{baseUrl}}/api/subjects/{{subject_temp_id}}
+Content-Type: application/json
+
+{
+  "titleCn": "临时测试作品",
   "subtitle": "已更新",
-  "displayTitle": "删除专用未引用作品（已更新）",
+  "displayTitle": "临时测试作品（已更新）",
   "releaseYear": 2025,
   "releaseQuarter": 4,
   "category": "NOVEL",
   "status": "NORMAL"
 }
 
-### 17. 再次查询刚更新的作品
-GET {{baseUrl}}/api/subjects/{{subject_delete_ok_id}}
+### 19. 再次查询刚更新的作品
+GET {{baseUrl}}/api/subjects/{{subject_temp_id}}
 
-### 18. 删除一个未被引用的作品（应成功）
-DELETE {{baseUrl}}/api/subjects/{{subject_delete_ok_id}}
+### 20. 删除临时作品（应成功）
+DELETE {{baseUrl}}/api/subjects/{{subject_temp_id}}
 
-### 19. 删除后再次查询（应 4043）
-GET {{baseUrl}}/api/subjects/{{subject_delete_ok_id}}
+### 21. 删除后再次查询（应 4043）
+GET {{baseUrl}}/api/subjects/{{subject_temp_id}}
 
-### 20. 删除一个已被记录引用的作品（应 4092）
+### 22. 删除一个已被记录引用的作品（应 4092）
 DELETE {{baseUrl}}/api/subjects/{{subject_bocchi_id}}
 
 ### =========================
@@ -153,9 +173,3 @@ GET {{baseUrl}}/api/subjects/{{subject_aot_p1_id}}
 
 ### 35. 查询另一个已被记录过的作品详情
 GET {{baseUrl}}/api/subjects/{{subject_frieren_id}}
-
-### 36. 查询一个未被记录过的作品详情（如果该样例仍存在）
-GET {{baseUrl}}/api/subjects/{{subject_delete_ok_id}}
-
-### 37. 查询不存在的作品详情
-GET {{baseUrl}}/api/subjects/999999

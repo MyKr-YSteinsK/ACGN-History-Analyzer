@@ -4,14 +4,22 @@ import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "user_subject_record")
+@Table(
+        name = "user_subject_record",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_user_subject_record_subject_id",
+                        columnNames = "subject_id"
+                )
+        }
+)
 public class UserSubjectRecord {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "subject_id")
+    @Column(name = "subject_id", nullable = false)
     private Long subjectId;
 
     @Column(name = "subject_title", nullable = false, length = 255)

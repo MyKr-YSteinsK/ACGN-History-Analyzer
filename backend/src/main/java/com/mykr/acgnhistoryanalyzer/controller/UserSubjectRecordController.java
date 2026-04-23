@@ -30,6 +30,10 @@ public class UserSubjectRecordController {
             return ApiResponse.fail(4042, "作品不存在");
         }
 
+        if (userSubjectRecordService.recordExistsBySubjectId(request.getSubjectId())) {
+            return ApiResponse.fail(4091, "该作品已有记录，请直接修改原记录");
+        }
+
         UserSubjectRecordResponse savedRecord = userSubjectRecordService.createRecord(request);
         return ApiResponse.success(savedRecord);
     }
@@ -128,6 +132,10 @@ public class UserSubjectRecordController {
     ) {
         if (!userSubjectRecordService.subjectExists(request.getSubjectId())) {
             return ApiResponse.fail(4042, "作品不存在");
+        }
+
+        if (userSubjectRecordService.recordExistsBySubjectIdExcludingCurrent(request.getSubjectId(), id)) {
+            return ApiResponse.fail(4091, "该作品已有记录，请直接修改原记录");
         }
 
         UserSubjectRecordResponse updatedRecord = userSubjectRecordService.updateRecord(id, request);

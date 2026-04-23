@@ -125,25 +125,6 @@ Content-Type: application/json
     client.global.set("subject_hidden_id", response.body.data.id);
 %}
 
-### 7. 删除专用未引用作品（2025 Q3，NOVEL，NORMAL）
-POST {{baseUrl}}/api/subjects
-Content-Type: application/json
-
-{
-  "titleCn": "删除专用未引用作品",
-  "displayTitle": "删除专用未引用作品",
-  "coverUrl": "https://example.com/delete-me.jpg",
-  "summary": "样例：专门给 subject 删除成功测试使用，不会被任何记录引用",
-  "releaseYear": 2025,
-  "releaseQuarter": 3,
-  "category": "NOVEL",
-  "studioName": "Test Publisher",
-  "platformLink": "https://bgm.tv/subject/delete-me",
-  "status": "NORMAL"
-}
-> {%
-    client.global.set("subject_delete_ok_id", response.body.data.id);
-%}
 
 ### ========== 创建记录样例 ==========
 
@@ -256,20 +237,4 @@ Content-Type: application/json
 }
 > {%
     client.global.set("record_g_id", response.body.data.id);
-%}
-
-### 15. 记录删除专用（后面 user-record.http 里更新/删除用）
-POST {{baseUrl}}/api/records
-Content-Type: application/json
-
-{
-  "subjectId": {{subject_frieren_id}},
-  "recordStatus": "WATCHED",
-  "scoreValue": 47,
-  "recordYear": 2025,
-  "recordQuarter": 2,
-  "note": "删除与更新专用记录"
-}
-> {%
-    client.global.set("record_temp_id", response.body.data.id);
 %}

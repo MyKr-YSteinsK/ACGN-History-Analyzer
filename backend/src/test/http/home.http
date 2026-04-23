@@ -1,13 +1,14 @@
 @baseUrl = http://localhost:8080
 
-### 说明
-# 1. 先运行 00-seed-data.http
-# 2. 这个文件专门测试首页聚合接口和首页搜索接口
-# 3. 不传 category 时，后端默认按 ANIME
-# 4. 不传 status 时，后端默认不过滤记录状态
-# 5. 不传 keyword 时，后端默认不过滤关键词
-# 6. 不传 recordSort 时，后端默认 TITLE_ASC
-# 7. 不传 librarySort 时，后端默认 TITLE_ASC
+### 使用说明
+# 1. 这个文件对“样例数据是否重复”非常敏感
+# 2. 跑之前，建议先在 Navicat 17 清库，再运行 00-seed-data.http
+# 3. 这个文件专门测试首页聚合接口和首页搜索接口
+# 4. 不传 category 时，后端默认按 ANIME
+# 5. 不传 status 时，后端默认不过滤记录状态
+# 6. 不传 keyword 时，后端默认不过滤关键词
+# 7. 不传 recordSort 时，后端默认 TITLE_ASC
+# 8. 不传 librarySort 时，后端默认 TITLE_ASC
 
 ### =========================
 ### quarter-dashboard 测试

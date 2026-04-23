@@ -11,5 +11,7 @@ public interface UserSubjectRecordRepository
 
     boolean existsBySubjectId(Long subjectId);
 
+    boolean existsBySubjectIdAndIdNot(Long subjectId, Long id);
+
     List<UserSubjectRecord> findBySubjectId(Long subjectId);
 }

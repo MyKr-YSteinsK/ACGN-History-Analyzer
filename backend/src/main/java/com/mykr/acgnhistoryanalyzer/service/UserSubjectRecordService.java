@@ -59,6 +59,14 @@ public class UserSubjectRecordService {
         return toResponse(savedRecord);
     }
 
+    public boolean recordExistsBySubjectId(Long subjectId) {
+        return userSubjectRecordRepository.existsBySubjectId(subjectId);
+    }
+
+    public boolean recordExistsBySubjectIdExcludingCurrent(Long subjectId, Long currentRecordId) {
+        return userSubjectRecordRepository.existsBySubjectIdAndIdNot(subjectId, currentRecordId);
+    }
+
     public List<UserSubjectRecordResponse> getRecords(Integer year, Integer quarter,
                                                       RecordStatus status, Integer minScore, Integer maxScore) {
 
@@ -204,7 +212,7 @@ public class UserSubjectRecordService {
                 excellentCount++;
             } else if (score >= 35 && score <= 41) {
                 normalCount++;
-            } else if (score >= 20 && score <= 34) {
+            } else if (score >= 0 && score <= 34) {
                 badCount++;
             }
         }
@@ -256,7 +264,7 @@ public class UserSubjectRecordService {
                     excellentCount++;
                 } else if (score >= 35 && score <= 41) {
                     normalCount++;
-                } else if (score >= 20 && score <= 34) {
+                } else if (score >= 0 && score <= 34) {
                     badCount++;
                 }
             }
@@ -328,7 +336,7 @@ public class UserSubjectRecordService {
                     excellentCount++;
                 } else if (score >= 35 && score <= 41) {
                     normalCount++;
-                } else if (score >= 20 && score <= 34) {
+                } else if (score >= 0 && score <= 34) {
                     badCount++;
                 }
             }
