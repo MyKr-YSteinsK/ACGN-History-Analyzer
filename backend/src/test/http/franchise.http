@@ -1,0 +1,88 @@
+@baseUrl = http://localhost:8080
+
+### 使用说明
+# 1. 建议先在 Navicat 17 清库
+# 2. 再运行 00-seed-data.http
+# 3. 本文件测试 franchise 模块以及 subject 与 franchise 的关联关系
+
+### 1. 创建系列：进击的巨人
+POST {{baseUrl}}/api/franchises
+Content-Type: application/json
+
+{
+  "name": "Attack on Titan",
+  "nameCn": "进击的巨人",
+  "description": "测试系列：进击的巨人",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("franchise_aot_id", response.body.data.id);
+%}
+
+### 2. 查询系列列表
+GET {{baseUrl}}/api/franchises
+
+### 3. 查询系列详情（此时还没有关联作品）
+GET {{baseUrl}}/api/franchises/{{franchise_aot_id}}
+
+### 4. 创建一个挂到该系列下的作品
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "进击的巨人 Final Season Part 1",
+  "subtitle": "Final Season Part 1",
+  "displayTitle": "进击的巨人 Final Season Part 1",
+  "seasonIndex": 4,
+  "partIndex": 1,
+  "franchiseId": {{franchise_aot_id}},
+  "releaseYear": 2020,
+  "releaseQuarter": 4,
+  "category": "ANIME",
+  "studioName": "MAPPA",
+  "platformLink": "https://bgm.tv/subject/test-aot-p1",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("subject_aot_franchise_test_id", response.body.data.id);
+%}
+
+### 5. 再查系列详情（应看到 subjects 列表）
+GET {{baseUrl}}/api/franchises/{{franchise_aot_id}}
+
+### 6. 查询作品详情（应看到 franchise 简要信息）
+GET {{baseUrl}}/api/subjects/{{subject_aot_franchise_test_id}}
+
+### 7. 创建作品时传不存在的 franchiseId（应 4044）
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "错误系列作品",
+  "displayTitle": "错误系列作品",
+  "franchiseId": 999999,
+  "releaseYear": 2025,
+  "releaseQuarter": 1,
+  "category": "ANIME",
+  "status": "NORMAL"
+}
+
+### 8. 更新系列
+PUT {{baseUrl}}/api/franchises/{{franchise_aot_id}}
+Content-Type: application/json
+
+{
+  "name": "Attack on Titan",
+  "nameCn": "进击的巨人系列",
+  "description": "已更新的系列说明",
+  "status": "NORMAL"
+}
+
+### 9. 删除有关联作品的系列（应 4093）
+DELETE {{baseUrl}}/api/franchises/{{franchise_aot_id}}
+
+### 10. 删除刚才创建的作品
+DELETE {{baseUrl}}/api/subjects/{{subject_aot_franchise_test_id}}
+
+### 11. 再删除系列（应成功）
+DELETE {{baseUrl}}/api/franchises/{{franchise_aot_id}}

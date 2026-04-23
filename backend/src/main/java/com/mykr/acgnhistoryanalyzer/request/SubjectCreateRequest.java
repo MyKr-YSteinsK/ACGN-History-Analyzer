@@ -54,6 +54,7 @@ public class SubjectCreateRequest {
     @Pattern(regexp = "NORMAL|HIDDEN", message = "状态只能是 NORMAL 或 HIDDEN")
     private String status;
 
+
     public SubjectCreateRequest() {
     }
 

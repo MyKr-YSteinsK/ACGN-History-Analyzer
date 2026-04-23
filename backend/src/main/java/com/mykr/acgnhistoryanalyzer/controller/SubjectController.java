@@ -5,6 +5,7 @@ import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
 import com.mykr.acgnhistoryanalyzer.response.PageResponse;
 import com.mykr.acgnhistoryanalyzer.response.SubjectDetailResponse;
+import com.mykr.acgnhistoryanalyzer.service.FranchiseService;
 import com.mykr.acgnhistoryanalyzer.service.SubjectService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -16,13 +17,19 @@ import java.util.List;
 public class SubjectController {
 
     private final SubjectService subjectService;
+    private final FranchiseService franchiseService;
 
-    public SubjectController(SubjectService subjectService) {
+    public SubjectController(SubjectService subjectService, FranchiseService franchiseService) {
         this.subjectService = subjectService;
+        this.franchiseService = franchiseService;
     }
-
     @PostMapping
     public ApiResponse<SubjectResponse> createSubject(@Valid @RequestBody SubjectCreateRequest request) {
+        if (request.getFranchiseId() != null
+                && !franchiseService.franchiseExists(request.getFranchiseId())) {
+            return ApiResponse.fail(4044, "系列不存在");
+        }
+
         SubjectResponse savedSubject = subjectService.createSubject(request);
         return ApiResponse.success(savedSubject);
     }
@@ -74,6 +81,11 @@ public class SubjectController {
             @PathVariable Long id,
             @Valid @RequestBody SubjectCreateRequest request
     ) {
+        if (request.getFranchiseId() != null
+                && !franchiseService.franchiseExists(request.getFranchiseId())) {
+            return ApiResponse.fail(4044, "系列不存在");
+        }
+
         SubjectResponse updatedSubject = subjectService.updateSubject(id, request);
 
         if (updatedSubject == null) {

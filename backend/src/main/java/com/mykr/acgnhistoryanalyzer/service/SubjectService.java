@@ -2,14 +2,13 @@ package com.mykr.acgnhistoryanalyzer.service;
 
 import com.mykr.acgnhistoryanalyzer.common.enums.HomeLibrarySortType;
 import com.mykr.acgnhistoryanalyzer.common.enums.SubjectPageSortType;
+import com.mykr.acgnhistoryanalyzer.entity.Franchise;
 import com.mykr.acgnhistoryanalyzer.entity.Subject;
+import com.mykr.acgnhistoryanalyzer.repository.FranchiseRepository;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
-import com.mykr.acgnhistoryanalyzer.response.PageResponse;
-import com.mykr.acgnhistoryanalyzer.response.SubjectDetailResponse;
-import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
-import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
+import com.mykr.acgnhistoryanalyzer.response.*;
 import com.mykr.acgnhistoryanalyzer.specification.SubjectSpecifications;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,13 +26,15 @@ public class SubjectService {
     private final SubjectRepository subjectRepository;
     private final UserSubjectRecordRepository userSubjectRecordRepository;
     private final UserSubjectRecordService userSubjectRecordService;
+    private final FranchiseRepository franchiseRepository;
 
     public SubjectService(SubjectRepository subjectRepository,
                           UserSubjectRecordRepository userSubjectRecordRepository,
-                          UserSubjectRecordService userSubjectRecordService) {
+                          UserSubjectRecordService userSubjectRecordService, FranchiseRepository franchiseRepository) {
         this.subjectRepository = subjectRepository;
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectRecordService = userSubjectRecordService;
+        this.franchiseRepository = franchiseRepository;
     }
 
     public SubjectResponse createSubject(SubjectCreateRequest request) {
@@ -122,6 +123,18 @@ public class SubjectService {
 
         List<UserSubjectRecordResponse> records = userSubjectRecordService.getRecordsBySubjectId(id);
 
+        FranchiseSimpleResponse franchise = null;
+        if (subject.getFranchiseId() != null) {
+            Franchise franchiseEntity = franchiseRepository.findById(subject.getFranchiseId()).orElse(null);
+            if (franchiseEntity != null) {
+                franchise = new FranchiseSimpleResponse(
+                        franchiseEntity.getId(),
+                        franchiseEntity.getName(),
+                        franchiseEntity.getNameCn()
+                );
+            }
+        }
+
         return new SubjectDetailResponse(
                 subject.getId(),
                 subject.getTitleCn(),
@@ -140,7 +153,8 @@ public class SubjectService {
                 subject.getStatus(),
                 !records.isEmpty(),
                 records.size(),
-                records
+                records,
+                franchise
         );
     }
 

@@ -23,6 +23,7 @@ public class SubjectDetailResponse {
     private boolean recorded;
     private int recordCount;
     private List<UserSubjectRecordResponse> records;
+    private FranchiseSimpleResponse franchise;
 
     public SubjectDetailResponse(Long id, String titleCn, String subtitle, String displayTitle,
                                  Integer seasonIndex, Integer partIndex, Long franchiseId,
@@ -30,7 +31,8 @@ public class SubjectDetailResponse {
                                  Integer releaseQuarter, String category, String studioName,
                                  String platformLink, String status,
                                  boolean recorded, int recordCount,
-                                 List<UserSubjectRecordResponse> records) {
+                                 List<UserSubjectRecordResponse> records,
+                                 FranchiseSimpleResponse franchise){
         this.id = id;
         this.titleCn = titleCn;
         this.subtitle = subtitle;
@@ -49,6 +51,7 @@ public class SubjectDetailResponse {
         this.recorded = recorded;
         this.recordCount = recordCount;
         this.records = records;
+        this.franchise = franchise;
     }
 
     public Long getId() {
@@ -122,4 +125,6 @@ public class SubjectDetailResponse {
     public List<UserSubjectRecordResponse> getRecords() {
         return records;
     }
+
+    public FranchiseSimpleResponse getFranchise() { return franchise; }
 }
