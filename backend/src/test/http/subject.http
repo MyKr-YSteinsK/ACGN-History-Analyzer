@@ -125,3 +125,22 @@ GET {{baseUrl}}/api/subjects/{{subject_aot_p1_id}}
 
 ### 22. 查询带 franchise 的作品详情
 GET {{baseUrl}}/api/subjects/{{subject_aot_p2_id}}
+
+### 23. 创建重复作品（应 4095）
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "进击的巨人",
+  "subtitle": "The Final Season Part 1",
+  "displayTitle": "进击的巨人 重复测试",
+  "seasonIndex": 4,
+  "partIndex": 1,
+  "franchiseId": {{franchise_aot_id}},
+  "releaseYear": 2030,
+  "releaseQuarter": 1,
+  "category": "ANIME",
+  "studioName": "MAPPA",
+  "platformLink": "https://example.com/duplicate-aot-p1",
+  "status": "NORMAL"
+}

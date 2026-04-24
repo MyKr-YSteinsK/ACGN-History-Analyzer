@@ -243,13 +243,8 @@ public class SubjectService {
                 }
             }
 
-            boolean exists = subjectRepository.existsByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(
-                    item.getDisplayTitle(),
-                    item.getReleaseYear(),
-                    item.getReleaseQuarter(),
-                    item.getCategory()
-            );
-
+            boolean exists = subjectBusinessUniqueExistsForCreate(item);
+            
             if (exists) {
                 skippedCount++;
                 items.add(new SubjectImportItemResponse(
@@ -382,6 +377,38 @@ public class SubjectService {
                 skippedCount,
                 items
         );
+    }
+
+    public boolean subjectBusinessUniqueExistsForCreate(SubjectCreateRequest request) {
+        return subjectRepository.existsByBusinessUnique(
+                normalizeTextKey(request.getTitleCn()),
+                normalizeTextKey(request.getSubtitle()),
+                normalizeNumberKey(request.getSeasonIndex()),
+                normalizeNumberKey(request.getPartIndex()),
+                normalizeTextKey(request.getCategory())
+        );
+    }
+
+    public boolean subjectBusinessUniqueExistsForUpdate(Long id, SubjectCreateRequest request) {
+        return subjectRepository.existsByBusinessUniqueAndIdNot(
+                normalizeTextKey(request.getTitleCn()),
+                normalizeTextKey(request.getSubtitle()),
+                normalizeNumberKey(request.getSeasonIndex()),
+                normalizeNumberKey(request.getPartIndex()),
+                normalizeTextKey(request.getCategory()),
+                id
+        );
+    }
+
+    private String normalizeTextKey(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return "";
+        }
+        return value.trim().toLowerCase();
+    }
+
+    private Integer normalizeNumberKey(Integer value) {
+        return value == null ? -1 : value;
     }
 
     private int normalizePage(Integer page) {

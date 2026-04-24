@@ -28,7 +28,9 @@ public class SubjectController {
                 && !franchiseService.franchiseExists(request.getFranchiseId())) {
             return ApiResponse.fail(4044, "系列不存在");
         }
-
+        if (subjectService.subjectBusinessUniqueExistsForCreate(request)) {
+            return ApiResponse.fail(4095, "作品已存在，请不要重复创建");
+        }
         SubjectResponse savedSubject = subjectService.createSubject(request);
         return ApiResponse.success(savedSubject);
     }
@@ -107,6 +109,9 @@ public class SubjectController {
             return ApiResponse.fail(4043, "作品不存在");
         }
 
+        if (subjectService.subjectBusinessUniqueExistsForUpdate(id, request)) {
+            return ApiResponse.fail(4095, "作品唯一信息重复，请修改后再保存");
+        }
         return ApiResponse.success(updatedSubject);
     }
 
