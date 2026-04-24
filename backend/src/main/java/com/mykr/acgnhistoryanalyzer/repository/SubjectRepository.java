@@ -10,4 +10,11 @@ public interface SubjectRepository
         extends JpaRepository<Subject, Long>, JpaSpecificationExecutor<Subject> {
 
     List<Subject> findByFranchiseId(Long franchiseId);
+
+    boolean existsByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(
+            String displayTitle,
+            Integer releaseYear,
+            Integer releaseQuarter,
+            String category
+    );
 }

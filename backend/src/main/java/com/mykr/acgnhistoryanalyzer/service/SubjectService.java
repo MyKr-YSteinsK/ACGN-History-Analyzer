@@ -8,6 +8,7 @@ import com.mykr.acgnhistoryanalyzer.repository.FranchiseRepository;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
+import com.mykr.acgnhistoryanalyzer.request.SubjectBatchImportRequest;
 import com.mykr.acgnhistoryanalyzer.response.*;
 import com.mykr.acgnhistoryanalyzer.specification.SubjectSpecifications;
 import org.springframework.data.domain.Page;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.ArrayList;
 
 @Service
 public class SubjectService {
@@ -204,6 +206,78 @@ public class SubjectService {
 
     public void deleteSubject(Long id) {
         subjectRepository.deleteById(id);
+    }
+
+    public SubjectImportResponse importSubjects(SubjectBatchImportRequest request) {
+        List<SubjectImportItemResponse> items = new ArrayList<>();
+
+        int importedCount = 0;
+        int skippedCount = 0;
+
+        for (SubjectCreateRequest item : request.getSubjects()) {
+            if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
+                skippedCount++;
+                items.add(new SubjectImportItemResponse(
+                        null,
+                        item.getDisplayTitle(),
+                        "SKIPPED",
+                        "系列不存在，已跳过"
+                ));
+                continue;
+            }
+
+            boolean exists = subjectRepository.existsByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(
+                    item.getDisplayTitle(),
+                    item.getReleaseYear(),
+                    item.getReleaseQuarter(),
+                    item.getCategory()
+            );
+
+            if (exists) {
+                skippedCount++;
+                items.add(new SubjectImportItemResponse(
+                        null,
+                        item.getDisplayTitle(),
+                        "SKIPPED",
+                        "作品已存在，已跳过"
+                ));
+                continue;
+            }
+
+            Subject subject = new Subject(
+                    item.getTitleCn(),
+                    item.getSubtitle(),
+                    item.getDisplayTitle(),
+                    item.getSeasonIndex(),
+                    item.getPartIndex(),
+                    item.getFranchiseId(),
+                    item.getCoverUrl(),
+                    item.getSummary(),
+                    item.getReleaseYear(),
+                    item.getReleaseQuarter(),
+                    item.getCategory(),
+                    item.getStudioName(),
+                    item.getPlatformLink(),
+                    item.getStatus()
+            );
+
+            Subject savedSubject = subjectRepository.save(subject);
+            importedCount++;
+
+            items.add(new SubjectImportItemResponse(
+                    savedSubject.getId(),
+                    savedSubject.getDisplayTitle(),
+                    "IMPORTED",
+                    "导入成功"
+            ));
+        }
+
+        return new SubjectImportResponse(
+                request.getSubjects().size(),
+                importedCount,
+                skippedCount,
+                items
+        );
     }
 
     private int normalizePage(Integer page) {
