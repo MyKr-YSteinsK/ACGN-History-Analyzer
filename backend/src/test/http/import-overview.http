@@ -1,0 +1,14 @@
+@baseUrl = http://localhost:8080
+
+### 使用说明
+# 1. 这个文件用于查看导入总览
+# 2. 不会写数据库，只返回当前导入模块的导航、步骤和规则说明
+
+### 1. 查看导入总览
+GET {{baseUrl}}/api/import/overview
+
+### 2. 查看 subject 导入模板
+GET {{baseUrl}}/api/import/templates/subject
+
+### 3. 查看 record 导入模板
+GET {{baseUrl}}/api/import/templates/record
