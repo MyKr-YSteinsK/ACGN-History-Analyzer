@@ -1,0 +1,11 @@
+@baseUrl = http://localhost:8080
+
+### 使用说明
+# 1. 这个文件用于查看导入模板和字段说明
+# 2. 不会写数据库，只是帮助你理解导入 JSON 结构
+
+### 1. 查看 subject 导入模板
+GET {{baseUrl}}/api/import/templates/subject
+
+### 2. 查看 record 导入模板
+GET {{baseUrl}}/api/import/templates/record
