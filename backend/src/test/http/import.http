@@ -26,7 +26,7 @@ Content-Type: application/json
       "titleCn": "导入测试作品B",
       "subtitle": "Import B",
       "displayTitle": "导入测试作品B Import B",
-      "franchiseId": {{franchise_aot_id}},
+      "franchiseName": "进击的巨人",
       "seasonIndex": 5,
       "partIndex": 1,
       "releaseYear": 2026,
@@ -56,6 +56,15 @@ Content-Type: application/json
       "franchiseId": 999999,
       "releaseYear": 2026,
       "releaseQuarter": 3,
+      "category": "ANIME",
+      "status": "NORMAL"
+    },
+    {
+      "titleCn": "错误系列名称作品",
+      "displayTitle": "错误系列名称作品",
+      "franchiseName": "根本不存在的系列名",
+      "releaseYear": 2026,
+      "releaseQuarter": 4,
       "category": "ANIME",
       "status": "NORMAL"
     }
@@ -83,7 +92,7 @@ Content-Type: application/json
       "titleCn": "导入测试作品B",
       "subtitle": "Import B",
       "displayTitle": "导入测试作品B Import B",
-      "franchiseId": {{franchise_aot_id}},
+      "franchiseName": "进击的巨人",
       "seasonIndex": 5,
       "partIndex": 1,
       "releaseYear": 2026,
@@ -113,6 +122,15 @@ Content-Type: application/json
       "franchiseId": 999999,
       "releaseYear": 2026,
       "releaseQuarter": 3,
+      "category": "ANIME",
+      "status": "NORMAL"
+    },
+    {
+      "titleCn": "错误系列名称作品",
+      "displayTitle": "错误系列名称作品",
+      "franchiseName": "根本不存在的系列名",
+      "releaseYear": 2026,
+      "releaseQuarter": 4,
       "category": "ANIME",
       "status": "NORMAL"
     }

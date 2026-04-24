@@ -54,7 +54,8 @@ public class SubjectCreateRequest {
     @Pattern(regexp = "NORMAL|HIDDEN", message = "状态只能是 NORMAL 或 HIDDEN")
     private String status;
 
-
+    @Size(max = 200, message = "系列名称不能超过200个字符")
+    private String franchiseName;
     public SubjectCreateRequest() {
     }
 
@@ -113,6 +114,7 @@ public class SubjectCreateRequest {
     public String getStatus() {
         return status;
     }
+    public String getFranchiseName() { return franchiseName;}
 
     public void setTitleCn(String titleCn) {
         this.titleCn = titleCn;
@@ -169,4 +171,6 @@ public class SubjectCreateRequest {
     public void setStatus(String status) {
         this.status = status;
     }
+
+    public void setFranchiseName(String franchiseName) { this.franchiseName = franchiseName;}
 }

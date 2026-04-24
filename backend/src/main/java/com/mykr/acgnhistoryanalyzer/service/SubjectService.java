@@ -215,15 +215,32 @@ public class SubjectService {
         int skippedCount = 0;
 
         for (SubjectCreateRequest item : request.getSubjects()) {
-            if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
-                skippedCount++;
-                items.add(new SubjectImportItemResponse(
-                        null,
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "系列不存在，已跳过"
-                ));
-                continue;
+            Long resolvedFranchiseId = null;
+
+            if (item.getFranchiseId() != null) {
+                if (!franchiseRepository.existsById(item.getFranchiseId())) {
+                    skippedCount++;
+                    items.add(new SubjectImportItemResponse(
+                            null,
+                            item.getDisplayTitle(),
+                            "SKIPPED",
+                            "franchiseId 对应的系列不存在，已跳过"
+                    ));
+                    continue;
+                }
+                resolvedFranchiseId = item.getFranchiseId();
+            } else if (hasText(item.getFranchiseName())) {
+                resolvedFranchiseId = resolveFranchiseIdByName(item.getFranchiseName());
+                if (resolvedFranchiseId == null) {
+                    skippedCount++;
+                    items.add(new SubjectImportItemResponse(
+                            null,
+                            item.getDisplayTitle(),
+                            "SKIPPED",
+                            "franchiseName 未匹配到已有系列，已跳过"
+                    ));
+                    continue;
+                }
             }
 
             boolean exists = subjectRepository.existsByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(
@@ -250,7 +267,7 @@ public class SubjectService {
                     item.getDisplayTitle(),
                     item.getSeasonIndex(),
                     item.getPartIndex(),
-                    item.getFranchiseId(),
+                    resolvedFranchiseId,
                     item.getCoverUrl(),
                     item.getSummary(),
                     item.getReleaseYear(),
@@ -280,6 +297,30 @@ public class SubjectService {
         );
     }
 
+    private Long resolveFranchiseIdByName(String franchiseName) {
+        if (!hasText(franchiseName)) {
+            return null;
+        }
+
+        String businessName = franchiseName.trim();
+
+        List<Franchise> matchedByCn = franchiseRepository.findAllByNormalizedNameCn(businessName);
+        if (!matchedByCn.isEmpty()) {
+            return matchedByCn.get(0).getId();
+        }
+
+        List<Franchise> matchedByName = franchiseRepository.findAllByNormalizedName(businessName);
+        if (!matchedByName.isEmpty()) {
+            return matchedByName.get(0).getId();
+        }
+
+        return null;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
     public SubjectImportPreviewResponse previewImportSubjects(SubjectBatchImportRequest request) {
         List<SubjectImportPreviewItemResponse> items = new ArrayList<>();
 
@@ -287,14 +328,27 @@ public class SubjectService {
         int skippedCount = 0;
 
         for (SubjectCreateRequest item : request.getSubjects()) {
-            if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
-                skippedCount++;
-                items.add(new SubjectImportPreviewItemResponse(
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "系列不存在，正式导入时会跳过"
-                ));
-                continue;
+            if (item.getFranchiseId() != null) {
+                if (!franchiseRepository.existsById(item.getFranchiseId())) {
+                    skippedCount++;
+                    items.add(new SubjectImportPreviewItemResponse(
+                            item.getDisplayTitle(),
+                            "SKIPPED",
+                            "franchiseId 对应的系列不存在，正式导入时会跳过"
+                    ));
+                    continue;
+                }
+            } else if (hasText(item.getFranchiseName())) {
+                Long resolvedFranchiseId = resolveFranchiseIdByName(item.getFranchiseName());
+                if (resolvedFranchiseId == null) {
+                    skippedCount++;
+                    items.add(new SubjectImportPreviewItemResponse(
+                            item.getDisplayTitle(),
+                            "SKIPPED",
+                            "franchiseName 未匹配到已有系列，正式导入时会跳过"
+                    ));
+                    continue;
+                }
             }
 
             boolean exists = subjectRepository.existsByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(

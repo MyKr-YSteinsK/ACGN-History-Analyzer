@@ -101,9 +101,9 @@ public class FranchiseService {
         boolean useChineseName = hasText(request.getNameCn());
 
         if (useChineseName) {
-            return franchiseRepository.existsByNameCnIgnoreCase(businessName);
+            return franchiseRepository.existsByNormalizedNameCn(businessName);
         }
-        return franchiseRepository.existsByNameIgnoreCase(businessName);
+        return franchiseRepository.existsByNormalizedName(businessName);
     }
 
     public boolean franchiseNameExistsForUpdate(Long id, FranchiseCreateRequest request) {
@@ -111,9 +111,9 @@ public class FranchiseService {
         boolean useChineseName = hasText(request.getNameCn());
 
         if (useChineseName) {
-            return franchiseRepository.existsByNameCnIgnoreCaseAndIdNot(businessName, id);
+            return franchiseRepository.existsByNormalizedNameCnAndIdNot(businessName, id);
         }
-        return franchiseRepository.existsByNameIgnoreCaseAndIdNot(businessName, id);
+        return franchiseRepository.existsByNormalizedNameAndIdNot(businessName, id);
     }
 
     private String extractBusinessName(String nameCn, String name) {
