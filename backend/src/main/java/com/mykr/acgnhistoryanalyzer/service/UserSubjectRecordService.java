@@ -75,9 +75,10 @@ public class UserSubjectRecordService {
 
         for (UserSubjectRecordImportItemRequest item : request.getRecords()) {
             SubjectResolveResult resolveResult = resolveSubjectForRecordImport(
-                    item.getSubjectDisplayTitle(),
-                    item.getSubjectReleaseYear(),
-                    item.getSubjectReleaseQuarter(),
+                    item.getSubjectTitleCn(),
+                    item.getSubjectSubtitle(),
+                    item.getSubjectSeasonIndex(),
+                    item.getSubjectPartIndex(),
                     item.getSubjectCategory()
             );
 
@@ -85,7 +86,7 @@ public class UserSubjectRecordService {
                 skippedCount++;
                 items.add(new UserSubjectRecordImportItemResponse(
                         null,
-                        item.getSubjectDisplayTitle(),
+                        buildSubjectLabel(item),
                         "SKIPPED",
                         resolveResult.getErrorMessage()
                 ));
@@ -97,7 +98,7 @@ public class UserSubjectRecordService {
                 skippedCount++;
                 items.add(new UserSubjectRecordImportItemResponse(
                         null,
-                        item.getSubjectDisplayTitle(),
+                        buildSubjectLabel(item),
                         "SKIPPED",
                         "作品不存在，请先导入作品库"
                 ));
@@ -108,7 +109,7 @@ public class UserSubjectRecordService {
                 skippedCount++;
                 items.add(new UserSubjectRecordImportItemResponse(
                         null,
-                        item.getSubjectDisplayTitle(),
+                        buildSubjectLabel(item),
                         "SKIPPED",
                         "该作品已有记录，已跳过"
                 ));
@@ -128,7 +129,7 @@ public class UserSubjectRecordService {
 
             items.add(new UserSubjectRecordImportItemResponse(
                     savedRecord.getId(),
-                    item.getSubjectDisplayTitle(),
+                    buildSubjectLabel(item),
                     "IMPORTED",
                     "导入成功"
             ));
@@ -150,16 +151,17 @@ public class UserSubjectRecordService {
 
         for (UserSubjectRecordImportItemRequest item : request.getRecords()) {
             SubjectResolveResult resolveResult = resolveSubjectForRecordImport(
-                    item.getSubjectDisplayTitle(),
-                    item.getSubjectReleaseYear(),
-                    item.getSubjectReleaseQuarter(),
+                    item.getSubjectTitleCn(),
+                    item.getSubjectSubtitle(),
+                    item.getSubjectSeasonIndex(),
+                    item.getSubjectPartIndex(),
                     item.getSubjectCategory()
             );
 
             if (resolveResult.hasError()) {
                 skippedCount++;
                 items.add(new UserSubjectRecordImportPreviewItemResponse(
-                        item.getSubjectDisplayTitle(),
+                        buildSubjectLabel(item),
                         "SKIPPED",
                         resolveResult.getErrorMessage()
                 ));
@@ -170,7 +172,7 @@ public class UserSubjectRecordService {
             if (userSubjectRecordRepository.existsBySubjectId(subject.getId())) {
                 skippedCount++;
                 items.add(new UserSubjectRecordImportPreviewItemResponse(
-                        item.getSubjectDisplayTitle(),
+                        buildSubjectLabel(item),
                         "SKIPPED",
                         "该作品已有记录，正式导入时会跳过"
                 ));
@@ -179,7 +181,7 @@ public class UserSubjectRecordService {
 
             canImportCount++;
             items.add(new UserSubjectRecordImportPreviewItemResponse(
-                    item.getSubjectDisplayTitle(),
+                    buildSubjectLabel(item),
                     "CAN_IMPORT",
                     "可以导入"
             ));
@@ -594,18 +596,19 @@ public class UserSubjectRecordService {
     }
 
     private SubjectResolveResult resolveSubjectForRecordImport(
-            String displayTitle,
-            Integer releaseYear,
-            Integer releaseQuarter,
+            String titleCn,
+            String subtitle,
+            Integer seasonIndex,
+            Integer partIndex,
             String category
     ) {
-        List<Subject> matchedSubjects =
-                subjectRepository.findAllByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(
-                        displayTitle,
-                        releaseYear,
-                        releaseQuarter,
-                        category
-                );
+        List<Subject> matchedSubjects = subjectRepository.findAllByBusinessUnique(
+                normalizeTextKey(titleCn),
+                normalizeTextKey(subtitle),
+                normalizeNumberKey(seasonIndex),
+                normalizeNumberKey(partIndex),
+                normalizeTextKey(category)
+        );
 
         if (matchedSubjects.isEmpty()) {
             return new SubjectResolveResult(null, "作品不存在，请先导入作品库");
@@ -616,6 +619,27 @@ public class UserSubjectRecordService {
         }
 
         return new SubjectResolveResult(matchedSubjects.get(0), null);
+    }
+
+    private String normalizeTextKey(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return "";
+        }
+        return value.trim().toLowerCase();
+    }
+
+    private Integer normalizeNumberKey(Integer value) {
+        return value == null ? -1 : value;
+    }
+
+    private String buildSubjectLabel(UserSubjectRecordImportItemRequest item) {
+        String title = item.getSubjectTitleCn() == null ? "" : item.getSubjectTitleCn().trim();
+        String subtitle = item.getSubjectSubtitle() == null ? "" : item.getSubjectSubtitle().trim();
+
+        if (!subtitle.isEmpty()) {
+            return title + " / " + subtitle;
+        }
+        return title;
     }
 
     private static class SubjectResolveResult {

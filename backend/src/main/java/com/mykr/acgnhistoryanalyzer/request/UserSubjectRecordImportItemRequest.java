@@ -5,19 +5,16 @@ import jakarta.validation.constraints.*;
 
 public class UserSubjectRecordImportItemRequest {
 
-    @NotBlank(message = "作品显示标题不能为空")
-    @Size(max = 500, message = "作品显示标题不能超过500个字符")
-    private String subjectDisplayTitle;
+    @NotBlank(message = "作品主标题不能为空")
+    @Size(max = 255, message = "作品主标题不能超过255个字符")
+    private String subjectTitleCn;
 
-    @NotNull(message = "作品发行年份不能为空")
-    @Min(value = 1900, message = "作品发行年份不合法")
-    @Max(value = 2100, message = "作品发行年份不合法")
-    private Integer subjectReleaseYear;
+    @Size(max = 255, message = "作品副标题不能超过255个字符")
+    private String subjectSubtitle;
 
-    @NotNull(message = "作品发行季度不能为空")
-    @Min(value = 1, message = "作品发行季度只能是1到4")
-    @Max(value = 4, message = "作品发行季度只能是1到4")
-    private Integer subjectReleaseQuarter;
+    private Integer subjectSeasonIndex;
+
+    private Integer subjectPartIndex;
 
     @NotBlank(message = "作品分类不能为空")
     @Size(max = 32, message = "作品分类不能超过32个字符")
@@ -45,19 +42,7 @@ public class UserSubjectRecordImportItemRequest {
 
     public UserSubjectRecordImportItemRequest() {
     }
-
-    public String getSubjectDisplayTitle() {
-        return subjectDisplayTitle;
-    }
-
-    public Integer getSubjectReleaseYear() {
-        return subjectReleaseYear;
-    }
-
-    public Integer getSubjectReleaseQuarter() {
-        return subjectReleaseQuarter;
-    }
-
+    
     public String getSubjectCategory() {
         return subjectCategory;
     }
@@ -80,18 +65,6 @@ public class UserSubjectRecordImportItemRequest {
 
     public String getNote() {
         return note;
-    }
-
-    public void setSubjectDisplayTitle(String subjectDisplayTitle) {
-        this.subjectDisplayTitle = subjectDisplayTitle;
-    }
-
-    public void setSubjectReleaseYear(Integer subjectReleaseYear) {
-        this.subjectReleaseYear = subjectReleaseYear;
-    }
-
-    public void setSubjectReleaseQuarter(Integer subjectReleaseQuarter) {
-        this.subjectReleaseQuarter = subjectReleaseQuarter;
     }
 
     public void setSubjectCategory(String subjectCategory) {
@@ -117,4 +90,37 @@ public class UserSubjectRecordImportItemRequest {
     public void setNote(String note) {
         this.note = note;
     }
+
+    public String getSubjectTitleCn() {
+        return subjectTitleCn;
+    }
+
+    public void setSubjectTitleCn(String subjectTitleCn) {
+        this.subjectTitleCn = subjectTitleCn;
+    }
+
+    public String getSubjectSubtitle() {
+        return subjectSubtitle;
+    }
+
+    public void setSubjectSubtitle(String subjectSubtitle) {
+        this.subjectSubtitle = subjectSubtitle;
+    }
+
+    public Integer getSubjectSeasonIndex() {
+        return subjectSeasonIndex;
+    }
+
+    public void setSubjectSeasonIndex(Integer subjectSeasonIndex) {
+        this.subjectSeasonIndex = subjectSeasonIndex;
+    }
+
+    public Integer getSubjectPartIndex() {
+        return subjectPartIndex;
+    }
+
+    public void setSubjectPartIndex(Integer subjectPartIndex) {
+        this.subjectPartIndex = subjectPartIndex;
+    }
+
 }

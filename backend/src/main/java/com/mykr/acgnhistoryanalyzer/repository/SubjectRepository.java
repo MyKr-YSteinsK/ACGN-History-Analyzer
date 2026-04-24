@@ -57,4 +57,20 @@ public interface SubjectRepository
                                            @Param("partIndexKey") Integer partIndexKey,
                                            @Param("categoryKey") String categoryKey,
                                            @Param("id") Long id);
+
+    @Query("""
+        select s
+        from Subject s
+        where lower(trim(coalesce(s.titleCn, ''))) = :titleCnKey
+          and lower(trim(coalesce(s.subtitle, ''))) = :subtitleKey
+          and coalesce(s.seasonIndex, -1) = :seasonIndexKey
+          and coalesce(s.partIndex, -1) = :partIndexKey
+          and lower(trim(coalesce(s.category, ''))) = :categoryKey
+        order by s.id asc
+        """)
+    List<Subject> findAllByBusinessUnique(@Param("titleCnKey") String titleCnKey,
+                                          @Param("subtitleKey") String subtitleKey,
+                                          @Param("seasonIndexKey") Integer seasonIndexKey,
+                                          @Param("partIndexKey") Integer partIndexKey,
+                                          @Param("categoryKey") String categoryKey);
 }
