@@ -1,0 +1,90 @@
+@baseUrl = http://localhost:8080
+
+### 使用说明
+# 1. 建议先运行 00-seed-data.http
+# 2. 本文件会先创建两个“无记录的新作品”，再测试批量导入记录
+
+### 1. 创建记录导入专用作品A
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "记录导入专用作品A",
+  "displayTitle": "记录导入专用作品A",
+  "releaseYear": 2026,
+  "releaseQuarter": 1,
+  "category": "ANIME",
+  "studioName": "Import Record Studio",
+  "platformLink": "https://example.com/record-import-a",
+  "status": "NORMAL"
+}
+
+### 2. 创建记录导入专用作品B
+POST {{baseUrl}}/api/subjects
+Content-Type: application/json
+
+{
+  "titleCn": "记录导入专用作品B",
+  "displayTitle": "记录导入专用作品B",
+  "releaseYear": 2026,
+  "releaseQuarter": 2,
+  "category": "COMIC",
+  "studioName": "Import Record Studio",
+  "platformLink": "https://example.com/record-import-b",
+  "status": "NORMAL"
+}
+
+### 3. 批量导入记录
+POST {{baseUrl}}/api/records/import
+Content-Type: application/json
+
+{
+  "records": [
+    {
+      "subjectDisplayTitle": "记录导入专用作品A",
+      "subjectReleaseYear": 2026,
+      "subjectReleaseQuarter": 1,
+      "subjectCategory": "ANIME",
+      "recordStatus": "WATCHED",
+      "scoreValue": 44,
+      "recordYear": 2026,
+      "recordQuarter": 1,
+      "note": "记录导入成功样例A"
+    },
+    {
+      "subjectDisplayTitle": "记录导入专用作品B",
+      "subjectReleaseYear": 2026,
+      "subjectReleaseQuarter": 2,
+      "subjectCategory": "COMIC",
+      "recordStatus": "ON_HOLD",
+      "scoreValue": 36,
+      "recordYear": 2026,
+      "recordQuarter": 2,
+      "note": "记录导入成功样例B"
+    },
+    {
+      "subjectDisplayTitle": "进击的巨人 The Final Season Part 1",
+      "subjectReleaseYear": 2020,
+      "subjectReleaseQuarter": 4,
+      "subjectCategory": "ANIME",
+      "recordStatus": "WATCHED",
+      "scoreValue": 48,
+      "recordYear": 2024,
+      "recordQuarter": 1,
+      "note": "已存在记录，应跳过"
+    },
+    {
+      "subjectDisplayTitle": "根本不存在的作品",
+      "subjectReleaseYear": 2026,
+      "subjectReleaseQuarter": 3,
+      "subjectCategory": "NOVEL",
+      "recordStatus": "WANT_TO_WATCH",
+      "recordYear": 2026,
+      "recordQuarter": 3,
+      "note": "作品不存在，应跳过"
+    }
+  ]
+}
+
+### 4. 查询 2026 年记录
+GET {{baseUrl}}/api/records?year=2026

@@ -3,11 +3,13 @@ package com.mykr.acgnhistoryanalyzer.controller;
 import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
+import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordBatchImportRequest;
 import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordYearOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.response.PageResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportResponse;
 import com.mykr.acgnhistoryanalyzer.service.UserSubjectRecordService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -36,6 +38,14 @@ public class UserSubjectRecordController {
 
         UserSubjectRecordResponse savedRecord = userSubjectRecordService.createRecord(request);
         return ApiResponse.success(savedRecord);
+    }
+
+    @PostMapping("/import")
+    public ApiResponse<UserSubjectRecordImportResponse> importRecords(
+            @Valid @RequestBody UserSubjectRecordBatchImportRequest request
+    ) {
+        UserSubjectRecordImportResponse response = userSubjectRecordService.importRecords(request);
+        return ApiResponse.success(response);
     }
 
     @GetMapping

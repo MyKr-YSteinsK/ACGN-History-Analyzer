@@ -7,11 +7,15 @@ import com.mykr.acgnhistoryanalyzer.entity.UserSubjectRecord;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
+import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordBatchImportRequest;
+import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordImportItemRequest;
 import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordYearOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.response.PageResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportItemResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportResponse;
 import com.mykr.acgnhistoryanalyzer.specification.UserSubjectRecordSpecifications;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.Page;
@@ -21,6 +25,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Optional;
 
 @Service
 public class UserSubjectRecordService {
@@ -57,6 +63,71 @@ public class UserSubjectRecordService {
 
         UserSubjectRecord savedRecord = userSubjectRecordRepository.save(record);
         return toResponse(savedRecord);
+    }
+
+    public UserSubjectRecordImportResponse importRecords(UserSubjectRecordBatchImportRequest request) {
+        List<UserSubjectRecordImportItemResponse> items = new ArrayList<>();
+
+        int importedCount = 0;
+        int skippedCount = 0;
+
+        for (UserSubjectRecordImportItemRequest item : request.getRecords()) {
+            Subject subject = subjectRepository
+                    .findByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(
+                            item.getSubjectDisplayTitle(),
+                            item.getSubjectReleaseYear(),
+                            item.getSubjectReleaseQuarter(),
+                            item.getSubjectCategory()
+                    )
+                    .orElse(null);
+
+            if (subject == null) {
+                skippedCount++;
+                items.add(new UserSubjectRecordImportItemResponse(
+                        null,
+                        item.getSubjectDisplayTitle(),
+                        "SKIPPED",
+                        "作品不存在，请先导入作品库"
+                ));
+                continue;
+            }
+
+            if (userSubjectRecordRepository.existsBySubjectId(subject.getId())) {
+                skippedCount++;
+                items.add(new UserSubjectRecordImportItemResponse(
+                        null,
+                        item.getSubjectDisplayTitle(),
+                        "SKIPPED",
+                        "该作品已有记录，已跳过"
+                ));
+                continue;
+            }
+
+            UserSubjectRecordCreateRequest createRequest = new UserSubjectRecordCreateRequest();
+            createRequest.setSubjectId(subject.getId());
+            createRequest.setRecordStatus(item.getRecordStatus());
+            createRequest.setScoreValue(item.getScoreValue());
+            createRequest.setRecordYear(item.getRecordYear());
+            createRequest.setRecordQuarter(item.getRecordQuarter());
+            createRequest.setNote(item.getNote());
+
+            UserSubjectRecordResponse savedRecord = createRecord(createRequest);
+            importedCount++;
+
+            items.add(new UserSubjectRecordImportItemResponse(
+                    savedRecord.getId(),
+                    item.getSubjectDisplayTitle(),
+                    "IMPORTED",
+                    "导入成功"
+            ));
+        }
+
+        return new UserSubjectRecordImportResponse(
+                request.getRecords().size(),
+                importedCount,
+                skippedCount,
+                items
+        );
     }
 
     public boolean recordExistsBySubjectId(Long subjectId) {
