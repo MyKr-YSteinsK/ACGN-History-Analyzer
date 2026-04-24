@@ -5,7 +5,64 @@
 # 2. 这个文件测试批量导入 subject
 # 3. 已存在作品会跳过，错误 franchiseId 也会跳过
 
-### 1. 批量导入
+### 1. 预览导入
+POST {{baseUrl}}/api/subjects/import/preview
+Content-Type: application/json
+
+{
+  "subjects": [
+    {
+      "titleCn": "导入测试作品A",
+      "subtitle": "Import A",
+      "displayTitle": "导入测试作品A Import A",
+      "releaseYear": 2026,
+      "releaseQuarter": 1,
+      "category": "ANIME",
+      "studioName": "Import Studio",
+      "platformLink": "https://example.com/import-a",
+      "status": "NORMAL"
+    },
+    {
+      "titleCn": "导入测试作品B",
+      "subtitle": "Import B",
+      "displayTitle": "导入测试作品B Import B",
+      "franchiseId": {{franchise_aot_id}},
+      "seasonIndex": 5,
+      "partIndex": 1,
+      "releaseYear": 2026,
+      "releaseQuarter": 2,
+      "category": "ANIME",
+      "studioName": "Import Studio",
+      "platformLink": "https://example.com/import-b",
+      "status": "NORMAL"
+    },
+    {
+      "titleCn": "进击的巨人",
+      "subtitle": "The Final Season Part 1",
+      "displayTitle": "进击的巨人 The Final Season Part 1",
+      "franchiseId": {{franchise_aot_id}},
+      "seasonIndex": 4,
+      "partIndex": 1,
+      "releaseYear": 2020,
+      "releaseQuarter": 4,
+      "category": "ANIME",
+      "studioName": "MAPPA",
+      "platformLink": "https://bgm.tv/subject/aot-final-part1",
+      "status": "NORMAL"
+    },
+    {
+      "titleCn": "错误系列导入作品",
+      "displayTitle": "错误系列导入作品",
+      "franchiseId": 999999,
+      "releaseYear": 2026,
+      "releaseQuarter": 3,
+      "category": "ANIME",
+      "status": "NORMAL"
+    }
+  ]
+}
+
+### 2. 批量导入
 POST {{baseUrl}}/api/subjects/import
 Content-Type: application/json
 

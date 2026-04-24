@@ -3,10 +3,7 @@ package com.mykr.acgnhistoryanalyzer.controller;
 import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
 import com.mykr.acgnhistoryanalyzer.request.SubjectBatchImportRequest;
-import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
-import com.mykr.acgnhistoryanalyzer.response.PageResponse;
-import com.mykr.acgnhistoryanalyzer.response.SubjectDetailResponse;
-import com.mykr.acgnhistoryanalyzer.response.SubjectImportResponse;
+import com.mykr.acgnhistoryanalyzer.response.*;
 import com.mykr.acgnhistoryanalyzer.service.FranchiseService;
 import com.mykr.acgnhistoryanalyzer.service.SubjectService;
 import jakarta.validation.Valid;
@@ -41,6 +38,14 @@ public class SubjectController {
             @Valid @RequestBody SubjectBatchImportRequest request
     ) {
         SubjectImportResponse response = subjectService.importSubjects(request);
+        return ApiResponse.success(response);
+    }
+
+    @PostMapping("/import/preview")
+    public ApiResponse<SubjectImportPreviewResponse> previewImportSubjects(
+            @Valid @RequestBody SubjectBatchImportRequest request
+    ) {
+        SubjectImportPreviewResponse response = subjectService.previewImportSubjects(request);
         return ApiResponse.success(response);
     }
 

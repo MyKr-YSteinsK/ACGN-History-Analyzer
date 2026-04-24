@@ -280,6 +280,56 @@ public class SubjectService {
         );
     }
 
+    public SubjectImportPreviewResponse previewImportSubjects(SubjectBatchImportRequest request) {
+        List<SubjectImportPreviewItemResponse> items = new ArrayList<>();
+
+        int canImportCount = 0;
+        int skippedCount = 0;
+
+        for (SubjectCreateRequest item : request.getSubjects()) {
+            if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
+                skippedCount++;
+                items.add(new SubjectImportPreviewItemResponse(
+                        item.getDisplayTitle(),
+                        "SKIPPED",
+                        "系列不存在，正式导入时会跳过"
+                ));
+                continue;
+            }
+
+            boolean exists = subjectRepository.existsByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(
+                    item.getDisplayTitle(),
+                    item.getReleaseYear(),
+                    item.getReleaseQuarter(),
+                    item.getCategory()
+            );
+
+            if (exists) {
+                skippedCount++;
+                items.add(new SubjectImportPreviewItemResponse(
+                        item.getDisplayTitle(),
+                        "SKIPPED",
+                        "作品已存在，正式导入时会跳过"
+                ));
+                continue;
+            }
+
+            canImportCount++;
+            items.add(new SubjectImportPreviewItemResponse(
+                    item.getDisplayTitle(),
+                    "CAN_IMPORT",
+                    "可以导入"
+            ));
+        }
+
+        return new SubjectImportPreviewResponse(
+                request.getSubjects().size(),
+                canImportCount,
+                skippedCount,
+                items
+        );
+    }
+
     private int normalizePage(Integer page) {
         if (page == null || page < 0) {
             return 0;
