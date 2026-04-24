@@ -80,3 +80,55 @@ DELETE {{baseUrl}}/api/subjects/{{subject_franchise_temp_id}}
 
 ### 12. 再删除临时系列（应成功）
 DELETE {{baseUrl}}/api/franchises/{{franchise_temp_id}}
+
+### ========== 重复系列测试 ==========
+
+### 13. 创建重复中文名系列（应 4094）
+POST {{baseUrl}}/api/franchises
+Content-Type: application/json
+
+{
+  "name": "Attack on Titan Duplicate",
+  "nameCn": "进击的巨人",
+  "description": "重复中文名测试",
+  "status": "NORMAL"
+}
+
+### 14. 创建临时系列A
+POST {{baseUrl}}/api/franchises
+Content-Type: application/json
+
+{
+  "name": "Temp Unique A",
+  "nameCn": "临时唯一系列A",
+  "description": "更新重名测试A",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("franchise_unique_a_id", response.body.data.id);
+%}
+
+### 15. 创建临时系列B
+POST {{baseUrl}}/api/franchises
+Content-Type: application/json
+
+{
+  "name": "Temp Unique B",
+  "nameCn": "临时唯一系列B",
+  "description": "更新重名测试B",
+  "status": "NORMAL"
+}
+> {%
+    client.global.set("franchise_unique_b_id", response.body.data.id);
+%}
+
+### 16. 把 B 改成和 A 同名（应 4094）
+PUT {{baseUrl}}/api/franchises/{{franchise_unique_b_id}}
+Content-Type: application/json
+
+{
+  "name": "Temp Unique B",
+  "nameCn": "临时唯一系列A",
+  "description": "更新成重复名称",
+  "status": "NORMAL"
+}

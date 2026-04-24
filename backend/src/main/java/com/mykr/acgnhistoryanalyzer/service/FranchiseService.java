@@ -27,10 +27,10 @@ public class FranchiseService {
 
     public FranchiseResponse createFranchise(FranchiseCreateRequest request) {
         Franchise franchise = new Franchise(
-                request.getName(),
-                request.getNameCn(),
-                request.getDescription(),
-                request.getStatus()
+                request.getName().trim(),
+                normalizeNullable(request.getNameCn()),
+                normalizeNullable(request.getDescription()),
+                request.getStatus().trim()
         );
 
         Franchise savedFranchise = franchiseRepository.save(franchise);
@@ -75,10 +75,10 @@ public class FranchiseService {
             return null;
         }
 
-        franchise.setName(request.getName());
-        franchise.setNameCn(request.getNameCn());
-        franchise.setDescription(request.getDescription());
-        franchise.setStatus(request.getStatus());
+        franchise.setName(request.getName().trim());
+        franchise.setNameCn(normalizeNullable(request.getNameCn()));
+        franchise.setDescription(normalizeNullable(request.getDescription()));
+        franchise.setStatus(request.getStatus().trim());
 
         Franchise updatedFranchise = franchiseRepository.save(franchise);
         return toResponse(updatedFranchise);
@@ -94,6 +94,44 @@ public class FranchiseService {
 
     public void deleteFranchise(Long id) {
         franchiseRepository.deleteById(id);
+    }
+
+    public boolean franchiseNameExistsForCreate(FranchiseCreateRequest request) {
+        String businessName = extractBusinessName(request.getNameCn(), request.getName());
+        boolean useChineseName = hasText(request.getNameCn());
+
+        if (useChineseName) {
+            return franchiseRepository.existsByNameCnIgnoreCase(businessName);
+        }
+        return franchiseRepository.existsByNameIgnoreCase(businessName);
+    }
+
+    public boolean franchiseNameExistsForUpdate(Long id, FranchiseCreateRequest request) {
+        String businessName = extractBusinessName(request.getNameCn(), request.getName());
+        boolean useChineseName = hasText(request.getNameCn());
+
+        if (useChineseName) {
+            return franchiseRepository.existsByNameCnIgnoreCaseAndIdNot(businessName, id);
+        }
+        return franchiseRepository.existsByNameIgnoreCaseAndIdNot(businessName, id);
+    }
+
+    private String extractBusinessName(String nameCn, String name) {
+        if (hasText(nameCn)) {
+            return nameCn.trim();
+        }
+        return name == null ? null : name.trim();
+    }
+
+    private String normalizeNullable(String value) {
+        if (!hasText(value)) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
     private FranchiseResponse toResponse(Franchise franchise) {

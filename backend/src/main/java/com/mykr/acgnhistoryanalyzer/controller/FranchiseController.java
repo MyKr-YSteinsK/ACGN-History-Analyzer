@@ -24,6 +24,10 @@ public class FranchiseController {
     public ApiResponse<FranchiseResponse> createFranchise(
             @Valid @RequestBody FranchiseCreateRequest request
     ) {
+        if (franchiseService.franchiseNameExistsForCreate(request)) {
+            return ApiResponse.fail(4094, "系列已存在，请直接复用已有系列");
+        }
+
         FranchiseResponse savedFranchise = franchiseService.createFranchise(request);
         return ApiResponse.success(savedFranchise);
     }
@@ -50,12 +54,15 @@ public class FranchiseController {
             @PathVariable Long id,
             @Valid @RequestBody FranchiseCreateRequest request
     ) {
-        FranchiseResponse updatedFranchise = franchiseService.updateFranchise(id, request);
-
-        if (updatedFranchise == null) {
+        if (!franchiseService.franchiseExists(id)) {
             return ApiResponse.fail(4044, "系列不存在");
         }
 
+        if (franchiseService.franchiseNameExistsForUpdate(id, request)) {
+            return ApiResponse.fail(4094, "系列名称重复，请修改后再保存");
+        }
+
+        FranchiseResponse updatedFranchise = franchiseService.updateFranchise(id, request);
         return ApiResponse.success(updatedFranchise);
     }
 
