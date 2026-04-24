@@ -10,6 +10,7 @@ import com.mykr.acgnhistoryanalyzer.response.RecordYearOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.response.PageResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportPreviewResponse;
 import com.mykr.acgnhistoryanalyzer.service.UserSubjectRecordService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -59,6 +60,14 @@ public class UserSubjectRecordController {
         List<UserSubjectRecordResponse> records =
                 userSubjectRecordService.getRecords(year, quarter, status, minScore, maxScore);
         return ApiResponse.success(records);
+    }
+
+    @PostMapping("/import/preview")
+    public ApiResponse<UserSubjectRecordImportPreviewResponse> previewImportRecords(
+            @Valid @RequestBody UserSubjectRecordBatchImportRequest request
+    ) {
+        UserSubjectRecordImportPreviewResponse response = userSubjectRecordService.previewImportRecords(request);
+        return ApiResponse.success(response);
     }
 
     @GetMapping("/page")

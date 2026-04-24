@@ -16,6 +16,8 @@ import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
 import com.mykr.acgnhistoryanalyzer.response.PageResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportItemResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportPreviewItemResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportPreviewResponse;
 import com.mykr.acgnhistoryanalyzer.specification.UserSubjectRecordSpecifications;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.Page;
@@ -72,14 +74,24 @@ public class UserSubjectRecordService {
         int skippedCount = 0;
 
         for (UserSubjectRecordImportItemRequest item : request.getRecords()) {
-            Subject subject = subjectRepository
-                    .findByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(
-                            item.getSubjectDisplayTitle(),
-                            item.getSubjectReleaseYear(),
-                            item.getSubjectReleaseQuarter(),
-                            item.getSubjectCategory()
-                    )
-                    .orElse(null);
+            SubjectResolveResult resolveResult = resolveSubjectForRecordImport(
+                    item.getSubjectDisplayTitle(),
+                    item.getSubjectReleaseYear(),
+                    item.getSubjectReleaseQuarter(),
+                    item.getSubjectCategory()
+            );
+
+            if (resolveResult.hasError()) {
+                skippedCount++;
+                items.add(new UserSubjectRecordImportItemResponse(
+                        null,
+                        item.getSubjectDisplayTitle(),
+                        "SKIPPED",
+                        resolveResult.getErrorMessage()
+                ));
+                continue;
+            }
+            Subject subject = resolveResult.getSubject();
 
             if (subject == null) {
                 skippedCount++;
@@ -125,6 +137,57 @@ public class UserSubjectRecordService {
         return new UserSubjectRecordImportResponse(
                 request.getRecords().size(),
                 importedCount,
+                skippedCount,
+                items
+        );
+    }
+
+    public UserSubjectRecordImportPreviewResponse previewImportRecords(UserSubjectRecordBatchImportRequest request) {
+        List<UserSubjectRecordImportPreviewItemResponse> items = new ArrayList<>();
+
+        int canImportCount = 0;
+        int skippedCount = 0;
+
+        for (UserSubjectRecordImportItemRequest item : request.getRecords()) {
+            SubjectResolveResult resolveResult = resolveSubjectForRecordImport(
+                    item.getSubjectDisplayTitle(),
+                    item.getSubjectReleaseYear(),
+                    item.getSubjectReleaseQuarter(),
+                    item.getSubjectCategory()
+            );
+
+            if (resolveResult.hasError()) {
+                skippedCount++;
+                items.add(new UserSubjectRecordImportPreviewItemResponse(
+                        item.getSubjectDisplayTitle(),
+                        "SKIPPED",
+                        resolveResult.getErrorMessage()
+                ));
+                continue;
+            }
+            Subject subject = resolveResult.getSubject();
+
+            if (userSubjectRecordRepository.existsBySubjectId(subject.getId())) {
+                skippedCount++;
+                items.add(new UserSubjectRecordImportPreviewItemResponse(
+                        item.getSubjectDisplayTitle(),
+                        "SKIPPED",
+                        "该作品已有记录，正式导入时会跳过"
+                ));
+                continue;
+            }
+
+            canImportCount++;
+            items.add(new UserSubjectRecordImportPreviewItemResponse(
+                    item.getSubjectDisplayTitle(),
+                    "CAN_IMPORT",
+                    "可以导入"
+            ));
+        }
+
+        return new UserSubjectRecordImportPreviewResponse(
+                request.getRecords().size(),
+                canImportCount,
                 skippedCount,
                 items
         );
@@ -528,6 +591,53 @@ public class UserSubjectRecordService {
                 UserSubjectRecordSpecifications.hasMinScore(minScore),
                 UserSubjectRecordSpecifications.hasMaxScore(maxScore)
         );
+    }
+
+    private SubjectResolveResult resolveSubjectForRecordImport(
+            String displayTitle,
+            Integer releaseYear,
+            Integer releaseQuarter,
+            String category
+    ) {
+        List<Subject> matchedSubjects =
+                subjectRepository.findAllByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(
+                        displayTitle,
+                        releaseYear,
+                        releaseQuarter,
+                        category
+                );
+
+        if (matchedSubjects.isEmpty()) {
+            return new SubjectResolveResult(null, "作品不存在，请先导入作品库");
+        }
+
+        if (matchedSubjects.size() > 1) {
+            return new SubjectResolveResult(null, "匹配到多个作品，无法唯一定位，请先清理重复作品");
+        }
+
+        return new SubjectResolveResult(matchedSubjects.get(0), null);
+    }
+
+    private static class SubjectResolveResult {
+        private final Subject subject;
+        private final String errorMessage;
+
+        private SubjectResolveResult(Subject subject, String errorMessage) {
+            this.subject = subject;
+            this.errorMessage = errorMessage;
+        }
+
+        public Subject getSubject() {
+            return subject;
+        }
+
+        public String getErrorMessage() {
+            return errorMessage;
+        }
+
+        public boolean hasError() {
+            return errorMessage != null;
+        }
     }
 
     private UserSubjectRecordResponse toResponse(UserSubjectRecord record) {
