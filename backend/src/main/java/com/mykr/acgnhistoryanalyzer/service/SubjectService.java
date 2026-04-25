@@ -348,13 +348,7 @@ public class SubjectService {
                 }
             }
 
-            boolean exists = subjectRepository.existsByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(
-                    item.getDisplayTitle(),
-                    item.getReleaseYear(),
-                    item.getReleaseQuarter(),
-                    item.getCategory()
-            );
-
+            boolean exists = subjectBusinessUniqueExistsForCreate(item);
             if (exists) {
                 skippedCount++;
                 items.add(new SubjectImportPreviewItemResponse(

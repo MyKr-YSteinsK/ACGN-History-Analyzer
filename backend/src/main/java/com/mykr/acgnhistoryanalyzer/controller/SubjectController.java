@@ -108,29 +108,28 @@ public class SubjectController {
             @PathVariable Long id,
             @Valid @RequestBody SubjectCreateRequest request
     ) {
-        if (request.getFranchiseId() != null
-                && !franchiseService.franchiseExists(request.getFranchiseId())) {
+        if (!subjectService.subjectExists(id)) {
+            return ApiResponse.fail(
+                    BusinessErrors.SUBJECT_NOT_FOUND.getCode(),
+                    BusinessErrors.SUBJECT_NOT_FOUND.getMessage()
+            );
+        }
+
+        if (request.getFranchiseId() != null && !franchiseService.franchiseExists(request.getFranchiseId())) {
             return ApiResponse.fail(
                     BusinessErrors.FRANCHISE_NOT_FOUND.getCode(),
                     BusinessErrors.FRANCHISE_NOT_FOUND.getMessage()
             );
         }
 
-        SubjectResponse updatedSubject = subjectService.updateSubject(id, request);
-
-        if (updatedSubject == null) {
-            return ApiResponse.fail(
-        BusinessErrors.SUBJECT_NOT_FOUND.getCode(),
-        BusinessErrors.SUBJECT_NOT_FOUND.getMessage()
-);
-        }
-
         if (subjectService.subjectBusinessUniqueExistsForUpdate(id, request)) {
             return ApiResponse.fail(
-        BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
-        BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getMessage()
-);
+                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
+                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getMessage()
+            );
         }
+
+        SubjectResponse updatedSubject = subjectService.updateSubject(id, request);
         return ApiResponse.success(updatedSubject);
     }
 
