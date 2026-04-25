@@ -1,6 +1,7 @@
 package com.mykr.acgnhistoryanalyzer.controller;
 
 import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
+import com.mykr.acgnhistoryanalyzer.common.error.BusinessErrors;
 import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordBatchImportRequest;
@@ -30,11 +31,17 @@ public class UserSubjectRecordController {
     @PostMapping
     public ApiResponse<?> createRecord(@Valid @RequestBody UserSubjectRecordCreateRequest request) {
         if (!userSubjectRecordService.subjectExists(request.getSubjectId())) {
-            return ApiResponse.fail(4042, "作品不存在");
+            return ApiResponse.fail(
+                    BusinessErrors.SUBJECT_NOT_FOUND.getCode(),
+                    BusinessErrors.SUBJECT_NOT_FOUND.getMessage()
+            );
         }
 
         if (userSubjectRecordService.recordExistsBySubjectId(request.getSubjectId())) {
-            return ApiResponse.fail(4091, "该作品已有记录，请直接修改原记录");
+            return ApiResponse.fail(
+                    BusinessErrors.SUBJECT_ALREADY_HAS_RECORD.getCode(),
+                    BusinessErrors.SUBJECT_ALREADY_HAS_RECORD.getMessage()
+            );
         }
 
         UserSubjectRecordResponse savedRecord = userSubjectRecordService.createRecord(request);
@@ -138,7 +145,10 @@ public class UserSubjectRecordController {
         UserSubjectRecordResponse record = userSubjectRecordService.getRecordById(id);
 
         if (record == null) {
-            return ApiResponse.fail(4041, "记录不存在");
+            return ApiResponse.fail(
+                    BusinessErrors.RECORD_NOT_FOUND.getCode(),
+                    BusinessErrors.RECORD_NOT_FOUND.getMessage()
+            );
         }
 
         return ApiResponse.success(record);
@@ -150,17 +160,26 @@ public class UserSubjectRecordController {
             @Valid @RequestBody UserSubjectRecordCreateRequest request
     ) {
         if (!userSubjectRecordService.subjectExists(request.getSubjectId())) {
-            return ApiResponse.fail(4042, "作品不存在");
+            return ApiResponse.fail(
+                    BusinessErrors.RELATED_SUBJECT_NOT_FOUND.getCode(),
+                    BusinessErrors.RELATED_SUBJECT_NOT_FOUND.getMessage()
+            );
         }
 
         if (userSubjectRecordService.recordExistsBySubjectIdExcludingCurrent(request.getSubjectId(), id)) {
-            return ApiResponse.fail(4091, "该作品已有记录，请直接修改原记录");
+            return ApiResponse.fail(
+                    BusinessErrors.SUBJECT_ALREADY_HAS_RECORD.getCode(),
+                    BusinessErrors.SUBJECT_ALREADY_HAS_RECORD.getMessage()
+            );
         }
 
         UserSubjectRecordResponse updatedRecord = userSubjectRecordService.updateRecord(id, request);
 
         if (updatedRecord == null) {
-            return ApiResponse.fail(4041, "记录不存在");
+            return ApiResponse.fail(
+                    BusinessErrors.RECORD_NOT_FOUND.getCode(),
+                    BusinessErrors.RECORD_NOT_FOUND.getMessage()
+            );
         }
 
         return ApiResponse.success(updatedRecord);
@@ -171,7 +190,10 @@ public class UserSubjectRecordController {
         boolean deleted = userSubjectRecordService.deleteRecord(id);
 
         if (!deleted) {
-            return ApiResponse.fail(4041, "记录不存在");
+            return ApiResponse.fail(
+                    BusinessErrors.RECORD_NOT_FOUND.getCode(),
+                    BusinessErrors.RECORD_NOT_FOUND.getMessage()
+            );
         }
 
         return ApiResponse.success("删除成功");

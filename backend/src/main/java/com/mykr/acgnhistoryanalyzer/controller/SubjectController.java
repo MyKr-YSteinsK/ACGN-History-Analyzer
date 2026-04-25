@@ -1,6 +1,7 @@
 package com.mykr.acgnhistoryanalyzer.controller;
 
 import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
+import com.mykr.acgnhistoryanalyzer.common.error.BusinessErrors;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
 import com.mykr.acgnhistoryanalyzer.request.SubjectBatchImportRequest;
 import com.mykr.acgnhistoryanalyzer.response.*;
@@ -26,10 +27,16 @@ public class SubjectController {
     public ApiResponse<SubjectResponse> createSubject(@Valid @RequestBody SubjectCreateRequest request) {
         if (request.getFranchiseId() != null
                 && !franchiseService.franchiseExists(request.getFranchiseId())) {
-            return ApiResponse.fail(4044, "系列不存在");
+            return ApiResponse.fail(
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getCode(),
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getMessage()
+            );
         }
         if (subjectService.subjectBusinessUniqueExistsForCreate(request)) {
-            return ApiResponse.fail(4095, "作品已存在，请不要重复创建");
+            return ApiResponse.fail(
+                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
+                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getMessage()
+            );
         }
         SubjectResponse savedSubject = subjectService.createSubject(request);
         return ApiResponse.success(savedSubject);
@@ -87,7 +94,10 @@ public class SubjectController {
         SubjectDetailResponse subject = subjectService.getSubjectDetailById(id);
 
         if (subject == null) {
-            return ApiResponse.fail(4043, "作品不存在");
+            return ApiResponse.fail(
+        BusinessErrors.SUBJECT_NOT_FOUND.getCode(),
+        BusinessErrors.SUBJECT_NOT_FOUND.getMessage()
+);
         }
 
         return ApiResponse.success(subject);
@@ -100,17 +110,26 @@ public class SubjectController {
     ) {
         if (request.getFranchiseId() != null
                 && !franchiseService.franchiseExists(request.getFranchiseId())) {
-            return ApiResponse.fail(4044, "系列不存在");
+            return ApiResponse.fail(
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getCode(),
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getMessage()
+            );
         }
 
         SubjectResponse updatedSubject = subjectService.updateSubject(id, request);
 
         if (updatedSubject == null) {
-            return ApiResponse.fail(4043, "作品不存在");
+            return ApiResponse.fail(
+        BusinessErrors.SUBJECT_NOT_FOUND.getCode(),
+        BusinessErrors.SUBJECT_NOT_FOUND.getMessage()
+);
         }
 
         if (subjectService.subjectBusinessUniqueExistsForUpdate(id, request)) {
-            return ApiResponse.fail(4095, "作品唯一信息重复，请修改后再保存");
+            return ApiResponse.fail(
+        BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
+        BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getMessage()
+);
         }
         return ApiResponse.success(updatedSubject);
     }
@@ -118,11 +137,17 @@ public class SubjectController {
     @DeleteMapping("/{id}")
     public ApiResponse<?> deleteSubject(@PathVariable Long id) {
         if (!subjectService.subjectExists(id)) {
-            return ApiResponse.fail(4043, "作品不存在");
+            return ApiResponse.fail(
+        BusinessErrors.SUBJECT_NOT_FOUND.getCode(),
+        BusinessErrors.SUBJECT_NOT_FOUND.getMessage()
+);
         }
 
         if (subjectService.isSubjectReferenced(id)) {
-            return ApiResponse.fail(4092, "作品已被用户记录引用，不能删除");
+            return ApiResponse.fail(
+                    BusinessErrors.SUBJECT_DELETE_FORBIDDEN.getCode(),
+                    BusinessErrors.SUBJECT_DELETE_FORBIDDEN.getMessage()
+            );
         }
 
         subjectService.deleteSubject(id);

@@ -124,6 +124,7 @@ public class SubjectService {
         }
 
         List<UserSubjectRecordResponse> records = userSubjectRecordService.getRecordsBySubjectId(id);
+        UserSubjectRecordResponse record = records.isEmpty() ? null : records.get(0);
 
         FranchiseSimpleResponse franchise = null;
         if (subject.getFranchiseId() != null) {
@@ -156,6 +157,7 @@ public class SubjectService {
                 !records.isEmpty(),
                 records.size(),
                 records,
+                record,
                 franchise
         );
     }

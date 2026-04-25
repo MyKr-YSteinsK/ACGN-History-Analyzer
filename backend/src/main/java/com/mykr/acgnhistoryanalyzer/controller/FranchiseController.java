@@ -1,5 +1,6 @@
 package com.mykr.acgnhistoryanalyzer.controller;
 
+import com.mykr.acgnhistoryanalyzer.common.error.BusinessErrors;
 import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.request.FranchiseCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.FranchiseDetailResponse;
@@ -25,7 +26,10 @@ public class FranchiseController {
             @Valid @RequestBody FranchiseCreateRequest request
     ) {
         if (franchiseService.franchiseNameExistsForCreate(request)) {
-            return ApiResponse.fail(4094, "系列已存在，请直接复用已有系列");
+            return ApiResponse.fail(
+                    BusinessErrors.FRANCHISE_NAME_DUPLICATED.getCode(),
+                    BusinessErrors.FRANCHISE_NAME_DUPLICATED.getMessage()
+            );
         }
 
         FranchiseResponse savedFranchise = franchiseService.createFranchise(request);
@@ -43,7 +47,10 @@ public class FranchiseController {
         FranchiseDetailResponse franchise = franchiseService.getFranchiseDetailById(id);
 
         if (franchise == null) {
-            return ApiResponse.fail(4044, "系列不存在");
+            return ApiResponse.fail(
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getCode(),
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getMessage()
+            );
         }
 
         return ApiResponse.success(franchise);
@@ -55,11 +62,17 @@ public class FranchiseController {
             @Valid @RequestBody FranchiseCreateRequest request
     ) {
         if (!franchiseService.franchiseExists(id)) {
-            return ApiResponse.fail(4044, "系列不存在");
+            return ApiResponse.fail(
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getCode(),
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getMessage()
+            );
         }
 
         if (franchiseService.franchiseNameExistsForUpdate(id, request)) {
-            return ApiResponse.fail(4094, "系列名称重复，请修改后再保存");
+            return ApiResponse.fail(
+                    BusinessErrors.FRANCHISE_NAME_DUPLICATED.getCode(),
+                    BusinessErrors.FRANCHISE_NAME_DUPLICATED.getMessage()
+            );
         }
 
         FranchiseResponse updatedFranchise = franchiseService.updateFranchise(id, request);
@@ -69,11 +82,17 @@ public class FranchiseController {
     @DeleteMapping("/{id}")
     public ApiResponse<?> deleteFranchise(@PathVariable Long id) {
         if (!franchiseService.franchiseExists(id)) {
-            return ApiResponse.fail(4044, "系列不存在");
+            return ApiResponse.fail(
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getCode(),
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getMessage()
+            );
         }
 
         if (franchiseService.isFranchiseReferenced(id)) {
-            return ApiResponse.fail(4093, "该系列下仍有关联作品，不能删除");
+            return ApiResponse.fail(
+                    BusinessErrors.FRANCHISE_DELETE_FORBIDDEN.getCode(),
+                    BusinessErrors.FRANCHISE_DELETE_FORBIDDEN.getMessage()
+            );
         }
 
         franchiseService.deleteFranchise(id);

@@ -19,10 +19,10 @@ public class SubjectDetailResponse {
     private String studioName;
     private String platformLink;
     private String status;
-
     private boolean recorded;
     private int recordCount;
     private List<UserSubjectRecordResponse> records;
+    private UserSubjectRecordResponse record;
     private FranchiseSimpleResponse franchise;
 
     public SubjectDetailResponse(Long id, String titleCn, String subtitle, String displayTitle,
@@ -32,6 +32,7 @@ public class SubjectDetailResponse {
                                  String platformLink, String status,
                                  boolean recorded, int recordCount,
                                  List<UserSubjectRecordResponse> records,
+                                 UserSubjectRecordResponse record,
                                  FranchiseSimpleResponse franchise){
         this.id = id;
         this.titleCn = titleCn;
@@ -51,6 +52,7 @@ public class SubjectDetailResponse {
         this.recorded = recorded;
         this.recordCount = recordCount;
         this.records = records;
+        this.record = record;
         this.franchise = franchise;
     }
 
@@ -127,4 +129,6 @@ public class SubjectDetailResponse {
     }
 
     public FranchiseSimpleResponse getFranchise() { return franchise; }
+
+    public UserSubjectRecordResponse getRecord() { return record; }
 }
