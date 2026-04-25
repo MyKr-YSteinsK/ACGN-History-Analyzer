@@ -227,8 +227,8 @@ public class UserSubjectRecordService {
         int effectiveSize = normalizeSize(size);
         RecordPageSortType effectiveSortType = normalizeRecordPageSort(sortType);
 
-        Specification<UserSubjectRecord> specification =
-                buildRecordSpecification(year, quarter, status, minScore, maxScore);
+        String normalizedCategory = normalizeBlankToNull(category);
+        String normalizedKeyword = normalizeBlankToNull(keyword);
 
         Pageable pageable = PageRequest.of(
                 effectivePage,
@@ -236,14 +236,20 @@ public class UserSubjectRecordService {
                 buildRecordPageSort(effectiveSortType)
         );
 
-        Page<UserSubjectRecord> recordPage = userSubjectRecordRepository.findAll(specification, pageable);
+        Page<UserSubjectRecord> recordPage =
+                userSubjectRecordRepository.findRecordPageWithSubjectFilters(
+                        year,
+                        quarter,
+                        status,
+                        minScore,
+                        maxScore,
+                        normalizedCategory,
+                        normalizedKeyword,
+                        pageable
+                );
 
         List<UserSubjectRecordResponse> content = recordPage.getContent().stream()
                 .map(this::toResponse)
-                .filter(record -> category == null || category.isBlank()
-                        || category.equalsIgnoreCase(record.getSubjectCategory()))
-                .filter(record -> keyword == null || keyword.isBlank()
-                        || matchesKeyword(record.getSubjectTitle(), keyword))
                 .toList();
 
         return new PageResponse<>(
@@ -299,6 +305,13 @@ public class UserSubjectRecordService {
         return RecordPageSortType.valueOf(sortType.toUpperCase());
     }
 
+    private String normalizeBlankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
     private Sort buildRecordPageSort(RecordPageSortType sortType) {
         return switch (sortType) {
             case RECORD_TIME_DESC -> Sort.by("recordYear").descending()
@@ -316,16 +329,6 @@ public class UserSubjectRecordService {
             case TITLE_DESC -> Sort.by("subjectTitle").descending()
                     .and(Sort.by("id").descending());
         };
-    }
-
-    private boolean matchesKeyword(String text, String keyword) {
-        if (keyword == null || keyword.isBlank()) {
-            return true;
-        }
-        if (text == null) {
-            return false;
-        }
-        return text.toLowerCase().contains(keyword.toLowerCase());
     }
 
     public RecordScoreBandStatsResponse getScoreBandStats(Integer year, Integer quarter, RecordStatus status) {
