@@ -3,7 +3,6 @@ package com.mykr.acgnhistoryanalyzer.service;
 import com.mykr.acgnhistoryanalyzer.common.enums.HomeLibrarySortType;
 import com.mykr.acgnhistoryanalyzer.common.enums.HomeRecordSortType;
 import com.mykr.acgnhistoryanalyzer.common.enums.HomeSearchScope;
-import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import com.mykr.acgnhistoryanalyzer.response.HomeQuarterDashboardResponse;
 import com.mykr.acgnhistoryanalyzer.response.HomeSearchResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
@@ -32,21 +31,18 @@ public class HomeService {
                                                             String keyword, String recordSort,
                                                             String librarySort) {
         String effectiveCategory = normalizeCategory(category);
-        RecordStatus effectiveRecordStatus = normalizeRecordStatus(status);
         String effectiveKeyword = normalizeKeyword(keyword);
         HomeRecordSortType effectiveRecordSort = normalizeRecordSort(recordSort);
         HomeLibrarySortType effectiveLibrarySort = normalizeLibrarySort(librarySort);
 
         List<UserSubjectRecordResponse> allQuarterRecords =
-                userSubjectRecordService.getRecords(year, quarter, null, null, null);
+                userSubjectRecordService.getRecords(year, quarter, null, null);
 
         List<UserSubjectRecordResponse> categoryRecordList = allQuarterRecords.stream()
                 .filter(record -> effectiveCategory.equals(record.getSubjectCategory()))
                 .toList();
 
         List<UserSubjectRecordResponse> filteredRecordList = categoryRecordList.stream()
-                .filter(record -> effectiveRecordStatus == null
-                        || effectiveRecordStatus.name().equals(record.getRecordStatus()))
                 .filter(record -> matchesKeyword(record.getSubjectTitle(), effectiveKeyword))
                 .toList();
 
@@ -77,7 +73,7 @@ public class HomeService {
                 year,
                 quarter,
                 effectiveCategory,
-                effectiveRecordStatus == null ? null : effectiveRecordStatus.name(),
+                null,
                 effectiveKeyword,
                 effectiveRecordSort.name(),
                 effectiveLibrarySort.name(),
@@ -97,7 +93,7 @@ public class HomeService {
 
         if (effectiveScope == HomeSearchScope.RECORDED) {
             List<UserSubjectRecordResponse> recordedResults =
-                    userSubjectRecordService.getRecords(year, quarter, null, null, null).stream()
+                    userSubjectRecordService.getRecords(year, quarter, null, null).stream()
                             .filter(record -> effectiveCategory.equals(record.getSubjectCategory()))
                             .filter(record -> matchesKeyword(record.getSubjectTitle(), effectiveKeyword))
                             .sorted(Comparator.comparing(
@@ -135,13 +131,6 @@ public class HomeService {
             return "ANIME";
         }
         return category.toUpperCase(Locale.ROOT);
-    }
-
-    private RecordStatus normalizeRecordStatus(String status) {
-        if (status == null || status.isBlank()) {
-            return null;
-        }
-        return RecordStatus.valueOf(status.toUpperCase(Locale.ROOT));
     }
 
     private String normalizeKeyword(String keyword) {
@@ -182,9 +171,7 @@ public class HomeService {
     private List<UserSubjectRecordResponse> sortRecordList(List<UserSubjectRecordResponse> records,
                                                            HomeRecordSortType sortType) {
         Comparator<UserSubjectRecordResponse> comparator = switch (sortType) {
-            case TITLE_ASC -> Comparator.comparing(
-                    record -> safeLower(record.getSubjectTitle())
-            );
+            case TITLE_ASC -> Comparator.comparing(record -> safeLower(record.getSubjectTitle()));
             case TITLE_DESC -> Comparator.comparing(
                     (UserSubjectRecordResponse record) -> safeLower(record.getSubjectTitle())
             ).reversed();
@@ -211,23 +198,12 @@ public class HomeService {
                                                                List<UserSubjectRecordResponse> recordList) {
         int totalCount = recordList.size();
         int highScoreCount = 0;
-        int watchedCount = 0;
-        int onHoldCount = 0;
-        int wantToWatchCount = 0;
         int excellentCount = 0;
         int normalCount = 0;
         int badCount = 0;
         int unratedCount = 0;
 
         for (UserSubjectRecordResponse record : recordList) {
-            if (record.getRecordStatus() != null) {
-                switch (record.getRecordStatus()) {
-                    case "WATCHED" -> watchedCount++;
-                    case "ON_HOLD" -> onHoldCount++;
-                    case "WANT_TO_WATCH" -> wantToWatchCount++;
-                }
-            }
-
             Integer score = record.getScoreValue();
 
             if (score == null) {
@@ -241,7 +217,7 @@ public class HomeService {
                     excellentCount++;
                 } else if (score >= 35 && score <= 41) {
                     normalCount++;
-                } else if (score >= 20 && score <= 34) {
+                } else if (score >= 0 && score <= 34) {
                     badCount++;
                 }
             }
@@ -252,9 +228,9 @@ public class HomeService {
                 quarter,
                 totalCount,
                 highScoreCount,
-                watchedCount,
-                onHoldCount,
-                wantToWatchCount,
+                totalCount,
+                0,
+                0,
                 excellentCount,
                 normalCount,
                 badCount,

@@ -1,5 +1,8 @@
 package com.mykr.acgnhistoryanalyzer.response;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
 public class SubjectResponse {
 
     private Long id;
@@ -16,13 +19,25 @@ public class SubjectResponse {
     private String category;
     private String studioName;
     private String platformLink;
+    private BigDecimal platformScore;
+    private Integer episodeCount;
+    private String tags;
+    private String sourcePlatform;
+    private String sourceId;
     private String status;
+    private String libraryStatus;
+    private String libraryStatusLabel;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public SubjectResponse(Long id, String titleCn, String subtitle, String displayTitle,
                            Integer seasonIndex, Integer partIndex, Long franchiseId,
                            String coverUrl, String summary, Integer releaseYear,
                            Integer releaseQuarter, String category, String studioName,
-                           String platformLink, String status) {
+                           String platformLink, BigDecimal platformScore, Integer episodeCount,
+                           String tags, String sourcePlatform, String sourceId, String status,
+                           String libraryStatus, String libraryStatusLabel,
+                           LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.titleCn = titleCn;
         this.subtitle = subtitle;
@@ -37,66 +52,63 @@ public class SubjectResponse {
         this.category = category;
         this.studioName = studioName;
         this.platformLink = platformLink;
+        this.platformScore = platformScore;
+        this.episodeCount = episodeCount;
+        this.tags = tags;
+        this.sourcePlatform = sourcePlatform;
+        this.sourceId = sourceId;
         this.status = status;
+        this.libraryStatus = libraryStatus;
+        this.libraryStatusLabel = libraryStatusLabel;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
-    public Long getId() {
-        return id;
-    }
+    public Long getId() { return id; }
 
-    public String getTitleCn() {
-        return titleCn;
-    }
+    public String getTitleCn() { return titleCn; }
 
-    public String getSubtitle() {
-        return subtitle;
-    }
+    public String getSubtitle() { return subtitle; }
 
-    public String getDisplayTitle() {
-        return displayTitle;
-    }
+    public String getDisplayTitle() { return displayTitle; }
 
-    public Integer getSeasonIndex() {
-        return seasonIndex;
-    }
+    public Integer getSeasonIndex() { return seasonIndex; }
 
-    public Integer getPartIndex() {
-        return partIndex;
-    }
+    public Integer getPartIndex() { return partIndex; }
 
-    public Long getFranchiseId() {
-        return franchiseId;
-    }
+    public Long getFranchiseId() { return franchiseId; }
 
-    public String getCoverUrl() {
-        return coverUrl;
-    }
+    public String getCoverUrl() { return coverUrl; }
 
-    public String getSummary() {
-        return summary;
-    }
+    public String getSummary() { return summary; }
 
-    public Integer getReleaseYear() {
-        return releaseYear;
-    }
+    public Integer getReleaseYear() { return releaseYear; }
 
-    public Integer getReleaseQuarter() {
-        return releaseQuarter;
-    }
+    public Integer getReleaseQuarter() { return releaseQuarter; }
 
-    public String getCategory() {
-        return category;
-    }
+    public String getCategory() { return category; }
 
-    public String getStudioName() {
-        return studioName;
-    }
+    public String getStudioName() { return studioName; }
 
-    public String getPlatformLink() {
-        return platformLink;
-    }
+    public String getPlatformLink() { return platformLink; }
 
-    public String getStatus() {
-        return status;
-    }
+    public BigDecimal getPlatformScore() { return platformScore; }
+
+    public Integer getEpisodeCount() { return episodeCount; }
+
+    public String getTags() { return tags; }
+
+    public String getSourcePlatform() { return sourcePlatform; }
+
+    public String getSourceId() { return sourceId; }
+
+    public String getStatus() { return status; }
+
+    public String getLibraryStatus() { return libraryStatus; }
+
+    public String getLibraryStatusLabel() { return libraryStatusLabel; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

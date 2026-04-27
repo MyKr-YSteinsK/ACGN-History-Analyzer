@@ -10,8 +10,8 @@
 ### 1. 默认 ANIME
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1
 
-### 2. ANIME + WATCHED
-GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&status=WATCHED
+### 2. ANIME
+GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME
 
 ### 3. ANIME + keyword=巨人
 GET {{baseUrl}}/api/home/quarter-dashboard?year=2024&quarter=1&category=ANIME&keyword=巨人

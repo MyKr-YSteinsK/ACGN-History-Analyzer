@@ -1,5 +1,7 @@
 package com.mykr.acgnhistoryanalyzer.response;
 
+import java.time.LocalDateTime;
+
 public class UserSubjectRecordResponse {
 
     private Long id;
@@ -15,13 +17,16 @@ public class UserSubjectRecordResponse {
     private Integer recordYear;
     private Integer recordQuarter;
     private String note;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public UserSubjectRecordResponse(Long id, Long subjectId, String subjectTitle,
                                      String subjectCategory, Integer subjectReleaseYear,
                                      Integer subjectReleaseQuarter, String subjectCoverUrl,
                                      String recordStatus, String recordStatusLabel,
                                      Integer scoreValue, Integer recordYear,
-                                     Integer recordQuarter, String note) {
+                                     Integer recordQuarter, String note,
+                                     LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.subjectId = subjectId;
         this.subjectTitle = subjectTitle;
@@ -35,57 +40,37 @@ public class UserSubjectRecordResponse {
         this.recordYear = recordYear;
         this.recordQuarter = recordQuarter;
         this.note = note;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
-    public Long getId() {
-        return id;
-    }
+    public Long getId() { return id; }
 
-    public Long getSubjectId() {
-        return subjectId;
-    }
+    public Long getSubjectId() { return subjectId; }
 
-    public String getSubjectTitle() {
-        return subjectTitle;
-    }
+    public String getSubjectTitle() { return subjectTitle; }
 
-    public String getSubjectCategory() {
-        return subjectCategory;
-    }
+    public String getSubjectCategory() { return subjectCategory; }
 
-    public Integer getSubjectReleaseYear() {
-        return subjectReleaseYear;
-    }
+    public Integer getSubjectReleaseYear() { return subjectReleaseYear; }
 
-    public Integer getSubjectReleaseQuarter() {
-        return subjectReleaseQuarter;
-    }
+    public Integer getSubjectReleaseQuarter() { return subjectReleaseQuarter; }
 
-    public String getSubjectCoverUrl() {
-        return subjectCoverUrl;
-    }
+    public String getSubjectCoverUrl() { return subjectCoverUrl; }
 
-    public String getRecordStatus() {
-        return recordStatus;
-    }
+    public String getRecordStatus() { return recordStatus; }
 
-    public String getRecordStatusLabel() {
-        return recordStatusLabel;
-    }
+    public String getRecordStatusLabel() { return recordStatusLabel; }
 
-    public Integer getScoreValue() {
-        return scoreValue;
-    }
+    public Integer getScoreValue() { return scoreValue; }
 
-    public Integer getRecordYear() {
-        return recordYear;
-    }
+    public Integer getRecordYear() { return recordYear; }
 
-    public Integer getRecordQuarter() {
-        return recordQuarter;
-    }
+    public Integer getRecordQuarter() { return recordQuarter; }
 
-    public String getNote() {
-        return note;
-    }
+    public String getNote() { return note; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

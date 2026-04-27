@@ -1,6 +1,5 @@
 package com.mykr.acgnhistoryanalyzer.specification;
 
-import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import com.mykr.acgnhistoryanalyzer.entity.UserSubjectRecord;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -21,15 +20,6 @@ public class UserSubjectRecordSpecifications {
                 return null;
             }
             return criteriaBuilder.equal(root.get("recordQuarter"), quarter);
-        };
-    }
-
-    public static Specification<UserSubjectRecord> hasRecordStatus(RecordStatus status) {
-        return (root, query, criteriaBuilder) -> {
-            if (status == null) {
-                return null;
-            }
-            return criteriaBuilder.equal(root.get("recordStatus"), status);
         };
     }
 

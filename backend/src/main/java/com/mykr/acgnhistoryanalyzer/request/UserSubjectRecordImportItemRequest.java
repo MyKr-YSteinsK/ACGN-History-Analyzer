@@ -1,27 +1,21 @@
 package com.mykr.acgnhistoryanalyzer.request;
 
-import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import jakarta.validation.constraints.*;
 
 public class UserSubjectRecordImportItemRequest {
 
     @NotBlank(message = "作品主标题不能为空")
-    @Size(max = 255, message = "作品主标题不能超过255个字符")
     private String subjectTitleCn;
 
-    @Size(max = 255, message = "作品副标题不能超过255个字符")
     private String subjectSubtitle;
 
     private Integer subjectSeasonIndex;
 
     private Integer subjectPartIndex;
 
-    @NotBlank(message = "作品分类不能为空")
-    @Size(max = 32, message = "作品分类不能超过32个字符")
+    @NotBlank(message = "作品类型不能为空")
+    @Pattern(regexp = "ANIME|COMIC|NOVEL|GAME", message = "作品类型只能是 ANIME、COMIC、NOVEL 或 GAME")
     private String subjectCategory;
-
-    @NotNull(message = "记录状态不能为空")
-    private RecordStatus recordStatus;
 
     @Min(value = 0, message = "评分不能小于0")
     @Max(value = 50, message = "评分不能大于50")
@@ -40,87 +34,39 @@ public class UserSubjectRecordImportItemRequest {
     @Size(max = 500, message = "备注不能超过500个字符")
     private String note;
 
-    public UserSubjectRecordImportItemRequest() {
-    }
-    
-    public String getSubjectCategory() {
-        return subjectCategory;
-    }
+    public String getSubjectTitleCn() { return subjectTitleCn; }
 
-    public RecordStatus getRecordStatus() {
-        return recordStatus;
-    }
+    public String getSubjectSubtitle() { return subjectSubtitle; }
 
-    public Integer getScoreValue() {
-        return scoreValue;
-    }
+    public Integer getSubjectSeasonIndex() { return subjectSeasonIndex; }
 
-    public Integer getRecordYear() {
-        return recordYear;
-    }
+    public Integer getSubjectPartIndex() { return subjectPartIndex; }
 
-    public Integer getRecordQuarter() {
-        return recordQuarter;
-    }
+    public String getSubjectCategory() { return subjectCategory; }
 
-    public String getNote() {
-        return note;
-    }
+    public Integer getScoreValue() { return scoreValue; }
 
-    public void setSubjectCategory(String subjectCategory) {
-        this.subjectCategory = subjectCategory;
-    }
+    public Integer getRecordYear() { return recordYear; }
 
-    public void setRecordStatus(RecordStatus recordStatus) {
-        this.recordStatus = recordStatus;
-    }
+    public Integer getRecordQuarter() { return recordQuarter; }
 
-    public void setScoreValue(Integer scoreValue) {
-        this.scoreValue = scoreValue;
-    }
+    public String getNote() { return note; }
 
-    public void setRecordYear(Integer recordYear) {
-        this.recordYear = recordYear;
-    }
+    public void setSubjectTitleCn(String subjectTitleCn) { this.subjectTitleCn = subjectTitleCn; }
 
-    public void setRecordQuarter(Integer recordQuarter) {
-        this.recordQuarter = recordQuarter;
-    }
+    public void setSubjectSubtitle(String subjectSubtitle) { this.subjectSubtitle = subjectSubtitle; }
 
-    public void setNote(String note) {
-        this.note = note;
-    }
+    public void setSubjectSeasonIndex(Integer subjectSeasonIndex) { this.subjectSeasonIndex = subjectSeasonIndex; }
 
-    public String getSubjectTitleCn() {
-        return subjectTitleCn;
-    }
+    public void setSubjectPartIndex(Integer subjectPartIndex) { this.subjectPartIndex = subjectPartIndex; }
 
-    public void setSubjectTitleCn(String subjectTitleCn) {
-        this.subjectTitleCn = subjectTitleCn;
-    }
+    public void setSubjectCategory(String subjectCategory) { this.subjectCategory = subjectCategory; }
 
-    public String getSubjectSubtitle() {
-        return subjectSubtitle;
-    }
+    public void setScoreValue(Integer scoreValue) { this.scoreValue = scoreValue; }
 
-    public void setSubjectSubtitle(String subjectSubtitle) {
-        this.subjectSubtitle = subjectSubtitle;
-    }
+    public void setRecordYear(Integer recordYear) { this.recordYear = recordYear; }
 
-    public Integer getSubjectSeasonIndex() {
-        return subjectSeasonIndex;
-    }
+    public void setRecordQuarter(Integer recordQuarter) { this.recordQuarter = recordQuarter; }
 
-    public void setSubjectSeasonIndex(Integer subjectSeasonIndex) {
-        this.subjectSeasonIndex = subjectSeasonIndex;
-    }
-
-    public Integer getSubjectPartIndex() {
-        return subjectPartIndex;
-    }
-
-    public void setSubjectPartIndex(Integer subjectPartIndex) {
-        this.subjectPartIndex = subjectPartIndex;
-    }
-
+    public void setNote(String note) { this.note = note; }
 }

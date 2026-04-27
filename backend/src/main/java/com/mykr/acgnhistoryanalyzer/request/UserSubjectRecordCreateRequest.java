@@ -1,6 +1,5 @@
 package com.mykr.acgnhistoryanalyzer.request;
 
-import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import jakarta.validation.constraints.*;
 
 public class UserSubjectRecordCreateRequest {
@@ -8,9 +7,6 @@ public class UserSubjectRecordCreateRequest {
     @NotNull(message = "作品ID不能为空")
     @Positive(message = "作品ID必须大于0")
     private Long subjectId;
-
-    @NotNull(message = "记录状态不能为空")
-    private RecordStatus recordStatus;
 
     @Min(value = 0, message = "评分不能小于0")
     @Max(value = 50, message = "评分不能大于50")
@@ -32,51 +28,23 @@ public class UserSubjectRecordCreateRequest {
     public UserSubjectRecordCreateRequest() {
     }
 
-    public Long getSubjectId() {
-        return subjectId;
-    }
+    public Long getSubjectId() { return subjectId; }
 
-    public RecordStatus getRecordStatus() {
-        return recordStatus;
-    }
+    public Integer getScoreValue() { return scoreValue; }
 
-    public Integer getScoreValue() {
-        return scoreValue;
-    }
+    public Integer getRecordYear() { return recordYear; }
 
-    public Integer getRecordYear() {
-        return recordYear;
-    }
+    public Integer getRecordQuarter() { return recordQuarter; }
 
-    public Integer getRecordQuarter() {
-        return recordQuarter;
-    }
+    public String getNote() { return note; }
 
-    public String getNote() {
-        return note;
-    }
+    public void setSubjectId(Long subjectId) { this.subjectId = subjectId; }
 
-    public void setSubjectId(Long subjectId) {
-        this.subjectId = subjectId;
-    }
+    public void setScoreValue(Integer scoreValue) { this.scoreValue = scoreValue; }
 
-    public void setRecordStatus(RecordStatus recordStatus) {
-        this.recordStatus = recordStatus;
-    }
+    public void setRecordYear(Integer recordYear) { this.recordYear = recordYear; }
 
-    public void setScoreValue(Integer scoreValue) {
-        this.scoreValue = scoreValue;
-    }
+    public void setRecordQuarter(Integer recordQuarter) { this.recordQuarter = recordQuarter; }
 
-    public void setRecordYear(Integer recordYear) {
-        this.recordYear = recordYear;
-    }
-
-    public void setRecordQuarter(Integer recordQuarter) {
-        this.recordQuarter = recordQuarter;
-    }
-
-    public void setNote(String note) {
-        this.note = note;
-    }
+    public void setNote(String note) { this.note = note; }
 }

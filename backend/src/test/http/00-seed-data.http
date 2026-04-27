@@ -214,7 +214,6 @@ Content-Type: application/json
 
 {
   "subjectId": {{subject_aot_p1_id}},
-  "recordStatus": "WATCHED",
   "scoreValue": 48,
   "recordYear": 2024,
   "recordQuarter": 1,
@@ -230,7 +229,6 @@ Content-Type: application/json
 
 {
   "subjectId": {{subject_bocchi_id}},
-  "recordStatus": "WATCHED",
   "scoreValue": 45,
   "recordYear": 2024,
   "recordQuarter": 1,
@@ -246,7 +244,6 @@ Content-Type: application/json
 
 {
   "subjectId": {{subject_aot_p2_id}},
-  "recordStatus": "WATCHED",
   "scoreValue": 49,
   "recordYear": 2024,
   "recordQuarter": 2,
@@ -256,13 +253,12 @@ Content-Type: application/json
     client.global.set("record_c_id", response.body.data.id);
 %}
 
-### D. 2024 Q2，ON_HOLD，35
+### D. 2024 Q2，收藏搁置，35
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
 {
   "subjectId": {{subject_bluelock_comic_id}},
-  "recordStatus": "ON_HOLD",
   "scoreValue": 35,
   "recordYear": 2024,
   "recordQuarter": 2,
@@ -272,13 +268,12 @@ Content-Type: application/json
     client.global.set("record_d_id", response.body.data.id);
 %}
 
-### E. 2024 Q3，WANT_TO_WATCH，未评分
+### E. 2024 Q3，收藏想看，未评分
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
 {
   "subjectId": {{subject_frieren_id}},
-  "recordStatus": "WANT_TO_WATCH",
   "recordYear": 2024,
   "recordQuarter": 3,
   "note": "样例记录E"
@@ -293,7 +288,6 @@ Content-Type: application/json
 
 {
   "subjectId": {{subject_bad_sample_id}},
-  "recordStatus": "WATCHED",
   "scoreValue": 20,
   "recordYear": 2025,
   "recordQuarter": 1,
@@ -303,13 +297,12 @@ Content-Type: application/json
     client.global.set("record_f_id", response.body.data.id);
 %}
 
-### G. 2025 Q4，ON_HOLD，42
+### G. 2025 Q4，收藏搁置，42
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
 {
   "subjectId": {{subject_score42_sample_id}},
-  "recordStatus": "ON_HOLD",
   "scoreValue": 42,
   "recordYear": 2025,
   "recordQuarter": 4,

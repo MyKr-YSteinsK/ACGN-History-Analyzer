@@ -2,6 +2,8 @@ package com.mykr.acgnhistoryanalyzer.request;
 
 import jakarta.validation.constraints.*;
 
+import java.math.BigDecimal;
+
 public class SubjectCreateRequest {
 
     @NotBlank(message = "中文标题不能为空")
@@ -50,127 +52,109 @@ public class SubjectCreateRequest {
     @Size(max = 500, message = "平台链接不能超过500个字符")
     private String platformLink;
 
+    @DecimalMin(value = "0.00", message = "平台评分不能小于0")
+    @DecimalMax(value = "10.00", message = "平台评分不能大于10")
+    private BigDecimal platformScore;
+
+    @Min(value = 0, message = "集数不能小于0")
+    private Integer episodeCount;
+
+    @Size(max = 1000, message = "标签不能超过1000个字符")
+    private String tags;
+
+    @Size(max = 64, message = "来源平台不能超过64个字符")
+    private String sourcePlatform;
+
+    @Size(max = 128, message = "来源ID不能超过128个字符")
+    private String sourceId;
+
     @NotBlank(message = "状态不能为空")
     @Pattern(regexp = "NORMAL|HIDDEN", message = "状态只能是 NORMAL 或 HIDDEN")
     private String status;
 
     @Size(max = 200, message = "系列名称不能超过200个字符")
     private String franchiseName;
+
     public SubjectCreateRequest() {
     }
 
-    public String getTitleCn() {
-        return titleCn;
-    }
+    public String getTitleCn() { return titleCn; }
 
-    public String getSubtitle() {
-        return subtitle;
-    }
+    public String getSubtitle() { return subtitle; }
 
-    public String getDisplayTitle() {
-        return displayTitle;
-    }
+    public String getDisplayTitle() { return displayTitle; }
 
-    public Integer getSeasonIndex() {
-        return seasonIndex;
-    }
+    public Integer getSeasonIndex() { return seasonIndex; }
 
-    public Integer getPartIndex() {
-        return partIndex;
-    }
+    public Integer getPartIndex() { return partIndex; }
 
-    public Long getFranchiseId() {
-        return franchiseId;
-    }
+    public Long getFranchiseId() { return franchiseId; }
 
-    public String getCoverUrl() {
-        return coverUrl;
-    }
+    public String getCoverUrl() { return coverUrl; }
 
-    public String getSummary() {
-        return summary;
-    }
+    public String getSummary() { return summary; }
 
-    public Integer getReleaseYear() {
-        return releaseYear;
-    }
+    public Integer getReleaseYear() { return releaseYear; }
 
-    public Integer getReleaseQuarter() {
-        return releaseQuarter;
-    }
+    public Integer getReleaseQuarter() { return releaseQuarter; }
 
-    public String getCategory() {
-        return category;
-    }
+    public String getCategory() { return category; }
 
-    public String getStudioName() {
-        return studioName;
-    }
+    public String getStudioName() { return studioName; }
 
-    public String getPlatformLink() {
-        return platformLink;
-    }
+    public String getPlatformLink() { return platformLink; }
 
-    public String getStatus() {
-        return status;
-    }
-    public String getFranchiseName() { return franchiseName;}
+    public BigDecimal getPlatformScore() { return platformScore; }
 
-    public void setTitleCn(String titleCn) {
-        this.titleCn = titleCn;
-    }
+    public Integer getEpisodeCount() { return episodeCount; }
 
-    public void setSubtitle(String subtitle) {
-        this.subtitle = subtitle;
-    }
+    public String getTags() { return tags; }
 
-    public void setDisplayTitle(String displayTitle) {
-        this.displayTitle = displayTitle;
-    }
+    public String getSourcePlatform() { return sourcePlatform; }
 
-    public void setSeasonIndex(Integer seasonIndex) {
-        this.seasonIndex = seasonIndex;
-    }
+    public String getSourceId() { return sourceId; }
 
-    public void setPartIndex(Integer partIndex) {
-        this.partIndex = partIndex;
-    }
+    public String getStatus() { return status; }
 
-    public void setFranchiseId(Long franchiseId) {
-        this.franchiseId = franchiseId;
-    }
+    public String getFranchiseName() { return franchiseName; }
 
-    public void setCoverUrl(String coverUrl) {
-        this.coverUrl = coverUrl;
-    }
+    public void setTitleCn(String titleCn) { this.titleCn = titleCn; }
 
-    public void setSummary(String summary) {
-        this.summary = summary;
-    }
+    public void setSubtitle(String subtitle) { this.subtitle = subtitle; }
 
-    public void setReleaseYear(Integer releaseYear) {
-        this.releaseYear = releaseYear;
-    }
+    public void setDisplayTitle(String displayTitle) { this.displayTitle = displayTitle; }
 
-    public void setReleaseQuarter(Integer releaseQuarter) {
-        this.releaseQuarter = releaseQuarter;
-    }
+    public void setSeasonIndex(Integer seasonIndex) { this.seasonIndex = seasonIndex; }
 
-    public void setCategory(String category) {
-        this.category = category;
-    }
+    public void setPartIndex(Integer partIndex) { this.partIndex = partIndex; }
 
-    public void setStudioName(String studioName) {
-        this.studioName = studioName;
-    }
+    public void setFranchiseId(Long franchiseId) { this.franchiseId = franchiseId; }
 
-    public void setPlatformLink(String platformLink) {
-        this.platformLink = platformLink;
-    }
+    public void setCoverUrl(String coverUrl) { this.coverUrl = coverUrl; }
 
-    public void setStatus(String status) {
-        this.status = status;
-    }
+    public void setSummary(String summary) { this.summary = summary; }
 
-    public void setFranchiseName(String franchiseName) { this.franchiseName = franchiseName;}
+    public void setReleaseYear(Integer releaseYear) { this.releaseYear = releaseYear; }
+
+    public void setReleaseQuarter(Integer releaseQuarter) { this.releaseQuarter = releaseQuarter; }
+
+    public void setCategory(String category) { this.category = category; }
+
+    public void setStudioName(String studioName) { this.studioName = studioName; }
+
+    public void setPlatformLink(String platformLink) { this.platformLink = platformLink; }
+
+    public void setPlatformScore(BigDecimal platformScore) { this.platformScore = platformScore; }
+
+    public void setEpisodeCount(Integer episodeCount) { this.episodeCount = episodeCount; }
+
+    public void setTags(String tags) { this.tags = tags; }
+
+    public void setSourcePlatform(String sourcePlatform) { this.sourcePlatform = sourcePlatform; }
+
+    public void setSourceId(String sourceId) { this.sourceId = sourceId; }
+
+    public void setStatus(String status) { this.status = status; }
+
+    public void setFranchiseName(String franchiseName) { this.franchiseName = franchiseName; }
 }

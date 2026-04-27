@@ -1,6 +1,6 @@
 package com.mykr.acgnhistoryanalyzer.controller;
 
-import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
+import com.mykr.acgnhistoryanalyzer.common.enums.CollectionType;
 import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.response.HealthResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordStatusResponse;
@@ -29,12 +29,14 @@ public class HelloController {
 
     @GetMapping("/api/record-statuses")
     public ApiResponse<RecordStatusResponse> recordStatuses() {
+        RecordStatusResponse response = new RecordStatusResponse(List.of("看过"));
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping("/api/collection-types")
+    public ApiResponse<RecordStatusResponse> collectionTypes() {
         RecordStatusResponse response = new RecordStatusResponse(
-                List.of(
-                        RecordStatus.WANT_TO_WATCH.getLabel(),
-                        RecordStatus.WATCHED.getLabel(),
-                        RecordStatus.ON_HOLD.getLabel()
-                )
+                List.of(CollectionType.WANT.getLabel(), CollectionType.PAUSED.getLabel())
         );
         return ApiResponse.success(response);
     }

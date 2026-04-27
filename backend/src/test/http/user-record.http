@@ -13,7 +13,7 @@ GET {{baseUrl}}/api/records
 GET {{baseUrl}}/api/records?year=2024&quarter=1
 
 ### 3. 查询 WATCHED 且最低分 45 的记录
-GET {{baseUrl}}/api/records?status=WATCHED&minScore=45
+GET {{baseUrl}}/api/records?minScore=45
 
 ### 4. 查询 2025 年 Q1 记录
 GET {{baseUrl}}/api/records?year=2025&quarter=1
@@ -49,7 +49,6 @@ Content-Type: application/json
 
 {
   "subjectId": {{subject_aot_p1_id}},
-  "recordStatus": "WATCHED",
   "scoreValue": 48,
   "recordYear": 2024,
   "recordQuarter": 5,
@@ -62,7 +61,6 @@ Content-Type: application/json
 
 {
   "subjectId": 999999,
-  "recordStatus": "WATCHED",
   "scoreValue": 48,
   "recordYear": 2024,
   "recordQuarter": 1,
@@ -75,7 +73,6 @@ Content-Type: application/json
 
 {
   "subjectId": {{subject_aot_p1_id}},
-  "recordStatus": "WATCHED",
   "scoreValue": 60,
   "recordYear": 2024,
   "recordQuarter": 1,
@@ -88,7 +85,6 @@ Content-Type: application/json
 
 {
   "subjectId": {{subject_aot_p1_id}},
-  "recordStatus": "WATCHED",
   "scoreValue": 40,
   "recordYear": 2025,
   "recordQuarter": 1,
@@ -101,7 +97,6 @@ Content-Type: application/json
 
 {
   "subjectId": {{subject_aot_p1_id}},
-  "recordStatus": "WATCHED",
   "scoreValue": 45,
   "recordYear": 2024,
   "recordQuarter": 1,
@@ -116,7 +111,6 @@ Content-Type: application/json
 
 {
   "subjectId": {{subject_hidden_id}},
-  "recordStatus": "WATCHED",
   "scoreValue": 47,
   "recordYear": 2025,
   "recordQuarter": 2,
@@ -132,7 +126,6 @@ Content-Type: application/json
 
 {
   "subjectId": {{subject_hidden_id}},
-  "recordStatus": "ON_HOLD",
   "scoreValue": 46,
   "recordYear": 2025,
   "recordQuarter": 3,
@@ -154,7 +147,7 @@ GET {{baseUrl}}/api/records/page
 GET {{baseUrl}}/api/records/page?year=2024&quarter=1&category=ANIME&page=0&size=10
 
 ### 23. WATCHED 且 45 分及以上，按评分倒序
-GET {{baseUrl}}/api/records/page?status=WATCHED&minScore=45&page=0&size=10&sort=SCORE_DESC
+GET {{baseUrl}}/api/records/page?minScore=45&page=0&size=10&sort=SCORE_DESC
 
 ### 24. 标题包含“巨人”的记录
 GET {{baseUrl}}/api/records/page?keyword=巨人&page=0&size=10

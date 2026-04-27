@@ -1,9 +1,13 @@
 package com.mykr.acgnhistoryanalyzer.service;
 
+import com.mykr.acgnhistoryanalyzer.common.enums.CollectionType;
+import com.mykr.acgnhistoryanalyzer.common.enums.LibraryStatus;
 import com.mykr.acgnhistoryanalyzer.entity.Franchise;
 import com.mykr.acgnhistoryanalyzer.entity.Subject;
 import com.mykr.acgnhistoryanalyzer.repository.FranchiseRepository;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
+import com.mykr.acgnhistoryanalyzer.repository.UserSubjectCollectionRepository;
+import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.FranchiseCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.FranchiseDetailResponse;
 import com.mykr.acgnhistoryanalyzer.response.FranchiseResponse;
@@ -18,11 +22,17 @@ public class FranchiseService {
 
     private final FranchiseRepository franchiseRepository;
     private final SubjectRepository subjectRepository;
+    private final UserSubjectRecordRepository userSubjectRecordRepository;
+    private final UserSubjectCollectionRepository userSubjectCollectionRepository;
 
     public FranchiseService(FranchiseRepository franchiseRepository,
-                            SubjectRepository subjectRepository) {
+                            SubjectRepository subjectRepository,
+                            UserSubjectRecordRepository userSubjectRecordRepository,
+                            UserSubjectCollectionRepository userSubjectCollectionRepository) {
         this.franchiseRepository = franchiseRepository;
         this.subjectRepository = subjectRepository;
+        this.userSubjectRecordRepository = userSubjectRecordRepository;
+        this.userSubjectCollectionRepository = userSubjectCollectionRepository;
     }
 
     public FranchiseResponse createFranchise(FranchiseCreateRequest request) {
@@ -146,7 +156,20 @@ public class FranchiseService {
         );
     }
 
+    private LibraryStatus resolveLibraryStatus(Long subjectId) {
+        if (userSubjectRecordRepository.existsBySubjectId(subjectId)) {
+            return LibraryStatus.WATCHED;
+        }
+
+        return userSubjectCollectionRepository.findBySubjectId(subjectId)
+                .map(collection -> collection.getCollectionType() == CollectionType.WANT
+                        ? LibraryStatus.WANT
+                        : LibraryStatus.PAUSED)
+                .orElse(LibraryStatus.NONE);
+    }
+
     private SubjectResponse toSubjectResponse(Subject subject) {
+        LibraryStatus libraryStatus = resolveLibraryStatus(subject.getId());
         return new SubjectResponse(
                 subject.getId(),
                 subject.getTitleCn(),
@@ -162,7 +185,16 @@ public class FranchiseService {
                 subject.getCategory(),
                 subject.getStudioName(),
                 subject.getPlatformLink(),
-                subject.getStatus()
+                subject.getPlatformScore(),
+                subject.getEpisodeCount(),
+                subject.getTags(),
+                subject.getSourcePlatform(),
+                subject.getSourceId(),
+                subject.getStatus(),
+                libraryStatus.name(),
+                libraryStatus.getLabel(),
+                subject.getCreatedAt(),
+                subject.getUpdatedAt()
         );
     }
 }

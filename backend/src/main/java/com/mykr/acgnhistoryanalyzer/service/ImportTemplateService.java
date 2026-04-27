@@ -28,6 +28,11 @@ public class ImportTemplateService {
         subjectItem.put("category", "ANIME");
         subjectItem.put("studioName", "MAPPA");
         subjectItem.put("platformLink", "https://bgm.tv/subject/aot-final-part1");
+        subjectItem.put("platformScore", 8.9);
+        subjectItem.put("episodeCount", 16);
+        subjectItem.put("tags", "战斗,奇幻,漫画改");
+        subjectItem.put("sourcePlatform", "BANGUMI");
+        subjectItem.put("sourceId", "aot-final-part1");
         subjectItem.put("status", "NORMAL");
 
         List<Map<String, Object>> subjects = new ArrayList<>();
@@ -56,9 +61,14 @@ public class ImportTemplateService {
                 new ImportFieldDocResponse("summary", false, "作品简介。", "样例：巨人最终季前半部分", "仅展示用途。"),
                 new ImportFieldDocResponse("releaseYear", true, "作品发行年份。", "2020", "用于展示和检索。"),
                 new ImportFieldDocResponse("releaseQuarter", true, "作品发行季度，只能是 1~4。", "4", "用于展示和检索。"),
-                new ImportFieldDocResponse("category", true, "作品类型，参与作品唯一性判断。", "ANIME", "当前常见值如 ANIME / COMIC / NOVEL。"),
+                new ImportFieldDocResponse("category", true, "作品类型，参与作品唯一性判断。", "ANIME", "当前值为 ANIME / COMIC / NOVEL / GAME。"),
                 new ImportFieldDocResponse("studioName", false, "制作公司、出版社或相关机构名。", "MAPPA", "当前字段名沿用 studioName。"),
                 new ImportFieldDocResponse("platformLink", false, "外部平台链接。", "https://bgm.tv/subject/xxx", "可为空。"),
+                new ImportFieldDocResponse("platformScore", false, "外部平台评分，例如 Bangumi 评分。", "8.9", "范围 0~10，可以为空。"),
+                new ImportFieldDocResponse("episodeCount", false, "集数、话数或章节数。", "16", "可以为空。"),
+                new ImportFieldDocResponse("tags", false, "作品标签，当前用逗号分隔字符串保存。", "战斗,奇幻,漫画改", "可以为空。"),
+                new ImportFieldDocResponse("sourcePlatform", false, "数据来源平台。", "BANGUMI", "预留给后续平台导入和 AI 分析溯源。"),
+                new ImportFieldDocResponse("sourceId", false, "来源平台上的作品 ID。", "123456", "可以为空。"),
                 new ImportFieldDocResponse("status", true, "作品状态。", "NORMAL", "通常使用 NORMAL 或 HIDDEN。")
         );
 
@@ -79,7 +89,6 @@ public class ImportTemplateService {
         recordItem.put("subjectSeasonIndex", 4);
         recordItem.put("subjectPartIndex", 1);
         recordItem.put("subjectCategory", "ANIME");
-        recordItem.put("recordStatus", "WATCHED");
         recordItem.put("scoreValue", 48);
         recordItem.put("recordYear", 2024);
         recordItem.put("recordQuarter", 1);
@@ -94,7 +103,8 @@ public class ImportTemplateService {
         List<String> rules = List.of(
                 "record 导入前，必须先保证对应 subject 已经存在。",
                 "record 导入定位 subject 的规则，已经与 subject 的业务唯一性规则对齐：titleCn + subtitle + seasonIndex + partIndex + category。",
-                "当前系统规则是一作品一记录；如果某个 subject 已经有记录，则新的 record 导入会跳过。",
+                "当前 record 只表示正式完成记录，不再承载想看/搁置；想看/搁置由 collection 模块管理。",
+                "当前系统规则是一作品一正式记录；如果某个 subject 已经有正式记录，则新的 record 导入会跳过。",
                 "preview 和正式 import 使用同一套 subject 匹配逻辑。",
                 "如果匹配到多个 subject，则会跳过，并提示先清理重复作品。"
         );
@@ -105,10 +115,9 @@ public class ImportTemplateService {
                 new ImportFieldDocResponse("subjectSeasonIndex", false, "目标作品第几季，用于定位 subject。", "4", "参与作品定位。"),
                 new ImportFieldDocResponse("subjectPartIndex", false, "目标作品第几部分，用于定位 subject。", "1", "参与作品定位。"),
                 new ImportFieldDocResponse("subjectCategory", true, "目标作品类型，用于定位 subject。", "ANIME", "参与作品定位。"),
-                new ImportFieldDocResponse("recordStatus", true, "记录状态。", "WATCHED", "当前常见值如 WANT_TO_WATCH / WATCHED / ON_HOLD。"),
-                new ImportFieldDocResponse("scoreValue", false, "评分，范围 0~50。", "48", "可以为空。"),
+                new ImportFieldDocResponse("scoreValue", false, "个人评分，范围 0~50。", "48", "可以为空。"),
                 new ImportFieldDocResponse("recordYear", true, "记录年份。", "2024", "必填。"),
-                new ImportFieldDocResponse("recordQuarter", true, "记录季度，只能是 1~4。", "1", "必填。"),
+                new ImportFieldDocResponse("recordQuarter", true, "记录季度，只能是1~4。", "1", "必填。"),
                 new ImportFieldDocResponse("note", false, "备注。", "样例：最终季前半部分补完", "可以为空。")
         );
 

@@ -1,44 +1,39 @@
 package com.mykr.acgnhistoryanalyzer.service;
 
-import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import com.mykr.acgnhistoryanalyzer.common.enums.RecordPageSortType;
 import com.mykr.acgnhistoryanalyzer.entity.Subject;
 import com.mykr.acgnhistoryanalyzer.entity.UserSubjectRecord;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
+import com.mykr.acgnhistoryanalyzer.repository.UserSubjectCollectionRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
-import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordBatchImportRequest;
+import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordImportItemRequest;
-import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
-import com.mykr.acgnhistoryanalyzer.response.RecordScoreBandStatsResponse;
-import com.mykr.acgnhistoryanalyzer.response.RecordYearOverviewResponse;
-import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
-import com.mykr.acgnhistoryanalyzer.response.PageResponse;
-import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportItemResponse;
-import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportResponse;
-import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportPreviewItemResponse;
-import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordImportPreviewResponse;
+import com.mykr.acgnhistoryanalyzer.response.*;
 import com.mykr.acgnhistoryanalyzer.specification.UserSubjectRecordSpecifications;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.ArrayList;
-import java.util.Optional;
+import java.util.List;
 
 @Service
 public class UserSubjectRecordService {
 
     private final UserSubjectRecordRepository userSubjectRecordRepository;
+    private final UserSubjectCollectionRepository userSubjectCollectionRepository;
     private final SubjectRepository subjectRepository;
 
     public UserSubjectRecordService(UserSubjectRecordRepository userSubjectRecordRepository,
+                                    UserSubjectCollectionRepository userSubjectCollectionRepository,
                                     SubjectRepository subjectRepository) {
         this.userSubjectRecordRepository = userSubjectRecordRepository;
+        this.userSubjectCollectionRepository = userSubjectCollectionRepository;
         this.subjectRepository = subjectRepository;
     }
 
@@ -46,9 +41,9 @@ public class UserSubjectRecordService {
         return subjectRepository.existsById(subjectId);
     }
 
+    @Transactional
     public UserSubjectRecordResponse createRecord(UserSubjectRecordCreateRequest request) {
         Subject subject = subjectRepository.findById(request.getSubjectId()).orElse(null);
-
         if (subject == null) {
             return null;
         }
@@ -56,7 +51,6 @@ public class UserSubjectRecordService {
         UserSubjectRecord record = new UserSubjectRecord(
                 subject.getId(),
                 subject.getDisplayTitle(),
-                request.getRecordStatus(),
                 request.getScoreValue(),
                 request.getRecordYear(),
                 request.getRecordQuarter(),
@@ -64,6 +58,12 @@ public class UserSubjectRecordService {
         );
 
         UserSubjectRecord savedRecord = userSubjectRecordRepository.save(record);
+
+        // 作品进入正式记录后，不再保留“想看/搁置”收藏状态。
+        if (userSubjectCollectionRepository.existsBySubjectId(subject.getId())) {
+            userSubjectCollectionRepository.deleteBySubjectId(subject.getId());
+        }
+
         return toResponse(savedRecord);
     }
 
@@ -92,18 +92,8 @@ public class UserSubjectRecordService {
                 ));
                 continue;
             }
-            Subject subject = resolveResult.getSubject();
 
-            if (subject == null) {
-                skippedCount++;
-                items.add(new UserSubjectRecordImportItemResponse(
-                        null,
-                        buildSubjectLabel(item),
-                        "SKIPPED",
-                        "作品不存在，请先导入作品库"
-                ));
-                continue;
-            }
+            Subject subject = resolveResult.getSubject();
 
             if (userSubjectRecordRepository.existsBySubjectId(subject.getId())) {
                 skippedCount++;
@@ -111,14 +101,13 @@ public class UserSubjectRecordService {
                         null,
                         buildSubjectLabel(item),
                         "SKIPPED",
-                        "该作品已有记录，已跳过"
+                        "该作品已有正式记录，已跳过"
                 ));
                 continue;
             }
 
             UserSubjectRecordCreateRequest createRequest = new UserSubjectRecordCreateRequest();
             createRequest.setSubjectId(subject.getId());
-            createRequest.setRecordStatus(item.getRecordStatus());
             createRequest.setScoreValue(item.getScoreValue());
             createRequest.setRecordYear(item.getRecordYear());
             createRequest.setRecordQuarter(item.getRecordQuarter());
@@ -167,6 +156,7 @@ public class UserSubjectRecordService {
                 ));
                 continue;
             }
+
             Subject subject = resolveResult.getSubject();
 
             if (userSubjectRecordRepository.existsBySubjectId(subject.getId())) {
@@ -174,7 +164,7 @@ public class UserSubjectRecordService {
                 items.add(new UserSubjectRecordImportPreviewItemResponse(
                         buildSubjectLabel(item),
                         "SKIPPED",
-                        "该作品已有记录，正式导入时会跳过"
+                        "该作品已有正式记录，正式导入时会跳过"
                 ));
                 continue;
             }
@@ -183,7 +173,7 @@ public class UserSubjectRecordService {
             items.add(new UserSubjectRecordImportPreviewItemResponse(
                     buildSubjectLabel(item),
                     "CAN_IMPORT",
-                    "可以导入"
+                    "可以导入正式记录"
             ));
         }
 
@@ -204,10 +194,9 @@ public class UserSubjectRecordService {
     }
 
     public List<UserSubjectRecordResponse> getRecords(Integer year, Integer quarter,
-                                                      RecordStatus status, Integer minScore, Integer maxScore) {
-
+                                                      Integer minScore, Integer maxScore) {
         Specification<UserSubjectRecord> specification =
-                buildRecordSpecification(year, quarter, status, minScore, maxScore);
+                buildRecordSpecification(year, quarter, minScore, maxScore);
 
         List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(specification);
 
@@ -217,12 +206,10 @@ public class UserSubjectRecordService {
     }
 
     public PageResponse<UserSubjectRecordResponse> getRecordPage(Integer year, Integer quarter,
-                                                                 RecordStatus status,
                                                                  Integer minScore, Integer maxScore,
                                                                  String category, String keyword,
                                                                  Integer page, Integer size,
                                                                  String sortType) {
-
         int effectivePage = normalizePage(page);
         int effectiveSize = normalizeSize(size);
         RecordPageSortType effectiveSortType = normalizeRecordPageSort(sortType);
@@ -240,7 +227,6 @@ public class UserSubjectRecordService {
                 userSubjectRecordRepository.findRecordPageWithSubjectFilters(
                         year,
                         quarter,
-                        status,
                         minScore,
                         maxScore,
                         normalizedCategory,
@@ -281,61 +267,10 @@ public class UserSubjectRecordService {
         return page.getContent().get(0).getRecordYear();
     }
 
-    private int normalizePage(Integer page) {
-        if (page == null || page < 0) {
-            return 0;
-        }
-        return page;
-    }
-
-    private int normalizeSize(Integer size) {
-        if (size == null) {
-            return 10;
-        }
-        if (size < 1) {
-            return 1;
-        }
-        return Math.min(size, 50);
-    }
-
-    private RecordPageSortType normalizeRecordPageSort(String sortType) {
-        if (sortType == null || sortType.isBlank()) {
-            return RecordPageSortType.RECORD_TIME_DESC;
-        }
-        return RecordPageSortType.valueOf(sortType.toUpperCase());
-    }
-
-    private String normalizeBlankToNull(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return value.trim();
-    }
-
-    private Sort buildRecordPageSort(RecordPageSortType sortType) {
-        return switch (sortType) {
-            case RECORD_TIME_DESC -> Sort.by("recordYear").descending()
-                    .and(Sort.by("recordQuarter").descending())
-                    .and(Sort.by("id").descending());
-            case RECORD_TIME_ASC -> Sort.by("recordYear").ascending()
-                    .and(Sort.by("recordQuarter").ascending())
-                    .and(Sort.by("id").ascending());
-            case SCORE_DESC -> Sort.by("scoreValue").descending()
-                    .and(Sort.by("id").descending());
-            case SCORE_ASC -> Sort.by("scoreValue").ascending()
-                    .and(Sort.by("id").ascending());
-            case TITLE_ASC -> Sort.by("subjectTitle").ascending()
-                    .and(Sort.by("id").ascending());
-            case TITLE_DESC -> Sort.by("subjectTitle").descending()
-                    .and(Sort.by("id").descending());
-        };
-    }
-
-    public RecordScoreBandStatsResponse getScoreBandStats(Integer year, Integer quarter, RecordStatus status) {
-        Specification<UserSubjectRecord> specification =
-                buildRecordSpecification(year, quarter, status, null, null);
-
-        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(specification);
+    public RecordScoreBandStatsResponse getScoreBandStats(Integer year, Integer quarter) {
+        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(
+                buildRecordSpecification(year, quarter, null, null)
+        );
 
         int excellentCount = 0;
         int normalCount = 0;
@@ -344,7 +279,6 @@ public class UserSubjectRecordService {
 
         for (UserSubjectRecord record : records) {
             Integer score = record.getScoreValue();
-
             if (score == null) {
                 unratedCount++;
             } else if (score >= 42 && score <= 50) {
@@ -366,39 +300,25 @@ public class UserSubjectRecordService {
     }
 
     public RecordQuarterOverviewResponse getQuarterOverview(Integer year, Integer quarter) {
-        Specification<UserSubjectRecord> specification =
-                buildRecordSpecification(year, quarter, null, null, null);
-
-        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(specification);
+        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(
+                buildRecordSpecification(year, quarter, null, null)
+        );
 
         int totalCount = records.size();
         int highScoreCount = 0;
-        int watchedCount = 0;
-        int onHoldCount = 0;
-        int wantToWatchCount = 0;
         int excellentCount = 0;
         int normalCount = 0;
         int badCount = 0;
         int unratedCount = 0;
 
         for (UserSubjectRecord record : records) {
-            if (record.getRecordStatus() != null) {
-                switch (record.getRecordStatus()) {
-                    case WATCHED -> watchedCount++;
-                    case ON_HOLD -> onHoldCount++;
-                    case WANT_TO_WATCH -> wantToWatchCount++;
-                }
-            }
-
             Integer score = record.getScoreValue();
-
             if (score == null) {
                 unratedCount++;
             } else {
                 if (score >= 45) {
                     highScoreCount++;
                 }
-
                 if (score >= 42 && score <= 50) {
                     excellentCount++;
                 } else if (score >= 35 && score <= 41) {
@@ -414,9 +334,9 @@ public class UserSubjectRecordService {
                 quarter,
                 totalCount,
                 highScoreCount,
-                watchedCount,
-                onHoldCount,
-                wantToWatchCount,
+                totalCount,
+                0,
+                0,
                 excellentCount,
                 normalCount,
                 badCount,
@@ -425,16 +345,12 @@ public class UserSubjectRecordService {
     }
 
     public RecordYearOverviewResponse getYearOverview(Integer year) {
-        Specification<UserSubjectRecord> specification =
-                buildRecordSpecification(year, null, null, null, null);
-
-        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(specification);
+        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(
+                buildRecordSpecification(year, null, null, null)
+        );
 
         int totalCount = records.size();
         int highScoreCount = 0;
-        int watchedCount = 0;
-        int onHoldCount = 0;
-        int wantToWatchCount = 0;
         int excellentCount = 0;
         int normalCount = 0;
         int badCount = 0;
@@ -445,32 +361,24 @@ public class UserSubjectRecordService {
         int q4Count = 0;
 
         for (UserSubjectRecord record : records) {
-            if (record.getRecordStatus() != null) {
-                switch (record.getRecordStatus()) {
-                    case WATCHED -> watchedCount++;
-                    case ON_HOLD -> onHoldCount++;
-                    case WANT_TO_WATCH -> wantToWatchCount++;
-                }
-            }
-
             if (record.getRecordQuarter() != null) {
                 switch (record.getRecordQuarter()) {
                     case 1 -> q1Count++;
                     case 2 -> q2Count++;
                     case 3 -> q3Count++;
                     case 4 -> q4Count++;
+                    default -> {
+                    }
                 }
             }
 
             Integer score = record.getScoreValue();
-
             if (score == null) {
                 unratedCount++;
             } else {
                 if (score >= 45) {
                     highScoreCount++;
                 }
-
                 if (score >= 42 && score <= 50) {
                     excellentCount++;
                 } else if (score >= 35 && score <= 41) {
@@ -485,9 +393,9 @@ public class UserSubjectRecordService {
                 year,
                 totalCount,
                 highScoreCount,
-                watchedCount,
-                onHoldCount,
-                wantToWatchCount,
+                totalCount,
+                0,
+                0,
                 excellentCount,
                 normalCount,
                 badCount,
@@ -499,15 +407,12 @@ public class UserSubjectRecordService {
         );
     }
 
-    public List<UserSubjectRecordResponse> getHighScoreRecords(Integer year, Integer quarter,
-                                                               RecordStatus status, Integer minScore) {
-
+    public List<UserSubjectRecordResponse> getHighScoreRecords(Integer year, Integer quarter, Integer minScore) {
         int effectiveMinScore = (minScore == null) ? 45 : minScore;
 
-        Specification<UserSubjectRecord> specification =
-                buildRecordSpecification(year, quarter, status, effectiveMinScore, 50);
-
-        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(specification);
+        List<UserSubjectRecord> records = userSubjectRecordRepository.findAll(
+                buildRecordSpecification(year, quarter, effectiveMinScore, 50)
+        );
 
         return records.stream()
                 .map(this::toResponse)
@@ -531,11 +436,9 @@ public class UserSubjectRecordService {
 
     public UserSubjectRecordResponse getRecordById(Long id) {
         UserSubjectRecord record = userSubjectRecordRepository.findById(id).orElse(null);
-
         if (record == null) {
             return null;
         }
-
         return toResponse(record);
     }
 
@@ -552,28 +455,31 @@ public class UserSubjectRecordService {
                 .toList();
     }
 
+    @Transactional
     public UserSubjectRecordResponse updateRecord(Long id, UserSubjectRecordCreateRequest request) {
         UserSubjectRecord existingRecord = userSubjectRecordRepository.findById(id).orElse(null);
-
         if (existingRecord == null) {
             return null;
         }
 
         Subject subject = subjectRepository.findById(request.getSubjectId()).orElse(null);
-
         if (subject == null) {
             return null;
         }
 
         existingRecord.setSubjectId(subject.getId());
         existingRecord.setSubjectTitle(subject.getDisplayTitle());
-        existingRecord.setRecordStatus(request.getRecordStatus());
         existingRecord.setScoreValue(request.getScoreValue());
         existingRecord.setRecordYear(request.getRecordYear());
         existingRecord.setRecordQuarter(request.getRecordQuarter());
         existingRecord.setNote(request.getNote());
 
         UserSubjectRecord updatedRecord = userSubjectRecordRepository.save(existingRecord);
+
+        if (userSubjectCollectionRepository.existsBySubjectId(subject.getId())) {
+            userSubjectCollectionRepository.deleteBySubjectId(subject.getId());
+        }
+
         return toResponse(updatedRecord);
     }
 
@@ -587,12 +493,10 @@ public class UserSubjectRecordService {
     }
 
     private Specification<UserSubjectRecord> buildRecordSpecification(Integer year, Integer quarter,
-                                                                      RecordStatus status,
                                                                       Integer minScore, Integer maxScore) {
         return Specification.allOf(
                 UserSubjectRecordSpecifications.hasRecordYear(year),
                 UserSubjectRecordSpecifications.hasRecordQuarter(quarter),
-                UserSubjectRecordSpecifications.hasRecordStatus(status),
                 UserSubjectRecordSpecifications.hasMinScore(minScore),
                 UserSubjectRecordSpecifications.hasMaxScore(maxScore)
         );
@@ -645,6 +549,56 @@ public class UserSubjectRecordService {
         return title;
     }
 
+    private int normalizePage(Integer page) {
+        if (page == null || page < 0) {
+            return 0;
+        }
+        return page;
+    }
+
+    private int normalizeSize(Integer size) {
+        if (size == null) {
+            return 10;
+        }
+        if (size < 1) {
+            return 1;
+        }
+        return Math.min(size, 50);
+    }
+
+    private RecordPageSortType normalizeRecordPageSort(String sortType) {
+        if (sortType == null || sortType.isBlank()) {
+            return RecordPageSortType.RECORD_TIME_DESC;
+        }
+        return RecordPageSortType.valueOf(sortType.toUpperCase());
+    }
+
+    private String normalizeBlankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private Sort buildRecordPageSort(RecordPageSortType sortType) {
+        return switch (sortType) {
+            case RECORD_TIME_DESC -> Sort.by("recordYear").descending()
+                    .and(Sort.by("recordQuarter").descending())
+                    .and(Sort.by("id").descending());
+            case RECORD_TIME_ASC -> Sort.by("recordYear").ascending()
+                    .and(Sort.by("recordQuarter").ascending())
+                    .and(Sort.by("id").ascending());
+            case SCORE_DESC -> Sort.by("scoreValue").descending()
+                    .and(Sort.by("id").descending());
+            case SCORE_ASC -> Sort.by("scoreValue").ascending()
+                    .and(Sort.by("id").ascending());
+            case TITLE_ASC -> Sort.by("subjectTitle").ascending()
+                    .and(Sort.by("id").ascending());
+            case TITLE_DESC -> Sort.by("subjectTitle").descending()
+                    .and(Sort.by("id").descending());
+        };
+    }
+
     private static class SubjectResolveResult {
         private final Subject subject;
         private final String errorMessage;
@@ -654,17 +608,11 @@ public class UserSubjectRecordService {
             this.errorMessage = errorMessage;
         }
 
-        public Subject getSubject() {
-            return subject;
-        }
+        public Subject getSubject() { return subject; }
 
-        public String getErrorMessage() {
-            return errorMessage;
-        }
+        public String getErrorMessage() { return errorMessage; }
 
-        public boolean hasError() {
-            return errorMessage != null;
-        }
+        public boolean hasError() { return errorMessage != null; }
     }
 
     private UserSubjectRecordResponse toResponse(UserSubjectRecord record) {
@@ -693,12 +641,14 @@ public class UserSubjectRecordService {
                 subjectReleaseYear,
                 subjectReleaseQuarter,
                 subjectCoverUrl,
-                record.getRecordStatus().name(),
-                record.getRecordStatus().getLabel(),
+                "WATCHED",
+                "看过",
                 record.getScoreValue(),
                 record.getRecordYear(),
                 record.getRecordQuarter(),
-                record.getNote()
+                record.getNote(),
+                record.getCreatedAt(),
+                record.getUpdatedAt()
         );
     }
 }

@@ -50,7 +50,7 @@ public class TopService {
 
     public TopMasterpieceResponse getMasterpieces() {
         List<UserSubjectRecordResponse> records = userSubjectRecordService
-                .getRecords(null, null, null, MASTERPIECE_THRESHOLD, 50)
+                .getRecords(null, null, MASTERPIECE_THRESHOLD, 50)
                 .stream()
                 .sorted(
                         Comparator.comparing(UserSubjectRecordResponse::getScoreValue,
@@ -76,7 +76,7 @@ public class TopService {
 
     private TopQuarterGroupResponse buildQuarterGroup(Integer year, Integer quarter) {
         List<UserSubjectRecordResponse> records = userSubjectRecordService
-                .getRecords(year, quarter, null, YEAR_TOP_THRESHOLD, 50)
+                .getRecords(year, quarter, YEAR_TOP_THRESHOLD, 50)
                 .stream()
                 .sorted(
                         Comparator.comparing(UserSubjectRecordResponse::getScoreValue,

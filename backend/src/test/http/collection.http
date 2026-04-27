@@ -1,0 +1,54 @@
+@baseUrl = http://localhost:8080
+
+### 使用说明
+# 1. 先运行 00-seed-data.http 创建作品库数据
+# 2. collection 只管理“想看 / 搁置”
+# 3. 如果作品已经有正式 record，后端会拒绝加入收藏
+# 4. 必须先运行“1. 加入想看”，它会自动保存 collection_id
+# 5. 然后才能运行 PUT / DELETE 这类需要 collection_id 的请求
+
+### 1. 加入想看
+POST {{baseUrl}}/api/collections
+Content-Type: application/json
+
+{
+  "subjectId": {{subject_hidden_id}},
+  "collectionType": "WANT",
+  "note": "后续想补"
+}
+
+> {%
+    client.global.set("collection_id", response.body.data.id);
+%}
+
+### 2. 移动到搁置
+PUT {{baseUrl}}/api/collections/{{collection_id}}
+Content-Type: application/json
+
+{
+  "collectionType": "PAUSED",
+  "note": "暂时搁置"
+}
+
+### 3. 查询想看清单
+GET {{baseUrl}}/api/collections?type=WANT&page=0&size=12
+
+### 4. 查询搁置清单
+GET {{baseUrl}}/api/collections?type=PAUSED&page=0&size=12
+
+### 5. 删除收藏
+DELETE {{baseUrl}}/api/collections/{{collection_id}}
+
+### 6. 快捷加入想看
+POST {{baseUrl}}/api/collections/want/{{subject_hidden_id}}
+
+> {%
+    client.global.set("collection_id", response.body.data.id);
+%}
+
+### 7. 快捷加入搁置
+POST {{baseUrl}}/api/collections/paused/{{subject_hidden_id}}
+
+> {%
+    client.global.set("collection_id", response.body.data.id);
+%}

@@ -1,7 +1,10 @@
 package com.mykr.acgnhistoryanalyzer.entity;
 
-import com.mykr.acgnhistoryanalyzer.common.enums.RecordStatus;
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(
@@ -25,10 +28,6 @@ public class UserSubjectRecord {
     @Column(name = "subject_title", nullable = false, length = 255)
     private String subjectTitle;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "record_status", nullable = false, length = 32)
-    private RecordStatus recordStatus;
-
     @Column(name = "score_value")
     private Integer scoreValue;
 
@@ -41,77 +40,55 @@ public class UserSubjectRecord {
     @Column(name = "note", length = 500)
     private String note;
 
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     public UserSubjectRecord() {
     }
 
-    public UserSubjectRecord(Long subjectId, String subjectTitle, RecordStatus recordStatus,
-                             Integer scoreValue, Integer recordYear, Integer recordQuarter, String note) {
+    public UserSubjectRecord(Long subjectId, String subjectTitle,
+                             Integer scoreValue, Integer recordYear,
+                             Integer recordQuarter, String note) {
         this.subjectId = subjectId;
         this.subjectTitle = subjectTitle;
-        this.recordStatus = recordStatus;
         this.scoreValue = scoreValue;
         this.recordYear = recordYear;
         this.recordQuarter = recordQuarter;
         this.note = note;
     }
 
-    public Long getId() {
-        return id;
-    }
+    public Long getId() { return id; }
 
-    public Long getSubjectId() {
-        return subjectId;
-    }
+    public Long getSubjectId() { return subjectId; }
 
-    public String getSubjectTitle() {
-        return subjectTitle;
-    }
+    public String getSubjectTitle() { return subjectTitle; }
 
-    public RecordStatus getRecordStatus() {
-        return recordStatus;
-    }
+    public Integer getScoreValue() { return scoreValue; }
 
-    public Integer getScoreValue() {
-        return scoreValue;
-    }
+    public Integer getRecordYear() { return recordYear; }
 
-    public Integer getRecordYear() {
-        return recordYear;
-    }
+    public Integer getRecordQuarter() { return recordQuarter; }
 
-    public Integer getRecordQuarter() {
-        return recordQuarter;
-    }
+    public String getNote() { return note; }
 
-    public String getNote() {
-        return note;
-    }
+    public LocalDateTime getCreatedAt() { return createdAt; }
 
-    public void setSubjectId(Long subjectId) {
-        this.subjectId = subjectId;
-    }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 
-    public void setSubjectTitle(String subjectTitle) {
-        this.subjectTitle = subjectTitle;
-    }
+    public void setSubjectId(Long subjectId) { this.subjectId = subjectId; }
 
-    public void setRecordStatus(RecordStatus recordStatus) {
-        this.recordStatus = recordStatus;
-    }
+    public void setSubjectTitle(String subjectTitle) { this.subjectTitle = subjectTitle; }
 
-    public void setScoreValue(Integer scoreValue) {
-        this.scoreValue = scoreValue;
-    }
+    public void setScoreValue(Integer scoreValue) { this.scoreValue = scoreValue; }
 
-    public void setRecordYear(Integer recordYear) {
-        this.recordYear = recordYear;
-    }
+    public void setRecordYear(Integer recordYear) { this.recordYear = recordYear; }
 
-    public void setRecordQuarter(Integer recordQuarter) {
-        this.recordQuarter = recordQuarter;
-    }
+    public void setRecordQuarter(Integer recordQuarter) { this.recordQuarter = recordQuarter; }
 
-    public void setNote(String note) {
-        this.note = note;
-    }
+    public void setNote(String note) { this.note = note; }
 }
