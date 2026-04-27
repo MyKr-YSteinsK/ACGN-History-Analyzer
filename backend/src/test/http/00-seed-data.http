@@ -208,7 +208,7 @@ Content-Type: application/json
 
 ### ========== 记录样例（一作品一记录） ==========
 
-### A. 2024 Q1，WATCHED，48
+### A. 2024 Q1，正式记录，48
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -223,7 +223,7 @@ Content-Type: application/json
     client.global.set("record_a_id", response.body.data.id);
 %}
 
-### B. 2024 Q1，WATCHED，45
+### B. 2024 Q1，正式记录，45
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -238,7 +238,7 @@ Content-Type: application/json
     client.global.set("record_b_id", response.body.data.id);
 %}
 
-### C. 2024 Q2，WATCHED，49
+### C. 2024 Q2，正式记录，49
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -253,7 +253,7 @@ Content-Type: application/json
     client.global.set("record_c_id", response.body.data.id);
 %}
 
-### D. 2024 Q2，收藏搁置，35
+### D. 2024 Q2，正式记录，35
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -268,7 +268,7 @@ Content-Type: application/json
     client.global.set("record_d_id", response.body.data.id);
 %}
 
-### E. 2024 Q3，收藏想看，未评分
+### E. 2024 Q3，正式记录，未评分
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -282,7 +282,7 @@ Content-Type: application/json
     client.global.set("record_e_id", response.body.data.id);
 %}
 
-### F. 2025 Q1，WATCHED，20
+### F. 2025 Q1，正式记录，20
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -297,7 +297,7 @@ Content-Type: application/json
     client.global.set("record_f_id", response.body.data.id);
 %}
 
-### G. 2025 Q4，收藏搁置，42
+### G. 2025 Q4，正式记录，42
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 

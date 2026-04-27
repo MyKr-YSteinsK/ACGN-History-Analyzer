@@ -641,8 +641,6 @@ public class UserSubjectRecordService {
                 subjectReleaseYear,
                 subjectReleaseQuarter,
                 subjectCoverUrl,
-                "WATCHED",
-                "看过",
                 record.getScoreValue(),
                 record.getRecordYear(),
                 record.getRecordQuarter(),

@@ -1,0 +1,17 @@
+@baseUrl = http://localhost:8080
+
+### 使用说明
+# 1. 这些接口只返回前端下拉筛选项，不写数据库
+# 2. record 不再提供状态选项；正式记录天然代表“看过/完成记录”
+
+### 1. 类型选项
+GET {{baseUrl}}/api/options/categories
+
+### 2. 季度选项
+GET {{baseUrl}}/api/options/quarters
+
+### 3. 收藏类型选项
+GET {{baseUrl}}/api/options/collection-types
+
+### 4. 作品库状态选项
+GET {{baseUrl}}/api/options/library-statuses

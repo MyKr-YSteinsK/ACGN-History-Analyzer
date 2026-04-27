@@ -11,8 +11,6 @@ public class UserSubjectRecordResponse {
     private Integer subjectReleaseYear;
     private Integer subjectReleaseQuarter;
     private String subjectCoverUrl;
-    private String recordStatus;
-    private String recordStatusLabel;
     private Integer scoreValue;
     private Integer recordYear;
     private Integer recordQuarter;
@@ -23,7 +21,6 @@ public class UserSubjectRecordResponse {
     public UserSubjectRecordResponse(Long id, Long subjectId, String subjectTitle,
                                      String subjectCategory, Integer subjectReleaseYear,
                                      Integer subjectReleaseQuarter, String subjectCoverUrl,
-                                     String recordStatus, String recordStatusLabel,
                                      Integer scoreValue, Integer recordYear,
                                      Integer recordQuarter, String note,
                                      LocalDateTime createdAt, LocalDateTime updatedAt) {
@@ -34,8 +31,6 @@ public class UserSubjectRecordResponse {
         this.subjectReleaseYear = subjectReleaseYear;
         this.subjectReleaseQuarter = subjectReleaseQuarter;
         this.subjectCoverUrl = subjectCoverUrl;
-        this.recordStatus = recordStatus;
-        this.recordStatusLabel = recordStatusLabel;
         this.scoreValue = scoreValue;
         this.recordYear = recordYear;
         this.recordQuarter = recordQuarter;
@@ -57,10 +52,6 @@ public class UserSubjectRecordResponse {
     public Integer getSubjectReleaseQuarter() { return subjectReleaseQuarter; }
 
     public String getSubjectCoverUrl() { return subjectCoverUrl; }
-
-    public String getRecordStatus() { return recordStatus; }
-
-    public String getRecordStatusLabel() { return recordStatusLabel; }
 
     public Integer getScoreValue() { return scoreValue; }
 

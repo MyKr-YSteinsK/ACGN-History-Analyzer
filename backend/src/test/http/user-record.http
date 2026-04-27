@@ -12,7 +12,7 @@ GET {{baseUrl}}/api/records
 ### 2. 查询 2024 年 Q1 记录
 GET {{baseUrl}}/api/records?year=2024&quarter=1
 
-### 3. 查询 WATCHED 且最低分 45 的记录
+### 3. 查询 正式记录且最低分 45 的记录
 GET {{baseUrl}}/api/records?minScore=45
 
 ### 4. 查询 2025 年 Q1 记录
@@ -146,7 +146,7 @@ GET {{baseUrl}}/api/records/page
 ### 22. 查询 2024 年 Q1 的动画记录
 GET {{baseUrl}}/api/records/page?year=2024&quarter=1&category=ANIME&page=0&size=10
 
-### 23. WATCHED 且 45 分及以上，按评分倒序
+### 23. 正式记录且 45 分及以上，按评分倒序
 GET {{baseUrl}}/api/records/page?minScore=45&page=0&size=10&sort=SCORE_DESC
 
 ### 24. 标题包含“巨人”的记录

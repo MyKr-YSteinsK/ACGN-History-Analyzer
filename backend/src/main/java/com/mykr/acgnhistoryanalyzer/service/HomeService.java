@@ -73,7 +73,6 @@ public class HomeService {
                 year,
                 quarter,
                 effectiveCategory,
-                null,
                 effectiveKeyword,
                 effectiveRecordSort.name(),
                 effectiveLibrarySort.name(),
