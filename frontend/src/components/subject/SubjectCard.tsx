@@ -37,7 +37,13 @@ function SubjectCard({ subject, onOpenDetail }: SubjectCardProps) {
     const metaTitle = buildSubjectMetaTitle(subject)
 
     return (
-        <article className="group overflow-hidden rounded-[24px] border border-white/70 bg-white/62 shadow-sm backdrop-blur transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_48px_rgba(120,135,160,0.16)]">
+        <article
+            className={[
+                'group overflow-hidden rounded-[24px] border border-white/70 bg-gradient-to-br shadow-sm backdrop-blur transition-all duration-200',
+                'hover:-translate-y-1 hover:shadow-[0_18px_48px_rgba(120,135,160,0.16)]',
+                category.softGradient,
+            ].join(' ')}
+        >
             <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
                 {subject.coverUrl ? (
                     <img
@@ -94,7 +100,7 @@ function SubjectCard({ subject, onOpenDetail }: SubjectCardProps) {
                 </div>
             </div>
 
-            <div className="p-3.5">
+            <div className="m-2.5 rounded-[20px] border border-white/65 bg-white/58 p-3.5 shadow-sm backdrop-blur">
                 <div className="min-w-0">
                     <h3 className="line-clamp-1 text-[14px] font-bold text-slate-800">
                         {subject.displayTitle}

@@ -41,13 +41,14 @@ function YearScroller({ years, value, onChange }: YearScrollerProps) {
                     disabled={!canMoveLeft}
                     onClick={() => setStartIndex((current) => Math.max(0, current - 1))}
                     className={[
-                        'h-10 w-10 rounded-full border text-sm font-bold transition-all duration-200',
+                        'h-11 w-11 rounded-2xl border text-lg font-black shadow-sm transition-all duration-200',
                         canMoveLeft
-                            ? 'border-white/80 bg-white/60 text-slate-500 hover:-translate-x-0.5 hover:bg-white'
-                            : 'border-white/40 bg-white/30 text-slate-300',
+                            ? 'border-amber-200/75 bg-white/78 text-amber-600 hover:-translate-x-0.5 hover:bg-amber-50'
+                            : 'cursor-not-allowed border-white/45 bg-white/35 text-slate-300',
                     ].join(' ')}
+                    aria-label="向前查看更多年份"
                 >
-                    ‹
+                    &lt;
                 </button>
 
                 <div className="flex gap-2 content-enter">
@@ -77,13 +78,14 @@ function YearScroller({ years, value, onChange }: YearScrollerProps) {
                         )
                     }
                     className={[
-                        'h-10 w-10 rounded-full border text-sm font-bold transition-all duration-200',
+                        'h-11 w-11 rounded-2xl border text-lg font-black shadow-sm transition-all duration-200',
                         canMoveRight
-                            ? 'border-white/80 bg-white/60 text-slate-500 hover:translate-x-0.5 hover:bg-white'
-                            : 'border-white/40 bg-white/30 text-slate-300',
+                            ? 'border-amber-200/75 bg-white/78 text-amber-600 hover:translate-x-0.5 hover:bg-amber-50'
+                            : 'cursor-not-allowed border-white/45 bg-white/35 text-slate-300',
                     ].join(' ')}
+                    aria-label="向后查看更多年份"
                 >
-                    ›
+                    &gt;
                 </button>
             </div>
         </div>

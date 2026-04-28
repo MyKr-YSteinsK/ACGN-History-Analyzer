@@ -1,18 +1,731 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+    getRecords,
+    updateRecord,
+    type RecordPageSort,
+    type UserSubjectRecordResponse,
+} from '../api/recordApi'
+import { getSubjectById } from '../api/subjectApi'
+import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
+import AddRecordModal, {
+    type AddRecordPayload,
+} from '../components/subject/AddRecordModal'
+import SubjectDetailDrawer from '../components/subject/SubjectDetailDrawer'
+import { mapSubjectDetailToCardView } from '../mappers/subjectMapper'
+import {
+    categoryTheme,
+    neutralPanelGradient,
+    personalScoreTheme,
+    quarterTheme,
+    yearChipClassName,
+} from '../theme/acgnTheme'
+import {
+    categoryOrder,
+    getReleaseQuarterLabel,
+    type AcgnCategory,
+    type ReleaseQuarter,
+} from '../types/common'
+import type { SubjectCardView } from '../types/subject'
+
+type SortOption = {
+    value: RecordPageSort
+    label: string
+}
+
+const sortOptions: SortOption[] = [
+    { value: 'RECORD_TIME_DESC', label: '添加新到旧' },
+    { value: 'RECORD_TIME_ASC', label: '添加旧到新' },
+    { value: 'SCORE_DESC', label: '评分高到低' },
+    { value: 'SCORE_ASC', label: '评分低到高' },
+]
+
+function getCurrentQuarter(): ReleaseQuarter {
+    const month = new Date().getMonth() + 1
+
+    if (month <= 3) {
+        return 1
+    }
+
+    if (month <= 6) {
+        return 2
+    }
+
+    if (month <= 9) {
+        return 3
+    }
+
+    return 4
+}
+
+function getErrorMessage(error: unknown) {
+    if (error instanceof Error) {
+        return error.message
+    }
+
+    return '请求失败，请稍后重试'
+}
+
+function compareRecordsBySort(
+    first: UserSubjectRecordResponse,
+    second: UserSubjectRecordResponse,
+    sort: RecordPageSort,
+) {
+    if (sort === 'RECORD_TIME_ASC') {
+        return first.id - second.id
+    }
+
+    if (sort === 'SCORE_DESC') {
+        return (second.scoreValue ?? -1) - (first.scoreValue ?? -1) || second.id - first.id
+    }
+
+    if (sort === 'SCORE_ASC') {
+        return (first.scoreValue ?? 51) - (second.scoreValue ?? 51) || first.id - second.id
+    }
+
+    return second.id - first.id
+}
+
+function getReleaseText(record: UserSubjectRecordResponse) {
+    if (!record.subjectReleaseYear) {
+        return null
+    }
+
+    const quarterLabel = record.subjectReleaseQuarter
+        ? getReleaseQuarterLabel(record.subjectReleaseQuarter)
+        : ''
+
+    return `发行 ${record.subjectReleaseYear}${quarterLabel}`
+}
 
 function RecordsPage() {
+    const [records, setRecords] = useState<UserSubjectRecordResponse[]>([])
+    const [loading, setLoading] = useState(false)
+    const [listError, setListError] = useState<string | null>(null)
+    const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
+    const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+    const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(getCurrentQuarter())
+    const [keyword, setKeyword] = useState('')
+    const [sort, setSort] = useState<RecordPageSort>('RECORD_TIME_DESC')
+    const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
+    const [addRecordSubject, setAddRecordSubject] = useState<SubjectCardView | null>(null)
+    const [detailLoading, setDetailLoading] = useState(false)
+    const [recordSubmitting, setRecordSubmitting] = useState(false)
+
+    const loadRecords = useCallback(async () => {
+        setLoading(true)
+        setListError(null)
+
+        try {
+            const response = await getRecords()
+            const sortedRecords = [...response].sort((first, second) =>
+                compareRecordsBySort(first, second, 'RECORD_TIME_DESC'),
+            )
+            setRecords(sortedRecords)
+
+            const firstAnimeRecord =
+                sortedRecords.find((record) => record.subjectCategory === 'ANIME') ??
+                sortedRecords[0]
+
+            if (firstAnimeRecord) {
+                setSelectedCategory(firstAnimeRecord.subjectCategory ?? 'ANIME')
+                setSelectedYear(firstAnimeRecord.recordYear)
+                setSelectedQuarter(firstAnimeRecord.recordQuarter)
+            }
+        } catch (loadError) {
+            setRecords([])
+            setListError(getErrorMessage(loadError))
+        } finally {
+            setLoading(false)
+        }
+    }, [])
+
+    useEffect(() => {
+        // 页面打开时同步正式记录列表，筛选和排序在前端完成。
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void loadRecords()
+    }, [loadRecords])
+
+    const yearOptions = useMemo(() => {
+        return Array.from(new Set(records.map((record) => record.recordYear))).sort(
+            (first, second) => first - second,
+        )
+    }, [records])
+
+    const currentYearIndex = yearOptions.indexOf(selectedYear)
+    const previousYear = currentYearIndex > 0 ? yearOptions[currentYearIndex - 1] : null
+    const nextYear =
+        currentYearIndex >= 0 && currentYearIndex < yearOptions.length - 1
+            ? yearOptions[currentYearIndex + 1]
+            : null
+
+    const filteredRecords = useMemo(() => {
+        const normalizedKeyword = keyword.trim().toLowerCase()
+
+        return records
+            .filter((record) => {
+                const matchCategory = record.subjectCategory === selectedCategory
+                const matchYear = record.recordYear === selectedYear
+                const matchQuarter = record.recordQuarter === selectedQuarter
+                const matchKeyword =
+                    normalizedKeyword.length === 0 ||
+                    record.subjectTitle.toLowerCase().includes(normalizedKeyword)
+
+                return matchCategory && matchYear && matchQuarter && matchKeyword
+            })
+            .sort((first, second) => compareRecordsBySort(first, second, sort))
+    }, [keyword, records, selectedCategory, selectedQuarter, selectedYear, sort])
+
+    const selectedCategoryTheme = categoryTheme[selectedCategory]
+    const selectedQuarterTheme = quarterTheme[selectedQuarter]
+    const selectedQuarterGradient =
+        selectedQuarterTheme?.panelGradient ?? neutralPanelGradient
+
+    function moveYear(direction: 'previous' | 'next') {
+        const targetYear = direction === 'previous' ? previousYear : nextYear
+
+        if (targetYear !== null) {
+            setSelectedYear(targetYear)
+        }
+    }
+
+    async function handleOpenDetail(record: UserSubjectRecordResponse) {
+        setDetailLoading(true)
+        setFeedbackMessage(null)
+
+        try {
+            const detail = await getSubjectById(record.subjectId)
+            setSelectedSubject(mapSubjectDetailToCardView(detail))
+        } catch (detailError) {
+            setFeedbackMessage(getErrorMessage(detailError))
+        } finally {
+            setDetailLoading(false)
+        }
+    }
+
+    async function handleOpenEditRecord(subject: SubjectCardView) {
+        setFeedbackMessage(null)
+
+        if (!subject.recordId) {
+            const detail = await getSubjectById(subject.id)
+            setAddRecordSubject(mapSubjectDetailToCardView(detail))
+            return
+        }
+
+        setAddRecordSubject(subject)
+    }
+
+    async function handleSubmitRecord(subject: SubjectCardView, payload: AddRecordPayload) {
+        if (!subject.recordId) {
+            setFeedbackMessage('未找到可编辑的正式记录，请重新打开详情后再试。')
+            return
+        }
+
+        setRecordSubmitting(true)
+        setFeedbackMessage(null)
+
+        try {
+            const updatedRecord = await updateRecord(subject.recordId, {
+                subjectId: subject.id,
+                recordYear: payload.recordYear,
+                recordQuarter: payload.recordQuarter,
+                scoreValue: payload.scoreValue,
+                note: payload.note || null,
+            })
+
+            setRecords((current) =>
+                current.map((record) =>
+                    record.id === updatedRecord.id ? updatedRecord : record,
+                ),
+            )
+            setSelectedCategory(updatedRecord.subjectCategory ?? selectedCategory)
+            setSelectedYear(updatedRecord.recordYear)
+            setSelectedQuarter(updatedRecord.recordQuarter)
+
+            const detail = await getSubjectById(subject.id)
+            const mappedDetail = mapSubjectDetailToCardView(detail)
+            setSelectedSubject(mappedDetail)
+            setAddRecordSubject(null)
+            setFeedbackMessage('已保存记录修改')
+        } catch (error) {
+            setFeedbackMessage(getErrorMessage(error))
+        } finally {
+            setRecordSubmitting(false)
+        }
+    }
+
     return (
-        <div className="space-y-6">
-            <PageHero
-                eyebrow="MY RECORDS"
-                title="我的记录"
-                description="这里只展示正式看过、读过或玩过的记录，不展示想看和搁置。后续会加入年份、季节、搜索定位和四类型分区。"
+        <>
+            <div className="space-y-6 content-enter">
+                <PageHero
+                    eyebrow="MY RECORDS"
+                    title="我的记录"
+                    description="固定年份与季度查看正式记录，按 ACGN 类型切换浏览。"
+                />
+
+                <GlassCard className="overflow-hidden">
+                    <div
+                        className={[
+                            'bg-gradient-to-br p-5 transition-all duration-300',
+                            selectedQuarterGradient,
+                        ].join(' ')}
+                    >
+                        <div className="grid items-end gap-4 xl:grid-cols-[1.05fr_330px_360px]">
+                            <label className="block">
+                                <span className="mb-2 block text-xs font-semibold text-slate-400">
+                                    搜索记录
+                                </span>
+                                <input
+                                    value={keyword}
+                                    onChange={(event) => setKeyword(event.target.value)}
+                                    placeholder="输入作品标题"
+                                    className="h-12 w-full rounded-2xl border border-white/80 bg-white/72 px-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-sky-200 focus:bg-white focus:shadow-sm"
+                                />
+                            </label>
+
+                            <YearTriplet
+                                selectedYear={selectedYear}
+                                previousYear={previousYear}
+                                nextYear={nextYear}
+                                onSelect={setSelectedYear}
+                                onMove={moveYear}
+                            />
+
+                            <div>
+                                <span className="mb-2 block text-xs font-semibold text-slate-400">
+                                    季度
+                                </span>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {([1, 2, 3, 4] as ReleaseQuarter[]).map((quarter) => {
+                                        const theme = quarterTheme[quarter]
+                                        const selected = selectedQuarter === quarter
+
+                                        return (
+                                            <button
+                                                key={quarter}
+                                                type="button"
+                                                onClick={() => setSelectedQuarter(quarter)}
+                                                className={[
+                                                    'h-12 rounded-2xl border text-sm font-bold transition-all duration-200',
+                                                    selected
+                                                        ? `${theme.border} ${theme.bg} ${theme.text} scale-[1.03] shadow-sm`
+                                                        : 'border-white/80 bg-white/62 text-slate-400 hover:-translate-y-0.5 hover:bg-white',
+                                                ].join(' ')}
+                                            >
+                                                {theme.cnName}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </GlassCard>
+
+                <CategorySwitch
+                    value={selectedCategory}
+                    onChange={setSelectedCategory}
+                />
+
+                {feedbackMessage ? (
+                    <div className="rounded-[24px] border border-sky-100 bg-white/62 px-5 py-4 text-sm font-semibold text-sky-700 shadow-sm backdrop-blur-xl">
+                        {feedbackMessage}
+                    </div>
+                ) : null}
+
+                <GlassCard className="overflow-hidden">
+                    <div
+                        className={[
+                            'bg-gradient-to-br p-5 transition-all duration-300',
+                            selectedQuarterGradient,
+                        ].join(' ')}
+                    >
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h3 className="text-lg font-black text-slate-800">
+                                    {selectedCategoryTheme.cnName}记录
+                                </h3>
+                                <p className="mt-1 text-sm text-slate-400">
+                                    {selectedYear} · {selectedQuarterTheme.cnName} · {filteredRecords.length} 条
+                                </p>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                {sortOptions.map((option) => {
+                                    const selected = sort === option.value
+
+                                    return (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            onClick={() => setSort(option.value)}
+                                            className={[
+                                                'rounded-full border px-4 py-2 text-xs font-semibold transition-all duration-200',
+                                                selected
+                                                    ? `${selectedCategoryTheme.border} ${selectedCategoryTheme.bg} ${selectedCategoryTheme.text} shadow-sm`
+                                                    : 'border-white/75 bg-white/55 text-slate-400 hover:-translate-y-0.5 hover:bg-white hover:text-slate-600',
+                                            ].join(' ')}
+                                        >
+                                            {option.label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="mt-5">
+                            {loading ? (
+                                <div className="subject-grid">
+                                    {Array.from({ length: 8 }, (_, index) => (
+                                        <div
+                                            key={index}
+                                            className="h-[430px] animate-pulse rounded-[24px] border border-white/70 bg-white/50 shadow-sm"
+                                        />
+                                    ))}
+                                </div>
+                            ) : listError ? (
+                                <div className="rounded-[28px] border border-rose-100 bg-white/58 p-10 text-center">
+                                    <p className="text-base font-semibold text-rose-600">记录加载失败</p>
+                                    <p className="mt-2 text-sm text-slate-400">{listError}</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => void loadRecords()}
+                                        className="mt-5 rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700"
+                                    >
+                                        重新加载
+                                    </button>
+                                </div>
+                            ) : filteredRecords.length > 0 ? (
+                                <div className="subject-grid">
+                                    {filteredRecords.map((record) => (
+                                        <RecordCard
+                                            key={record.id}
+                                            record={record}
+                                            category={selectedCategory}
+                                            onOpenDetail={handleOpenDetail}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/50 p-12 text-center">
+                                    <p className="text-base font-semibold text-slate-500">没有匹配的记录</p>
+                                    <p className="mt-2 text-sm text-slate-400">
+                                        可以切换年份、季度、类型或调整搜索关键词。
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </GlassCard>
+            </div>
+
+            <SubjectDetailDrawer
+                open={selectedSubject !== null}
+                subject={selectedSubject}
+                onClose={() => setSelectedSubject(null)}
+                onAddRecord={(subject) => void handleOpenEditRecord(subject)}
+                onAddToWant={() => undefined}
+                onAddToPaused={() => undefined}
+                onSetToNone={() => undefined}
+                detailLoading={detailLoading}
+                showActions
+                showStatusActions={false}
             />
 
-            <section className="rounded-[32px] border border-white/70 bg-white/45 p-8 text-sm text-slate-500 shadow-sm backdrop-blur-xl">
-                我的记录页待开发
-            </section>
+            <AddRecordModal
+                open={addRecordSubject !== null}
+                subject={addRecordSubject}
+                onClose={() => setAddRecordSubject(null)}
+                onSubmit={handleSubmitRecord}
+                submitting={recordSubmitting}
+            />
+        </>
+    )
+}
+
+type YearTripletProps = {
+    selectedYear: number
+    previousYear: number | null
+    nextYear: number | null
+    onSelect: (year: number) => void
+    onMove: (direction: 'previous' | 'next') => void
+}
+
+function YearTriplet({
+                         selectedYear,
+                         previousYear,
+                         nextYear,
+                         onSelect,
+                         onMove,
+                     }: YearTripletProps) {
+    const visibleYears = [previousYear, selectedYear, nextYear]
+
+    return (
+        <div>
+            <span className="mb-2 block text-xs font-semibold text-slate-400">
+                年份
+            </span>
+            <div className="grid grid-cols-[44px_1fr_44px] gap-2">
+                <button
+                    type="button"
+                    disabled={previousYear === null}
+                    onClick={() => onMove('previous')}
+                    className={[
+                        'h-12 rounded-2xl border text-lg font-black shadow-sm transition-all duration-200',
+                        previousYear !== null
+                            ? 'border-amber-200/75 bg-white/78 text-amber-600 hover:-translate-x-0.5 hover:bg-amber-50'
+                            : 'cursor-not-allowed border-white/45 bg-white/35 text-slate-300',
+                    ].join(' ')}
+                    aria-label="选择上一年"
+                >
+                    &lt;
+                </button>
+
+                <div className="grid grid-cols-3 gap-2">
+                    {visibleYears.map((year, index) => {
+                        if (year === null) {
+                            return (
+                                <span
+                                    key={`empty-${index}`}
+                                    aria-hidden="true"
+                                    className="h-12 rounded-2xl border border-white/35 bg-white/25"
+                                />
+                            )
+                        }
+
+                        const selected = year === selectedYear
+
+                        return (
+                            <button
+                                key={year}
+                                type="button"
+                                onClick={() => onSelect(year)}
+                                className={[
+                                    'h-12 rounded-2xl border px-2 text-sm font-black transition-all duration-200',
+                                    selected
+                                        ? 'scale-[1.03] border-amber-200 bg-amber-100/90 text-amber-700 shadow-sm'
+                                        : 'border-white/75 bg-white/62 text-slate-400 hover:-translate-y-0.5 hover:bg-white hover:text-slate-600',
+                                ].join(' ')}
+                            >
+                                {year}
+                            </button>
+                        )
+                    })}
+                </div>
+
+                <button
+                    type="button"
+                    disabled={nextYear === null}
+                    onClick={() => onMove('next')}
+                    className={[
+                        'h-12 rounded-2xl border text-lg font-black shadow-sm transition-all duration-200',
+                        nextYear !== null
+                            ? 'border-amber-200/75 bg-white/78 text-amber-600 hover:translate-x-0.5 hover:bg-amber-50'
+                            : 'cursor-not-allowed border-white/45 bg-white/35 text-slate-300',
+                    ].join(' ')}
+                    aria-label="选择下一年"
+                >
+                    &gt;
+                </button>
+            </div>
         </div>
+    )
+}
+
+type CategorySwitchProps = {
+    value: AcgnCategory
+    onChange: (category: AcgnCategory) => void
+}
+
+function CategorySwitch({ value, onChange }: CategorySwitchProps) {
+    const activeIndex = categoryOrder.indexOf(value)
+    const activeTheme = categoryTheme[value]
+
+    return (
+        <section
+            className={[
+                'relative overflow-hidden rounded-[30px] border border-white/70 bg-gradient-to-br p-2 shadow-sm backdrop-blur-xl transition-all duration-300',
+                activeTheme.softGradient,
+            ].join(' ')}
+        >
+            <div
+                className="absolute bottom-2 top-2 rounded-[24px] border border-white/85 bg-white/78 shadow-[0_16px_40px_rgba(120,135,160,0.14)] transition-transform duration-300 ease-out"
+                style={{
+                    width: '25%',
+                    transform: `translateX(${activeIndex * 100}%)`,
+                }}
+            />
+
+            <div className="relative grid grid-cols-4">
+                {categoryOrder.map((category) => {
+                    const theme = categoryTheme[category]
+                    const selected = value === category
+                    const upperName = theme.enName.toUpperCase()
+
+                    return (
+                        <button
+                            key={category}
+                            type="button"
+                            onClick={() => onChange(category)}
+                            className="relative flex h-24 items-center justify-center rounded-[24px] px-2 transition-all duration-200"
+                        >
+                            <span className="flex flex-col items-center gap-2">
+                                <span className="flex items-end gap-1 leading-none">
+                                    <span
+                                        className={[
+                                            'text-[36px] font-black leading-none transition-colors',
+                                            selected ? theme.text : 'text-slate-300',
+                                        ].join(' ')}
+                                    >
+                                        {upperName[0]}
+                                    </span>
+                                    <span
+                                        className={[
+                                            'pb-[4px] text-[15px] font-black leading-none transition-colors',
+                                            selected ? 'text-slate-800' : 'text-slate-400',
+                                        ].join(' ')}
+                                    >
+                                        {upperName.slice(1)}
+                                    </span>
+                                </span>
+
+                                <span
+                                    className={[
+                                        'rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors',
+                                        selected
+                                            ? `${theme.border} ${theme.bg} ${theme.text}`
+                                            : 'border-white/70 bg-white/45 text-slate-400',
+                                    ].join(' ')}
+                                >
+                                    {theme.cnName}
+                                </span>
+                            </span>
+                        </button>
+                    )
+                })}
+            </div>
+        </section>
+    )
+}
+
+type RecordCardProps = {
+    record: UserSubjectRecordResponse
+    category: AcgnCategory
+    onOpenDetail: (record: UserSubjectRecordResponse) => void
+}
+
+function RecordCard({ record, category, onOpenDetail }: RecordCardProps) {
+    const theme = categoryTheme[record.subjectCategory ?? category]
+    const recordQuarter = quarterTheme[record.recordQuarter]
+    const releaseText = getReleaseText(record)
+
+    return (
+        <button
+            type="button"
+            onClick={() => onOpenDetail(record)}
+            className={[
+                'group flex h-full flex-col overflow-hidden rounded-[24px] border border-white/70 bg-gradient-to-br text-left shadow-sm backdrop-blur transition-all duration-200',
+                'hover:-translate-y-1 hover:shadow-[0_18px_48px_rgba(120,135,160,0.16)]',
+                theme.softGradient,
+            ].join(' ')}
+        >
+            <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
+                {record.subjectCoverUrl ? (
+                    <img
+                        src={record.subjectCoverUrl}
+                        alt={record.subjectTitle}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                    />
+                ) : (
+                    <div
+                        className={[
+                            'flex h-full w-full items-center justify-center bg-gradient-to-br',
+                            theme.softGradient,
+                        ].join(' ')}
+                    >
+                        <span className={['text-6xl font-black', theme.text].join(' ')}>
+                            {theme.letter}
+                        </span>
+                    </div>
+                )}
+
+                <div className="absolute right-3 top-3">
+                    {record.scoreValue !== null ? (
+                        <span
+                            className={[
+                                'rounded-2xl border px-3 py-1 text-xs font-black',
+                                personalScoreTheme.className,
+                            ].join(' ')}
+                        >
+                            {record.scoreValue}
+                        </span>
+                    ) : (
+                        <span className="rounded-2xl border border-slate-200 bg-slate-50/90 px-3 py-1 text-xs font-semibold text-slate-400">
+                            未评分
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            <div className="m-2.5 flex flex-1 flex-col rounded-[20px] border border-white/65 bg-white/58 p-3.5 shadow-sm backdrop-blur">
+                <h3 className="line-clamp-1 text-[14px] font-bold text-slate-800">
+                    {record.subjectTitle}
+                </h3>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                    <span
+                        className={[
+                            'rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+                            theme.bg,
+                            theme.text,
+                        ].join(' ')}
+                    >
+                        {theme.cnName}
+                    </span>
+
+                    <span
+                        className={[
+                            'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
+                            yearChipClassName,
+                        ].join(' ')}
+                    >
+                        记录 {record.recordYear}
+                    </span>
+
+                    <span
+                        className={[
+                            'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
+                            recordQuarter.bg,
+                            recordQuarter.text,
+                            recordQuarter.border,
+                        ].join(' ')}
+                    >
+                        {recordQuarter.cnName}
+                    </span>
+
+                    {releaseText ? (
+                        <span className="rounded-full border border-white/75 bg-white/70 px-2.5 py-0.5 text-[11px] font-semibold text-slate-400">
+                            {releaseText}
+                        </span>
+                    ) : null}
+                </div>
+
+                <p className="mt-3 min-h-[40px] line-clamp-2 text-xs leading-5 text-slate-400">
+                    {record.note ?? '暂无备注'}
+                </p>
+
+                <div className="mt-auto flex items-center justify-between border-t border-white/70 pt-3">
+                    <span className="line-clamp-1 text-[11px] text-slate-400">
+                        {record.updatedAt ? '已同步记录' : '正式记录'}
+                    </span>
+
+                    <span className="rounded-full border border-slate-200/70 bg-white/75 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:bg-slate-900 group-hover:text-white">
+                        详情
+                    </span>
+                </div>
+            </div>
+        </button>
     )
 }
 

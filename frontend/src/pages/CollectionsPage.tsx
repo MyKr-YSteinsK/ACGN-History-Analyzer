@@ -1,18 +1,799 @@
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+    deleteCollection,
+    getCollections,
+    updateCollection,
+    type UserSubjectCollectionResponse,
+} from '../api/collectionApi'
+import { createRecord } from '../api/recordApi'
+import { getSubjectById } from '../api/subjectApi'
+import ConfirmDialog from '../components/common/ConfirmDialog'
+import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
+import AddRecordModal, {
+    type AddRecordPayload,
+} from '../components/subject/AddRecordModal'
+import SubjectDetailDrawer from '../components/subject/SubjectDetailDrawer'
+import { mapSubjectDetailToCardView } from '../mappers/subjectMapper'
+import {
+    categoryTheme,
+    libraryStatusTheme,
+    quarterTheme,
+    yearChipClassName,
+} from '../theme/acgnTheme'
+import {
+    categoryOrder,
+    getReleaseQuarterLabel,
+    type AcgnCategory,
+    type CollectionType,
+} from '../types/common'
+import type { PageResponse } from '../types/api'
+import type { SubjectCardView } from '../types/subject'
+
+const pageSize = 12
+
+type CollectionPageState = Pick<
+    PageResponse<unknown>,
+    'page' | 'size' | 'totalElements' | 'totalPages' | 'first' | 'last'
+>
+
+const initialPageState: CollectionPageState = {
+    page: 0,
+    size: pageSize,
+    totalElements: 0,
+    totalPages: 0,
+    first: true,
+    last: true,
+}
+
+const collectionTypeOptions: Array<{
+    value: CollectionType
+    label: string
+    description: string
+}> = [
+    {
+        value: 'WANT',
+        label: '想看',
+        description: '之后准备正式补完的作品',
+    },
+    {
+        value: 'PAUSED',
+        label: '搁置',
+        description: '暂时停下但还想保留的作品',
+    },
+]
+
+function getErrorMessage(error: unknown) {
+    if (error instanceof Error) {
+        return error.message
+    }
+
+    return '请求失败，请稍后重试'
+}
+
+function getReleaseText(collection: UserSubjectCollectionResponse) {
+    if (!collection.subjectReleaseYear) {
+        return null
+    }
+
+    const quarterLabel = collection.subjectReleaseQuarter
+        ? getReleaseQuarterLabel(collection.subjectReleaseQuarter)
+        : ''
+
+    return `${collection.subjectReleaseYear}${quarterLabel}`
+}
 
 function CollectionsPage() {
+    const [collections, setCollections] = useState<UserSubjectCollectionResponse[]>([])
+    const [pageInfo, setPageInfo] = useState<CollectionPageState>(initialPageState)
+    const [selectedType, setSelectedType] = useState<CollectionType>('WANT')
+    const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
+    const [keyword, setKeyword] = useState('')
+    const [currentPage, setCurrentPage] = useState(0)
+    const [loading, setLoading] = useState(false)
+    const [actionLoading, setActionLoading] = useState(false)
+    const [listError, setListError] = useState<string | null>(null)
+    const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
+    const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+    const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
+    const [addRecordSubject, setAddRecordSubject] = useState<SubjectCardView | null>(null)
+    const [pendingDelete, setPendingDelete] =
+        useState<UserSubjectCollectionResponse | null>(null)
+    const [detailLoading, setDetailLoading] = useState(false)
+    const [recordSubmitting, setRecordSubmitting] = useState(false)
+
+    const selectedCategoryTheme = categoryTheme[selectedCategory]
+    const selectedTypeTheme = libraryStatusTheme[selectedType]
+    const resultAnimationKey = [
+        selectedType,
+        selectedCategory,
+        keyword,
+        currentPage,
+    ].join('-')
+
+    const loadCollections = useCallback(async () => {
+        setLoading(true)
+        setListError(null)
+
+        try {
+            const response = await getCollections({
+                type: selectedType,
+                category: selectedCategory,
+                keyword: keyword.trim() || undefined,
+                page: currentPage,
+                size: pageSize,
+            })
+
+            setCollections(response.content)
+            setPageInfo({
+                page: response.page,
+                size: response.size,
+                totalElements: response.totalElements,
+                totalPages: response.totalPages,
+                first: response.first,
+                last: response.last,
+            })
+        } catch (error) {
+            setCollections([])
+            setPageInfo(initialPageState)
+            setListError(getErrorMessage(error))
+        } finally {
+            setLoading(false)
+        }
+    }, [currentPage, keyword, selectedCategory, selectedType])
+
+    useEffect(() => {
+        // 收藏夹页只展示想看 / 搁置，切换筛选或分页时重新请求后端分页。
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void loadCollections()
+    }, [loadCollections])
+
+    function resetPage() {
+        setCurrentPage(0)
+    }
+
+    function handleTypeChange(type: CollectionType) {
+        resetPage()
+        setOpenMenuId(null)
+        setSelectedType(type)
+    }
+
+    function handleCategoryChange(category: AcgnCategory) {
+        resetPage()
+        setOpenMenuId(null)
+        setSelectedCategory(category)
+    }
+
+    function handleKeywordChange(value: string) {
+        resetPage()
+        setKeyword(value)
+    }
+
+    async function loadSubjectForAction(subjectId: number) {
+        const detail = await getSubjectById(subjectId)
+        return mapSubjectDetailToCardView(detail)
+    }
+
+    async function handleOpenDetail(collection: UserSubjectCollectionResponse) {
+        setDetailLoading(true)
+        setFeedbackMessage(null)
+        setOpenMenuId(null)
+
+        try {
+            setSelectedSubject(await loadSubjectForAction(collection.subjectId))
+        } catch (error) {
+            setFeedbackMessage(getErrorMessage(error))
+        } finally {
+            setDetailLoading(false)
+        }
+    }
+
+    async function handleOpenAddRecord(collection: UserSubjectCollectionResponse) {
+        setActionLoading(true)
+        setFeedbackMessage(null)
+        setOpenMenuId(null)
+
+        try {
+            setAddRecordSubject(await loadSubjectForAction(collection.subjectId))
+        } catch (error) {
+            setFeedbackMessage(getErrorMessage(error))
+        } finally {
+            setActionLoading(false)
+        }
+    }
+
+    async function handleMoveCollection(collection: UserSubjectCollectionResponse) {
+        const targetType: CollectionType =
+            collection.collectionType === 'WANT' ? 'PAUSED' : 'WANT'
+
+        setActionLoading(true)
+        setFeedbackMessage(null)
+        setOpenMenuId(null)
+
+        try {
+            await updateCollection(collection.id, {
+                collectionType: targetType,
+                note: collection.note,
+            })
+            await loadCollections()
+            setFeedbackMessage(targetType === 'WANT' ? '已移至想看' : '已移至搁置')
+        } catch (error) {
+            setFeedbackMessage(getErrorMessage(error))
+        } finally {
+            setActionLoading(false)
+        }
+    }
+
+    async function handleConfirmDelete() {
+        if (!pendingDelete) {
+            return
+        }
+
+        setActionLoading(true)
+        setFeedbackMessage(null)
+
+        try {
+            await deleteCollection(pendingDelete.id)
+            await loadCollections()
+            setPendingDelete(null)
+            setFeedbackMessage('已删除收藏')
+        } catch (error) {
+            setFeedbackMessage(getErrorMessage(error))
+        } finally {
+            setActionLoading(false)
+        }
+    }
+
+    async function handleSubmitRecord(subject: SubjectCardView, payload: AddRecordPayload) {
+        setRecordSubmitting(true)
+        setFeedbackMessage(null)
+
+        try {
+            await createRecord({
+                subjectId: subject.id,
+                recordYear: payload.recordYear,
+                recordQuarter: payload.recordQuarter,
+                scoreValue: payload.scoreValue,
+                note: payload.note || null,
+            })
+            await loadCollections()
+            setAddRecordSubject(null)
+            setSelectedSubject(await loadSubjectForAction(subject.id))
+            setFeedbackMessage('已添加正式记录，作品已从收藏夹移出')
+        } catch (error) {
+            setFeedbackMessage(getErrorMessage(error))
+        } finally {
+            setRecordSubmitting(false)
+        }
+    }
+
+    const pageText = useMemo(() => {
+        if (pageInfo.totalPages === 0) {
+            return '第 0 / 0 页'
+        }
+
+        return `第 ${pageInfo.page + 1} / ${pageInfo.totalPages} 页`
+    }, [pageInfo.page, pageInfo.totalPages])
+
     return (
-        <div className="space-y-6">
-            <PageHero
-                eyebrow="COLLECTIONS"
-                title="收藏夹"
-                description="收藏夹只管理想看和搁置，不按年份季度展示。后续会加入类型筛选、想看/搁置切换、分页和更多操作菜单。"
+        <>
+            <div className="space-y-6 content-enter">
+                <PageHero
+                    eyebrow="COLLECTIONS"
+                    title="收藏夹"
+                    description="收藏夹只管理想看和搁置，不按年份季度展示。"
+                />
+
+                <GlassCard className="overflow-hidden">
+                    <div
+                        className={[
+                            'bg-gradient-to-br p-6 transition-all duration-300',
+                            selectedCategoryTheme.softGradient,
+                        ].join(' ')}
+                    >
+                        <div className="grid gap-5 xl:grid-cols-[1fr_1.25fr]">
+                            <div>
+                                <p className="mb-2 text-xs font-semibold text-slate-400">
+                                    清单
+                                </p>
+                                <CollectionTypeTabs
+                                    value={selectedType}
+                                    onChange={handleTypeChange}
+                                />
+                            </div>
+
+                            <label className="block">
+                                <span className="mb-2 block text-xs font-semibold text-slate-400">
+                                    搜索收藏
+                                </span>
+                                <input
+                                    value={keyword}
+                                    onChange={(event) => handleKeywordChange(event.target.value)}
+                                    placeholder="输入作品标题"
+                                    className="h-12 w-full rounded-2xl border border-white/80 bg-white/72 px-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-sky-200 focus:bg-white focus:shadow-sm"
+                                />
+                            </label>
+                        </div>
+                    </div>
+                </GlassCard>
+
+                <CategorySwitch
+                    value={selectedCategory}
+                    onChange={handleCategoryChange}
+                />
+
+                {feedbackMessage ? (
+                    <div className="rounded-[24px] border border-sky-100 bg-white/62 px-5 py-4 text-sm font-semibold text-sky-700 shadow-sm backdrop-blur-xl">
+                        {feedbackMessage}
+                    </div>
+                ) : null}
+
+                <GlassCard className="overflow-hidden">
+                    <div
+                        className={[
+                            'bg-gradient-to-br p-6 transition-all duration-300',
+                            selectedCategoryTheme.softGradient,
+                        ].join(' ')}
+                    >
+                        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+                            <div>
+                                <h3 className="text-lg font-black text-slate-800">
+                                    {selectedCategoryTheme.cnName} · {selectedTypeTheme.label}
+                                </h3>
+                                <p className="mt-1 text-sm text-slate-400">
+                                    当前展示 {collections.length} 部作品，共 {pageInfo.totalElements} 部。
+                                </p>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 text-xs text-slate-400">
+                                <span className="rounded-full bg-white/65 px-3 py-1.5">
+                                    按加入时间排序
+                                </span>
+                                <span className="rounded-full bg-white/65 px-3 py-1.5">
+                                    {pageText}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div key={resultAnimationKey} className="content-enter">
+                            {loading ? (
+                                <div className="subject-grid">
+                                    {Array.from({ length: 8 }, (_, index) => (
+                                        <div
+                                            key={index}
+                                            className="h-[410px] animate-pulse rounded-[24px] border border-white/70 bg-white/50 shadow-sm"
+                                        />
+                                    ))}
+                                </div>
+                            ) : listError ? (
+                                <div className="rounded-[28px] border border-rose-100 bg-white/58 p-10 text-center">
+                                    <p className="text-base font-semibold text-rose-600">
+                                        收藏夹加载失败
+                                    </p>
+                                    <p className="mt-2 text-sm text-slate-400">{listError}</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => void loadCollections()}
+                                        className="mt-5 rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700"
+                                    >
+                                        重新加载
+                                    </button>
+                                </div>
+                            ) : collections.length > 0 ? (
+                                <div className="subject-grid">
+                                    {collections.map((collection) => (
+                                        <CollectionCard
+                                            key={collection.id}
+                                            collection={collection}
+                                            fallbackCategory={selectedCategory}
+                                            menuOpen={openMenuId === collection.id}
+                                            actionLoading={actionLoading}
+                                            onToggleMenu={() =>
+                                                setOpenMenuId((current) =>
+                                                    current === collection.id ? null : collection.id,
+                                                )
+                                            }
+                                            onOpenDetail={handleOpenDetail}
+                                            onMove={handleMoveCollection}
+                                            onDelete={(target) => {
+                                                setOpenMenuId(null)
+                                                setPendingDelete(target)
+                                            }}
+                                            onAddRecord={handleOpenAddRecord}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/50 p-12 text-center">
+                                    <p className="text-base font-semibold text-slate-500">
+                                        没有匹配的收藏
+                                    </p>
+                                    <p className="mt-2 text-sm text-slate-400">
+                                        可以切换清单、类型，或调整搜索关键词。
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/65 pt-5">
+                            <p className="text-sm font-semibold text-slate-400">{pageText}</p>
+
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    disabled={pageInfo.first || loading}
+                                    onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
+                                    className={[
+                                        'rounded-2xl border px-4 py-2.5 text-sm font-semibold transition',
+                                        pageInfo.first || loading
+                                            ? 'cursor-not-allowed border-white/50 bg-white/35 text-slate-300'
+                                            : 'border-white/80 bg-white/70 text-slate-600 hover:-translate-y-0.5 hover:bg-white',
+                                    ].join(' ')}
+                                >
+                                    上一页
+                                </button>
+
+                                <button
+                                    type="button"
+                                    disabled={pageInfo.last || loading || pageInfo.totalPages === 0}
+                                    onClick={() =>
+                                        setCurrentPage((page) =>
+                                            Math.min(pageInfo.totalPages - 1, page + 1),
+                                        )
+                                    }
+                                    className={[
+                                        'rounded-2xl border px-4 py-2.5 text-sm font-semibold transition',
+                                        pageInfo.last || loading || pageInfo.totalPages === 0
+                                            ? 'cursor-not-allowed border-white/50 bg-white/35 text-slate-300'
+                                            : 'border-white/80 bg-white/70 text-slate-600 hover:-translate-y-0.5 hover:bg-white',
+                                    ].join(' ')}
+                                >
+                                    下一页
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </GlassCard>
+            </div>
+
+            <SubjectDetailDrawer
+                open={selectedSubject !== null}
+                subject={selectedSubject}
+                onClose={() => setSelectedSubject(null)}
+                onAddRecord={(subject) => setAddRecordSubject(subject)}
+                onAddToWant={() => undefined}
+                onAddToPaused={() => undefined}
+                onSetToNone={() => undefined}
+                detailLoading={detailLoading}
+                showActions
+                showStatusActions={false}
             />
 
-            <section className="rounded-[32px] border border-white/70 bg-white/45 p-8 text-sm text-slate-500 shadow-sm backdrop-blur-xl">
-                收藏夹页待开发
-            </section>
+            <AddRecordModal
+                open={addRecordSubject !== null}
+                subject={addRecordSubject}
+                onClose={() => setAddRecordSubject(null)}
+                onSubmit={handleSubmitRecord}
+                submitting={recordSubmitting}
+            />
+
+            <ConfirmDialog
+                open={pendingDelete !== null}
+                title="删除收藏？"
+                description={
+                    pendingDelete
+                        ? `这会把《${pendingDelete.subjectTitle}》从${pendingDelete.collectionTypeLabel}清单中移除，不会删除作品库里的作品。`
+                        : ''
+                }
+                confirmText="删除收藏"
+                loading={actionLoading}
+                tone="danger"
+                onCancel={() => {
+                    if (!actionLoading) {
+                        setPendingDelete(null)
+                    }
+                }}
+                onConfirm={() => void handleConfirmDelete()}
+            />
+        </>
+    )
+}
+
+type CollectionTypeTabsProps = {
+    value: CollectionType
+    onChange: (type: CollectionType) => void
+}
+
+function CollectionTypeTabs({ value, onChange }: CollectionTypeTabsProps) {
+    return (
+        <div className="grid gap-3 sm:grid-cols-2">
+            {collectionTypeOptions.map((option) => {
+                const selected = value === option.value
+                const theme = libraryStatusTheme[option.value]
+
+                return (
+                    <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => onChange(option.value)}
+                        className={[
+                            'rounded-[24px] border p-4 text-left transition-all duration-200',
+                            selected
+                                ? `${theme.className} shadow-sm`
+                                : 'border-white/75 bg-white/50 text-slate-500 hover:-translate-y-0.5 hover:bg-white/75',
+                        ].join(' ')}
+                    >
+                        <p className="text-base font-black">{option.label}</p>
+                        <p className="mt-1 text-xs leading-5 opacity-75">
+                            {option.description}
+                        </p>
+                    </button>
+                )
+            })}
         </div>
+    )
+}
+
+type CategorySwitchProps = {
+    value: AcgnCategory
+    onChange: (category: AcgnCategory) => void
+}
+
+function CategorySwitch({ value, onChange }: CategorySwitchProps) {
+    const activeIndex = categoryOrder.indexOf(value)
+    const activeTheme = categoryTheme[value]
+
+    return (
+        <section
+            className={[
+                'relative overflow-hidden rounded-[30px] border border-white/70 bg-gradient-to-br p-2 shadow-sm backdrop-blur-xl transition-all duration-300',
+                activeTheme.softGradient,
+            ].join(' ')}
+        >
+            <div
+                className="absolute bottom-2 top-2 rounded-[24px] border border-white/85 bg-white/78 shadow-[0_16px_40px_rgba(120,135,160,0.14)] transition-transform duration-300 ease-out"
+                style={{
+                    width: '25%',
+                    transform: `translateX(${activeIndex * 100}%)`,
+                }}
+            />
+
+            <div className="relative grid grid-cols-4">
+                {categoryOrder.map((category) => {
+                    const theme = categoryTheme[category]
+                    const selected = value === category
+                    const upperName = theme.enName.toUpperCase()
+
+                    return (
+                        <button
+                            key={category}
+                            type="button"
+                            onClick={() => onChange(category)}
+                            className="relative flex h-24 items-center justify-center rounded-[24px] px-2 transition-all duration-200"
+                        >
+                            <span className="flex flex-col items-center gap-2">
+                                <span className="flex items-end gap-1 leading-none">
+                                    <span
+                                        className={[
+                                            'text-[36px] font-black leading-none transition-colors',
+                                            selected ? theme.text : 'text-slate-300',
+                                        ].join(' ')}
+                                    >
+                                        {upperName[0]}
+                                    </span>
+                                    <span
+                                        className={[
+                                            'pb-[4px] text-[15px] font-black leading-none transition-colors',
+                                            selected ? 'text-slate-800' : 'text-slate-400',
+                                        ].join(' ')}
+                                    >
+                                        {upperName.slice(1)}
+                                    </span>
+                                </span>
+
+                                <span
+                                    className={[
+                                        'rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors',
+                                        selected
+                                            ? `${theme.border} ${theme.bg} ${theme.text}`
+                                            : 'border-white/70 bg-white/45 text-slate-400',
+                                    ].join(' ')}
+                                >
+                                    {theme.cnName}
+                                </span>
+                            </span>
+                        </button>
+                    )
+                })}
+            </div>
+        </section>
+    )
+}
+
+type CollectionCardProps = {
+    collection: UserSubjectCollectionResponse
+    fallbackCategory: AcgnCategory
+    menuOpen: boolean
+    actionLoading: boolean
+    onToggleMenu: () => void
+    onOpenDetail: (collection: UserSubjectCollectionResponse) => void
+    onMove: (collection: UserSubjectCollectionResponse) => void
+    onDelete: (collection: UserSubjectCollectionResponse) => void
+    onAddRecord: (collection: UserSubjectCollectionResponse) => void
+}
+
+function CollectionCard({
+                            collection,
+                            fallbackCategory,
+                            menuOpen,
+                            actionLoading,
+                            onToggleMenu,
+                            onOpenDetail,
+                            onMove,
+                            onDelete,
+                            onAddRecord,
+                        }: CollectionCardProps) {
+    const category = categoryTheme[collection.subjectCategory ?? fallbackCategory]
+    const releaseQuarter = collection.subjectReleaseQuarter
+        ? quarterTheme[collection.subjectReleaseQuarter]
+        : null
+    const releaseText = getReleaseText(collection)
+    const typeTheme = libraryStatusTheme[collection.collectionType]
+    const moveTargetText = collection.collectionType === 'WANT' ? '搁置' : '想看'
+
+    return (
+        <article
+            className={[
+                'group relative flex h-full flex-col overflow-hidden rounded-[24px] border border-white/70 bg-gradient-to-br text-left shadow-sm backdrop-blur transition-all duration-200',
+                'hover:-translate-y-1 hover:shadow-[0_18px_48px_rgba(120,135,160,0.16)]',
+                category.softGradient,
+            ].join(' ')}
+        >
+            <button
+                type="button"
+                onClick={() => onOpenDetail(collection)}
+                className="block text-left"
+            >
+                <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
+                    {collection.subjectCoverUrl ? (
+                        <img
+                            src={collection.subjectCoverUrl}
+                            alt={collection.subjectTitle}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                        />
+                    ) : (
+                        <div
+                            className={[
+                                'flex h-full w-full items-center justify-center bg-gradient-to-br',
+                                category.softGradient,
+                            ].join(' ')}
+                        >
+                            <span className={['text-6xl font-black', category.text].join(' ')}>
+                                {category.letter}
+                            </span>
+                        </div>
+                    )}
+
+                    <div className="absolute left-3 top-3">
+                        <span
+                            className={[
+                                'rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur',
+                                typeTheme.className,
+                            ].join(' ')}
+                        >
+                            {typeTheme.label}
+                        </span>
+                    </div>
+                </div>
+            </button>
+
+            <button
+                type="button"
+                aria-label="打开收藏操作菜单"
+                disabled={actionLoading}
+                onClick={onToggleMenu}
+                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-white/75 bg-white/80 text-xl font-black leading-none text-slate-500 shadow-sm transition hover:bg-white hover:text-slate-800 disabled:cursor-not-allowed disabled:text-slate-300"
+            >
+                ⋯
+            </button>
+
+            {menuOpen ? (
+                <div className="absolute right-3 top-14 z-10 w-40 overflow-hidden rounded-[18px] border border-white/75 bg-white/92 p-1.5 shadow-[0_16px_45px_rgba(80,90,120,0.18)] backdrop-blur-xl">
+                    <MenuButton onClick={() => onAddRecord(collection)}>
+                        添加已看
+                    </MenuButton>
+                    <MenuButton onClick={() => onMove(collection)}>
+                        移至{moveTargetText}
+                    </MenuButton>
+                    <MenuButton tone="danger" onClick={() => onDelete(collection)}>
+                        删除收藏
+                    </MenuButton>
+                </div>
+            ) : null}
+
+            <div className="m-2.5 flex flex-1 flex-col rounded-[20px] border border-white/65 bg-white/58 p-3.5 shadow-sm backdrop-blur">
+                <h3 className="line-clamp-1 text-[14px] font-bold text-slate-800">
+                    {collection.subjectTitle}
+                </h3>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                    <span
+                        className={[
+                            'rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+                            category.bg,
+                            category.text,
+                        ].join(' ')}
+                    >
+                        {category.cnName}
+                    </span>
+
+                    {releaseText ? (
+                        <span
+                            className={[
+                                'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
+                                yearChipClassName,
+                            ].join(' ')}
+                        >
+                            {releaseText}
+                        </span>
+                    ) : null}
+
+                    {releaseQuarter ? (
+                        <span
+                            className={[
+                                'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
+                                releaseQuarter.bg,
+                                releaseQuarter.text,
+                                releaseQuarter.border,
+                            ].join(' ')}
+                        >
+                            {releaseQuarter.cnName}
+                        </span>
+                    ) : null}
+                </div>
+
+                <p className="mt-3 min-h-[40px] line-clamp-2 text-xs leading-5 text-slate-400">
+                    {collection.note ?? '暂无收藏备注'}
+                </p>
+
+                <div className="mt-auto flex items-center justify-between border-t border-white/70 pt-3">
+                    <span className="line-clamp-1 text-[11px] text-slate-400">
+                        {collection.createdAt ? '按加入时间排序' : '收藏记录'}
+                    </span>
+
+                    <button
+                        type="button"
+                        onClick={() => onOpenDetail(collection)}
+                        className="rounded-full border border-slate-200/70 bg-white/75 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-900 hover:text-white"
+                    >
+                        详情
+                    </button>
+                </div>
+            </div>
+        </article>
+    )
+}
+
+type MenuButtonProps = {
+    children: ReactNode
+    tone?: 'normal' | 'danger'
+    onClick: () => void
+}
+
+function MenuButton({ children, tone = 'normal', onClick }: MenuButtonProps) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={[
+                'block w-full rounded-[14px] px-3 py-2 text-left text-xs font-semibold transition',
+                tone === 'danger'
+                    ? 'text-rose-600 hover:bg-rose-50'
+                    : 'text-slate-600 hover:bg-slate-50',
+            ].join(' ')}
+        >
+            {children}
+        </button>
     )
 }
 

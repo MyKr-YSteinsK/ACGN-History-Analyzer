@@ -14,6 +14,7 @@ import AddRecordModal, {
 import SubjectCard from '../components/subject/SubjectCard'
 import SubjectDetailDrawer from '../components/subject/SubjectDetailDrawer'
 import {
+    categoryTheme,
     neutralPanelGradient,
     quarterTheme,
 } from '../theme/acgnTheme'
@@ -474,7 +475,12 @@ function LibraryPage() {
                 />
 
                 <GlassCard className="overflow-hidden">
-                    <div className="bg-gradient-to-br from-white/65 via-white/40 to-sky-50/45 p-6">
+                    <div
+                        className={[
+                            'bg-gradient-to-br p-6 transition-all duration-300',
+                            categoryTheme[selectedCategory].softGradient,
+                        ].join(' ')}
+                    >
                         <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-800">

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import StatusBadge from '../common/StatusBadge'
 import {
     categoryTheme,
+    neutralPanelGradient,
     personalScoreTheme,
     platformScoreTheme,
     quarterTheme,
@@ -19,6 +20,8 @@ type SubjectDetailDrawerProps = {
     onSetToNone: (subject: SubjectCardView) => void
     statusAction?: 'WANT' | 'PAUSED' | 'NONE' | null
     detailLoading?: boolean
+    showActions?: boolean
+    showStatusActions?: boolean
 }
 
 function buildSeasonPartText(subject: SubjectCardView) {
@@ -45,6 +48,8 @@ function SubjectDetailDrawer({
                                  onSetToNone,
                                  statusAction = null,
                                  detailLoading = false,
+                                 showActions = true,
+                                 showStatusActions = true,
                              }: SubjectDetailDrawerProps) {
     useEffect(() => {
         if (!open) {
@@ -70,6 +75,10 @@ function SubjectDetailDrawer({
 
     const category = categoryTheme[subject.category]
     const quarter = subject.releaseQuarter ? quarterTheme[subject.releaseQuarter] : null
+    const recordQuarter = subject.personalRecordQuarter
+        ? quarterTheme[subject.personalRecordQuarter]
+        : null
+    const recordPanelGradient = recordQuarter?.panelGradient ?? neutralPanelGradient
     const wantDisabled =
         subject.libraryStatus === 'WANT' || statusAction !== null
     const pausedDisabled =
@@ -87,7 +96,12 @@ function SubjectDetailDrawer({
             />
 
             <section className="content-enter relative flex max-h-[calc(100vh-48px)] w-full max-w-[920px] overflow-hidden rounded-[34px] border border-white/75 bg-white/82 shadow-[0_30px_110px_rgba(70,80,110,0.28)] backdrop-blur-2xl">
-                <div className="w-[280px] shrink-0 border-r border-white/65 bg-white/42 p-5">
+                <div
+                    className={[
+                        'w-[280px] shrink-0 border-r border-white/65 bg-gradient-to-br p-5',
+                        category.softGradient,
+                    ].join(' ')}
+                >
                     <div
                         className={[
                             'relative aspect-[3/4] overflow-hidden rounded-[28px] bg-gradient-to-br shadow-sm',
@@ -186,75 +200,81 @@ function SubjectDetailDrawer({
                         ) : null}
                     </div>
 
-                    <div className="mt-5 grid gap-2">
-                        <button
-                            type="button"
-                            onClick={() => onAddRecord(subject)}
-                            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700"
-                        >
-                            {subject.libraryStatus === 'WATCHED' ? '编辑记录' : '添加已看记录'}
-                        </button>
-
-                        <div className="grid grid-cols-2 gap-2">
+                    {showActions ? (
+                        <div className="mt-5 grid gap-2">
                             <button
                                 type="button"
-                                disabled={wantDisabled}
-                                onClick={() => onAddToWant(subject)}
-                                className={[
-                                    'rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
-                                    wantDisabled
-                                        ? 'cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-400'
-                                        : 'border-emerald-100 bg-emerald-50/85 text-emerald-700 hover:-translate-y-0.5 hover:bg-emerald-100',
-                                ].join(' ')}
+                                onClick={() => onAddRecord(subject)}
+                                className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700"
                             >
-                                {statusAction === 'WANT'
-                                    ? '保存中'
-                                    : subject.libraryStatus === 'WANT'
-                                      ? '已想看'
-                                      : '想看'}
+                                {subject.libraryStatus === 'WATCHED' ? '编辑记录' : '添加已看记录'}
                             </button>
 
-                            <button
-                                type="button"
-                                disabled={pausedDisabled}
-                                onClick={() => onAddToPaused(subject)}
-                                className={[
-                                    'rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
-                                    pausedDisabled
-                                        ? 'cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-400'
-                                        : 'border-orange-100 bg-orange-50/85 text-orange-700 hover:-translate-y-0.5 hover:bg-orange-100',
-                                ].join(' ')}
-                            >
-                                {statusAction === 'PAUSED'
-                                    ? '保存中'
-                                    : subject.libraryStatus === 'PAUSED'
-                                      ? '已搁置'
-                                      : '搁置'}
-                            </button>
+                            {showStatusActions ? (
+                                <>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={wantDisabled}
+                                            onClick={() => onAddToWant(subject)}
+                                            className={[
+                                                'rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
+                                                wantDisabled
+                                                    ? 'cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-400'
+                                                    : 'border-emerald-100 bg-emerald-50/85 text-emerald-700 hover:-translate-y-0.5 hover:bg-emerald-100',
+                                            ].join(' ')}
+                                        >
+                                            {statusAction === 'WANT'
+                                                ? '保存中'
+                                                : subject.libraryStatus === 'WANT'
+                                                  ? '已想看'
+                                                  : '想看'}
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            disabled={pausedDisabled}
+                                            onClick={() => onAddToPaused(subject)}
+                                            className={[
+                                                'rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
+                                                pausedDisabled
+                                                    ? 'cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-400'
+                                                    : 'border-orange-100 bg-orange-50/85 text-orange-700 hover:-translate-y-0.5 hover:bg-orange-100',
+                                            ].join(' ')}
+                                        >
+                                            {statusAction === 'PAUSED'
+                                                ? '保存中'
+                                                : subject.libraryStatus === 'PAUSED'
+                                                  ? '已搁置'
+                                                  : '搁置'}
+                                        </button>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        disabled={noneDisabled}
+                                        onClick={() => onSetToNone(subject)}
+                                        className={[
+                                            'rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
+                                            noneDisabled
+                                                ? 'cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-400'
+                                                : subject.libraryStatus === 'WATCHED'
+                                                  ? 'border-rose-100 bg-rose-50/85 text-rose-700 hover:-translate-y-0.5 hover:bg-rose-100'
+                                                  : 'border-slate-200 bg-white/75 text-slate-600 hover:-translate-y-0.5 hover:bg-white',
+                                        ].join(' ')}
+                                    >
+                                        {statusAction === 'NONE'
+                                            ? '处理中'
+                                            : subject.libraryStatus === 'WATCHED'
+                                              ? '删除观看记录'
+                                              : subject.libraryStatus === 'NONE'
+                                                ? '已未记录'
+                                                : '设为未记录'}
+                                    </button>
+                                </>
+                            ) : null}
                         </div>
-
-                        <button
-                            type="button"
-                            disabled={noneDisabled}
-                            onClick={() => onSetToNone(subject)}
-                            className={[
-                                'rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
-                                noneDisabled
-                                    ? 'cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-400'
-                                    : subject.libraryStatus === 'WATCHED'
-                                      ? 'border-rose-100 bg-rose-50/85 text-rose-700 hover:-translate-y-0.5 hover:bg-rose-100'
-                                      : 'border-slate-200 bg-white/75 text-slate-600 hover:-translate-y-0.5 hover:bg-white',
-                            ].join(' ')}
-                        >
-                            {statusAction === 'NONE'
-                                ? '处理中'
-                                : subject.libraryStatus === 'WATCHED'
-                                  ? '删除观看记录'
-                                  : subject.libraryStatus === 'NONE'
-                                    ? '已未记录'
-                                    : '设为未记录'}
-                        </button>
-                    </div>
+                    ) : null}
                 </div>
 
                 <div className="min-w-0 flex-1 p-6">
@@ -318,6 +338,36 @@ function SubjectDetailDrawer({
                                 )}
                             </div>
                         </div>
+                    </section>
+
+                    <section
+                        className={[
+                            'mt-4 rounded-[28px] border border-white/70 bg-gradient-to-br p-5 shadow-sm transition-all duration-300',
+                            recordPanelGradient,
+                        ].join(' ')}
+                    >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <h3 className="text-sm font-bold text-slate-700">我的评价 / 备注</h3>
+
+                            {subject.personalScore !== null && subject.personalScore !== undefined ? (
+                                <span
+                                    className={[
+                                        'rounded-2xl border px-3 py-1.5 text-sm font-black',
+                                        personalScoreTheme.className,
+                                    ].join(' ')}
+                                >
+                                    {subject.personalScore} / 50
+                                </span>
+                            ) : (
+                                <span className="rounded-2xl border border-white/70 bg-white/55 px-3 py-1.5 text-xs font-semibold text-slate-400">
+                                    暂无评分
+                                </span>
+                            )}
+                        </div>
+
+                        <p className="mt-3 min-h-[54px] whitespace-pre-wrap rounded-[22px] border border-white/70 bg-white/48 px-4 py-3 text-sm leading-7 text-slate-500">
+                            {subject.personalRecordNote?.trim() || '暂无正式记录备注。'}
+                        </p>
                     </section>
 
                     <section className="mt-4 rounded-[28px] border border-white/70 bg-white/55 p-5 shadow-sm">
