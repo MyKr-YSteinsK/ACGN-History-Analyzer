@@ -4,7 +4,13 @@ import {
     getFranchises,
     type FranchiseDetailResponse,
 } from '../api/franchiseApi'
+import { getApiErrorMessage } from '../api/request'
 import { getSubjectById } from '../api/subjectApi'
+import {
+    EmptyState,
+    ErrorState,
+    FeedbackBanner,
+} from '../components/common/FeedbackState'
 import GlassCard from '../components/common/GlassCard'
 import StatusBadge from '../components/common/StatusBadge'
 import PageHero from '../components/layout/PageHero'
@@ -55,14 +61,6 @@ const categoryScopeOptions: Array<{
 ]
 
 const statusOrder: LibraryStatus[] = ['WATCHED', 'WANT', 'PAUSED', 'NONE']
-
-function getErrorMessage(error: unknown) {
-    if (error instanceof Error) {
-        return error.message
-    }
-
-    return '请求失败，请稍后重试'
-}
 
 function getFranchiseTitle(franchise: FranchiseDetailResponse) {
     return franchise.nameCn || franchise.name
@@ -248,7 +246,7 @@ function FranchisesPage() {
         } catch (error) {
             setFranchises([])
             setSelectedFranchiseId(null)
-            setListError(getErrorMessage(error))
+            setListError(getApiErrorMessage(error))
         } finally {
             setLoading(false)
         }
@@ -267,7 +265,7 @@ function FranchisesPage() {
             const detail = await getSubjectById(subject.id)
             setSelectedSubject(mapSubjectDetailToCardView(detail))
         } catch (error) {
-            setListError(getErrorMessage(error))
+            setListError(getApiErrorMessage(error))
         } finally {
             setDetailLoading(false)
         }
@@ -352,21 +350,15 @@ function FranchisesPage() {
 
                     <div className="space-y-3">
                         {loading ? (
-                            <div className="rounded-[24px] border border-white/70 bg-white/50 p-5 text-sm text-slate-400">
-                                正在加载系列数据...
-                            </div>
+                            <FeedbackBanner>正在加载系列数据...</FeedbackBanner>
                         ) : null}
 
                         {listError ? (
-                            <div className="rounded-[24px] border border-rose-100 bg-rose-50/80 p-5 text-sm font-semibold text-rose-500">
-                                {listError}
-                            </div>
+                            <FeedbackBanner tone="error">{listError}</FeedbackBanner>
                         ) : null}
 
                         {!loading && !listError && filteredFranchises.length === 0 ? (
-                            <div className="rounded-[24px] border border-white/70 bg-white/50 p-5 text-sm text-slate-400">
-                                暂时没有符合条件的系列。
-                            </div>
+                            <FeedbackBanner>暂时没有符合条件的系列。</FeedbackBanner>
                         ) : null}
 
                         {filteredFranchises.map((franchise) => {
@@ -619,8 +611,19 @@ function FranchisesPage() {
                             </section>
                         </>
                     ) : (
-                        <GlassCard className="p-8 text-sm text-slate-400">
-                            暂无系列数据。先在作品库里给作品关联系列，再回到这里查看系列时间线。
+                        <GlassCard className="p-6">
+                            {listError ? (
+                                <ErrorState
+                                    title="系列数据加载失败"
+                                    message={listError}
+                                    onRetry={() => void loadFranchises()}
+                                />
+                            ) : (
+                                <EmptyState
+                                    title="暂无系列数据"
+                                    description="先在作品库里给作品关联系列，再回到这里查看系列时间线。"
+                                />
+                            )}
                         </GlassCard>
                     )}
                 </div>

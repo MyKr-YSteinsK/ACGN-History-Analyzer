@@ -30,6 +30,36 @@ function isApiResponse(value: unknown): value is ApiResponse<unknown> {
     )
 }
 
+function getResponseMessage(value: unknown) {
+    if (isApiResponse(value)) {
+        return value.message
+    }
+
+    return null
+}
+
+function getTransportErrorMessage(error: AxiosError<unknown>) {
+    const status = error.response?.status
+
+    if (status === 502 || status === 503 || status === 504) {
+        return '后端服务暂时无法连接，请确认 Spring Boot 后端已经启动，并且 Vite 代理端口仍然是 8080'
+    }
+
+    if (error.code === 'ECONNABORTED') {
+        return '请求超时，请检查后端服务是否正在运行'
+    }
+
+    if (!error.response) {
+        return '无法连接后端服务，请检查后端是否启动'
+    }
+
+    if (status && status >= 500) {
+        return '后端服务返回异常，请查看 Spring Boot 控制台日志'
+    }
+
+    return error.message || '网络请求失败，请检查后端服务是否正常运行'
+}
+
 request.interceptors.response.use(
     (response) => {
         const body = response.data
@@ -44,23 +74,37 @@ request.interceptors.response.use(
 
         return body.data
     },
-    (error: AxiosError<ApiResponse<unknown>>) => {
+    (error: AxiosError<unknown>) => {
         const responseBody = error.response?.data
         const message =
-            responseBody?.message ||
-            error.message ||
-            '网络请求失败，请检查后端服务是否正常运行'
+            getResponseMessage(responseBody) ||
+            getTransportErrorMessage(error)
 
         return Promise.reject(
             new ApiRequestError(
                 message,
-                responseBody?.code,
+                isApiResponse(responseBody) ? responseBody.code : undefined,
                 error.response?.status,
                 responseBody ?? error,
             ),
         )
     },
 )
+
+export function getApiErrorMessage(
+    error: unknown,
+    fallback = '请求失败，请稍后重试',
+) {
+    if (error instanceof ApiRequestError) {
+        return error.message || fallback
+    }
+
+    if (error instanceof Error) {
+        return error.message || fallback
+    }
+
+    return fallback
+}
 
 export function apiRequest<T>(config: AxiosRequestConfig) {
     return request.request<unknown, T>(config)

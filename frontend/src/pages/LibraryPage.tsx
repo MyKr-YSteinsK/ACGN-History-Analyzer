@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { addToPaused, addToWant, deleteCollection } from '../api/collectionApi'
 import { createRecord, deleteRecord, updateRecord } from '../api/recordApi'
+import { getApiErrorMessage } from '../api/request'
 import { getSubjectById, getSubjectPage } from '../api/subjectApi'
 import CategorySelector from '../components/common/CategorySelector'
 import ConfirmDialog from '../components/common/ConfirmDialog'
+import {
+    EmptyState,
+    ErrorState,
+    FeedbackBanner,
+    LoadingGrid,
+} from '../components/common/FeedbackState'
 import FilterPillGroup from '../components/common/FilterPillGroup'
 import GlassCard from '../components/common/GlassCard'
 import YearScroller from '../components/common/YearScroller'
@@ -107,14 +114,6 @@ const initialPageState: SubjectPageState = {
     last: true,
 }
 
-function getErrorMessage(error: unknown) {
-    if (error instanceof Error) {
-        return error.message
-    }
-
-    return '请求失败，请稍后重试'
-}
-
 function LibraryPage() {
     const [subjects, setSubjects] = useState<SubjectCardView[]>([])
     const [pageInfo, setPageInfo] = useState<SubjectPageState>(initialPageState)
@@ -197,7 +196,7 @@ function LibraryPage() {
         } catch (error) {
             setSubjects([])
             setPageInfo(initialPageState)
-            setListError(getErrorMessage(error))
+            setListError(getApiErrorMessage(error))
         } finally {
             setListLoading(false)
         }
@@ -228,7 +227,7 @@ function LibraryPage() {
                 updateSubjectEverywhere(mappedDetail)
                 return mappedDetail
             } catch (error) {
-                setFeedbackMessage(getErrorMessage(error))
+                setFeedbackMessage(getApiErrorMessage(error))
                 return null
             } finally {
                 if (showLoading) {
@@ -312,7 +311,7 @@ function LibraryPage() {
                 subject.recordId ? '已保存记录修改' : '已添加正式记录，收藏状态已自动更新',
             )
         } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setRecordSubmitting(false)
         }
@@ -384,7 +383,7 @@ function LibraryPage() {
                 setFeedbackMessage(target === 'WANT' ? '已加入想看' : '已加入搁置')
             }
         } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setStatusAction(null)
         }
@@ -547,9 +546,7 @@ function LibraryPage() {
                 </GlassCard>
 
                 {feedbackMessage ? (
-                    <div className="rounded-[24px] border border-sky-100 bg-white/62 px-5 py-4 text-sm font-semibold text-sky-700 shadow-sm backdrop-blur-xl">
-                        {feedbackMessage}
-                    </div>
+                    <FeedbackBanner>{feedbackMessage}</FeedbackBanner>
                 ) : null}
 
                 <GlassCard className="overflow-hidden">
@@ -581,28 +578,13 @@ function LibraryPage() {
 
                         <div key={resultAnimationKey} className="content-enter">
                             {listLoading ? (
-                                <div className="subject-grid">
-                                    {Array.from({ length: 8 }, (_, index) => (
-                                        <div
-                                            key={index}
-                                            className="h-[430px] animate-pulse rounded-[24px] border border-white/70 bg-white/50 shadow-sm"
-                                        />
-                                    ))}
-                                </div>
+                                <LoadingGrid />
                             ) : listError ? (
-                                <div className="rounded-[28px] border border-rose-100 bg-white/58 p-10 text-center">
-                                    <p className="text-base font-semibold text-rose-600">
-                                        作品列表加载失败
-                                    </p>
-                                    <p className="mt-2 text-sm text-slate-400">{listError}</p>
-                                    <button
-                                        type="button"
-                                        onClick={() => void loadSubjects()}
-                                        className="mt-5 rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700"
-                                    >
-                                        重新加载
-                                    </button>
-                                </div>
+                                <ErrorState
+                                    title="作品列表加载失败"
+                                    message={listError}
+                                    onRetry={() => void loadSubjects()}
+                                />
                             ) : subjects.length > 0 ? (
                                 <div className="subject-grid">
                                     {subjects.map((subject) => (
@@ -614,14 +596,10 @@ function LibraryPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/50 p-12 text-center">
-                                    <p className="text-base font-semibold text-slate-500">
-                                        没有匹配的作品
-                                    </p>
-                                    <p className="mt-2 text-sm text-slate-400">
-                                        可以尝试切换类型、年份、季度、状态或搜索关键词。
-                                    </p>
-                                </div>
+                                <EmptyState
+                                    title="没有匹配的作品"
+                                    description="可以尝试切换类型、年份、季度、状态或搜索关键词。"
+                                />
                             )}
                         </div>
 
