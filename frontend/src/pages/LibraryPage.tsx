@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { addToPaused, addToWant } from '../api/collectionApi'
-import { createRecord, updateRecord } from '../api/recordApi'
+import { addToPaused, addToWant, deleteCollection } from '../api/collectionApi'
+import { createRecord, deleteRecord, updateRecord } from '../api/recordApi'
 import { getSubjectById, getSubjectPage } from '../api/subjectApi'
 import CategorySelector from '../components/common/CategorySelector'
+import ConfirmDialog from '../components/common/ConfirmDialog'
 import FilterPillGroup from '../components/common/FilterPillGroup'
 import GlassCard from '../components/common/GlassCard'
 import YearScroller from '../components/common/YearScroller'
@@ -89,6 +90,13 @@ type SubjectPageState = Pick<
     'page' | 'size' | 'totalElements' | 'totalPages' | 'first' | 'last'
 >
 
+type StatusTarget = 'WANT' | 'PAUSED' | 'NONE'
+
+type PendingStatusChange = {
+    subject: SubjectCardView
+    target: StatusTarget
+}
+
 const initialPageState: SubjectPageState = {
     page: 0,
     size: pageSize,
@@ -122,7 +130,9 @@ function LibraryPage() {
     const [addRecordSubject, setAddRecordSubject] = useState<SubjectCardView | null>(null)
     const [detailLoading, setDetailLoading] = useState(false)
     const [recordSubmitting, setRecordSubmitting] = useState(false)
-    const [collectionAction, setCollectionAction] = useState<'WANT' | 'PAUSED' | null>(null)
+    const [statusAction, setStatusAction] = useState<StatusTarget | null>(null)
+    const [pendingStatusChange, setPendingStatusChange] =
+        useState<PendingStatusChange | null>(null)
 
     const selectedQuarterGradient =
         selectedQuarter === 'ALL'
@@ -307,37 +317,144 @@ function LibraryPage() {
         }
     }
 
-    async function handleAddToWant(subject: SubjectCardView) {
-        setCollectionAction('WANT')
-        setFeedbackMessage(null)
+    async function getFreshSubject(subject: SubjectCardView) {
+        if (
+            (subject.libraryStatus === 'WATCHED' && !subject.recordId) ||
+            (subject.libraryStatus !== 'WATCHED' &&
+                subject.libraryStatus !== 'NONE' &&
+                !subject.collectionId)
+        ) {
+            return (await loadSubjectDetail(subject.id, false)) ?? subject
+        }
 
-        try {
-            await addToWant(subject.id)
-            await loadSubjectDetail(subject.id, false)
-            await loadSubjects()
-            setFeedbackMessage('已加入想看')
-        } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
-        } finally {
-            setCollectionAction(null)
+        return subject
+    }
+
+    async function removeCurrentStatus(subject: SubjectCardView) {
+        const freshSubject = await getFreshSubject(subject)
+
+        if (freshSubject.libraryStatus === 'WATCHED') {
+            if (!freshSubject.recordId) {
+                throw new Error('未找到可删除的观看记录，请重新打开详情后再试')
+            }
+
+            await deleteRecord(freshSubject.recordId)
+            return
+        }
+
+        if (freshSubject.libraryStatus === 'WANT' || freshSubject.libraryStatus === 'PAUSED') {
+            if (!freshSubject.collectionId) {
+                throw new Error('未找到可移除的收藏记录，请重新打开详情后再试')
+            }
+
+            await deleteCollection(freshSubject.collectionId)
         }
     }
 
-    async function handleAddToPaused(subject: SubjectCardView) {
-        setCollectionAction('PAUSED')
+    async function applyStatusChange(subject: SubjectCardView, target: StatusTarget) {
+        setStatusAction(target)
         setFeedbackMessage(null)
 
         try {
-            await addToPaused(subject.id)
+            if (target === 'NONE') {
+                await removeCurrentStatus(subject)
+            } else {
+                if (subject.libraryStatus === 'WATCHED') {
+                    await removeCurrentStatus(subject)
+                }
+
+                if (target === 'WANT') {
+                    await addToWant(subject.id)
+                } else {
+                    await addToPaused(subject.id)
+                }
+            }
+
             await loadSubjectDetail(subject.id, false)
             await loadSubjects()
-            setFeedbackMessage('已加入搁置')
+
+            if (target === 'NONE') {
+                setFeedbackMessage(
+                    subject.libraryStatus === 'WATCHED'
+                        ? '已删除观看记录，作品状态已回到未记录'
+                        : '已移出收藏夹，作品状态已回到未记录',
+                )
+            } else {
+                setFeedbackMessage(target === 'WANT' ? '已加入想看' : '已加入搁置')
+            }
         } catch (error) {
             setFeedbackMessage(getErrorMessage(error))
         } finally {
-            setCollectionAction(null)
+            setStatusAction(null)
         }
     }
+
+    function requestStatusChange(subject: SubjectCardView, target: StatusTarget) {
+        if (subject.libraryStatus === 'WATCHED') {
+            setPendingStatusChange({ subject, target })
+            return
+        }
+
+        void applyStatusChange(subject, target)
+    }
+
+    function handleAddToWant(subject: SubjectCardView) {
+        requestStatusChange(subject, 'WANT')
+    }
+
+    function handleAddToPaused(subject: SubjectCardView) {
+        requestStatusChange(subject, 'PAUSED')
+    }
+
+    function handleSetToNone(subject: SubjectCardView) {
+        requestStatusChange(subject, 'NONE')
+    }
+
+    function closeConfirmDialog() {
+        if (statusAction !== null) {
+            return
+        }
+
+        setPendingStatusChange(null)
+    }
+
+    async function confirmStatusChange() {
+        if (!pendingStatusChange) {
+            return
+        }
+
+        const currentPending = pendingStatusChange
+        await applyStatusChange(currentPending.subject, currentPending.target)
+        setPendingStatusChange(null)
+    }
+
+    const confirmCopy = useMemo(() => {
+        if (!pendingStatusChange) {
+            return null
+        }
+
+        const targetText =
+            pendingStatusChange.target === 'WANT'
+                ? '想看'
+                : pendingStatusChange.target === 'PAUSED'
+                  ? '搁置'
+                  : '未记录'
+
+        return {
+            title:
+                pendingStatusChange.target === 'NONE'
+                    ? '删除观看记录？'
+                    : `改为${targetText}？`,
+            description:
+                pendingStatusChange.target === 'NONE'
+                    ? `这会删除《${pendingStatusChange.subject.displayTitle}》的正式观看记录，个人评分和备注也会从记录表移除。`
+                    : `这会先删除《${pendingStatusChange.subject.displayTitle}》的正式观看记录，再把作品加入${targetText}清单。`,
+            confirmText:
+                pendingStatusChange.target === 'NONE'
+                    ? '删除记录'
+                    : `删除记录并加入${targetText}`,
+        }
+    }, [pendingStatusChange])
 
     const pageText = useMemo(() => {
         if (pageInfo.totalPages === 0) {
@@ -550,7 +667,8 @@ function LibraryPage() {
                 onAddRecord={handleOpenAddRecord}
                 onAddToWant={handleAddToWant}
                 onAddToPaused={handleAddToPaused}
-                collectionAction={collectionAction}
+                onSetToNone={handleSetToNone}
+                statusAction={statusAction}
                 detailLoading={detailLoading}
             />
 
@@ -561,6 +679,19 @@ function LibraryPage() {
                 onSubmit={handleSubmitRecord}
                 submitting={recordSubmitting}
             />
+
+            {confirmCopy ? (
+                <ConfirmDialog
+                    open={pendingStatusChange !== null}
+                    title={confirmCopy.title}
+                    description={confirmCopy.description}
+                    confirmText={confirmCopy.confirmText}
+                    loading={statusAction !== null}
+                    tone="danger"
+                    onCancel={closeConfirmDialog}
+                    onConfirm={() => void confirmStatusChange()}
+                />
+            ) : null}
         </>
     )
 }

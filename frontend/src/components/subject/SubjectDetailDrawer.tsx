@@ -16,7 +16,8 @@ type SubjectDetailDrawerProps = {
     onAddRecord: (subject: SubjectCardView) => void
     onAddToWant: (subject: SubjectCardView) => void
     onAddToPaused: (subject: SubjectCardView) => void
-    collectionAction?: 'WANT' | 'PAUSED' | null
+    onSetToNone: (subject: SubjectCardView) => void
+    statusAction?: 'WANT' | 'PAUSED' | 'NONE' | null
     detailLoading?: boolean
 }
 
@@ -41,7 +42,8 @@ function SubjectDetailDrawer({
                                  onAddRecord,
                                  onAddToWant,
                                  onAddToPaused,
-                                 collectionAction = null,
+                                 onSetToNone,
+                                 statusAction = null,
                                  detailLoading = false,
                              }: SubjectDetailDrawerProps) {
     useEffect(() => {
@@ -68,11 +70,12 @@ function SubjectDetailDrawer({
 
     const category = categoryTheme[subject.category]
     const quarter = subject.releaseQuarter ? quarterTheme[subject.releaseQuarter] : null
-    const cannotCollect = subject.libraryStatus === 'WATCHED'
     const wantDisabled =
-        cannotCollect || subject.libraryStatus === 'WANT' || collectionAction !== null
+        subject.libraryStatus === 'WANT' || statusAction !== null
     const pausedDisabled =
-        cannotCollect || subject.libraryStatus === 'PAUSED' || collectionAction !== null
+        subject.libraryStatus === 'PAUSED' || statusAction !== null
+    const noneDisabled =
+        subject.libraryStatus === 'NONE' || statusAction !== null
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -204,13 +207,11 @@ function SubjectDetailDrawer({
                                         : 'border-emerald-100 bg-emerald-50/85 text-emerald-700 hover:-translate-y-0.5 hover:bg-emerald-100',
                                 ].join(' ')}
                             >
-                                {collectionAction === 'WANT'
+                                {statusAction === 'WANT'
                                     ? '保存中'
                                     : subject.libraryStatus === 'WANT'
                                       ? '已想看'
-                                      : cannotCollect
-                                        ? '已看过'
-                                        : '想看'}
+                                      : '想看'}
                             </button>
 
                             <button
@@ -224,15 +225,35 @@ function SubjectDetailDrawer({
                                         : 'border-orange-100 bg-orange-50/85 text-orange-700 hover:-translate-y-0.5 hover:bg-orange-100',
                                 ].join(' ')}
                             >
-                                {collectionAction === 'PAUSED'
+                                {statusAction === 'PAUSED'
                                     ? '保存中'
                                     : subject.libraryStatus === 'PAUSED'
                                       ? '已搁置'
-                                      : cannotCollect
-                                        ? '已看过'
-                                        : '搁置'}
+                                      : '搁置'}
                             </button>
                         </div>
+
+                        <button
+                            type="button"
+                            disabled={noneDisabled}
+                            onClick={() => onSetToNone(subject)}
+                            className={[
+                                'rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
+                                noneDisabled
+                                    ? 'cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-400'
+                                    : subject.libraryStatus === 'WATCHED'
+                                      ? 'border-rose-100 bg-rose-50/85 text-rose-700 hover:-translate-y-0.5 hover:bg-rose-100'
+                                      : 'border-slate-200 bg-white/75 text-slate-600 hover:-translate-y-0.5 hover:bg-white',
+                            ].join(' ')}
+                        >
+                            {statusAction === 'NONE'
+                                ? '处理中'
+                                : subject.libraryStatus === 'WATCHED'
+                                  ? '删除观看记录'
+                                  : subject.libraryStatus === 'NONE'
+                                    ? '已未记录'
+                                    : '设为未记录'}
+                        </button>
                     </div>
                 </div>
 
