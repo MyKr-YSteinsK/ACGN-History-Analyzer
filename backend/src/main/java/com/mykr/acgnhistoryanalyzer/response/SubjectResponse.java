@@ -2,6 +2,7 @@ package com.mykr.acgnhistoryanalyzer.response;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class SubjectResponse {
 
@@ -21,7 +22,7 @@ public class SubjectResponse {
     private String platformLink;
     private BigDecimal platformScore;
     private Integer episodeCount;
-    private String tags;
+    private List<TagResponse> tagList;
     private String sourcePlatform;
     private String sourceId;
     private String status;
@@ -35,7 +36,8 @@ public class SubjectResponse {
                            String coverUrl, String summary, Integer releaseYear,
                            Integer releaseQuarter, String category, String studioName,
                            String platformLink, BigDecimal platformScore, Integer episodeCount,
-                           String tags, String sourcePlatform, String sourceId, String status,
+                           List<TagResponse> tagList, String sourcePlatform,
+                           String sourceId, String status,
                            String libraryStatus, String libraryStatusLabel,
                            LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
@@ -54,7 +56,7 @@ public class SubjectResponse {
         this.platformLink = platformLink;
         this.platformScore = platformScore;
         this.episodeCount = episodeCount;
-        this.tags = tags;
+        this.tagList = tagList;
         this.sourcePlatform = sourcePlatform;
         this.sourceId = sourceId;
         this.status = status;
@@ -96,7 +98,7 @@ public class SubjectResponse {
 
     public Integer getEpisodeCount() { return episodeCount; }
 
-    public String getTags() { return tags; }
+    public List<TagResponse> getTagList() { return tagList; }
 
     public String getSourcePlatform() { return sourcePlatform; }
 

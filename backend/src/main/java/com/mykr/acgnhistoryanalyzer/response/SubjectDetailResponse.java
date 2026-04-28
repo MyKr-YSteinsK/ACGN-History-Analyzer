@@ -22,7 +22,7 @@ public class SubjectDetailResponse {
     private String platformLink;
     private BigDecimal platformScore;
     private Integer episodeCount;
-    private String tags;
+    private List<TagResponse> tagList;
     private String sourcePlatform;
     private String sourceId;
     private String status;
@@ -42,7 +42,8 @@ public class SubjectDetailResponse {
                                  String coverUrl, String summary, Integer releaseYear,
                                  Integer releaseQuarter, String category, String studioName,
                                  String platformLink, BigDecimal platformScore, Integer episodeCount,
-                                 String tags, String sourcePlatform, String sourceId, String status,
+                                 List<TagResponse> tagList, String sourcePlatform,
+                                 String sourceId, String status,
                                  String libraryStatus, String libraryStatusLabel,
                                  boolean recorded, int recordCount,
                                  List<UserSubjectRecordResponse> records,
@@ -66,7 +67,7 @@ public class SubjectDetailResponse {
         this.platformLink = platformLink;
         this.platformScore = platformScore;
         this.episodeCount = episodeCount;
-        this.tags = tags;
+        this.tagList = tagList;
         this.sourcePlatform = sourcePlatform;
         this.sourceId = sourceId;
         this.status = status;
@@ -114,7 +115,7 @@ public class SubjectDetailResponse {
 
     public Integer getEpisodeCount() { return episodeCount; }
 
-    public String getTags() { return tags; }
+    public List<TagResponse> getTagList() { return tagList; }
 
     public String getSourcePlatform() { return sourcePlatform; }
 

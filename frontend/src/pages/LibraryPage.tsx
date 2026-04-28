@@ -3,6 +3,7 @@ import { addToPaused, addToWant, deleteCollection } from '../api/collectionApi'
 import { createRecord, deleteRecord, updateRecord } from '../api/recordApi'
 import { getApiErrorMessage } from '../api/request'
 import { getSubjectById, getSubjectPage } from '../api/subjectApi'
+import { getTags, type TagResponse } from '../api/tagApi'
 import CategorySelector from '../components/common/CategorySelector'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import {
@@ -93,6 +94,18 @@ const statusOptions: Array<{
     },
 ]
 
+const tagChipClassNames: Record<string, string> = {
+    sky: 'border-sky-200 bg-sky-100/80 text-sky-700',
+    blue: 'border-blue-200 bg-blue-100/80 text-blue-700',
+    cyan: 'border-cyan-200 bg-cyan-100/80 text-cyan-700',
+    emerald: 'border-emerald-200 bg-emerald-100/80 text-emerald-700',
+    amber: 'border-amber-200 bg-amber-100/80 text-amber-700',
+    rose: 'border-rose-200 bg-rose-100/80 text-rose-700',
+    pink: 'border-pink-200 bg-pink-100/80 text-pink-700',
+    violet: 'border-violet-200 bg-violet-100/80 text-violet-700',
+    slate: 'border-slate-200 bg-slate-100/80 text-slate-600',
+}
+
 type SubjectPageState = Pick<
     PageResponse<unknown>,
     'page' | 'size' | 'totalElements' | 'totalPages' | 'first' | 'last'
@@ -120,6 +133,8 @@ function LibraryPage() {
     const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
     const [keyword, setKeyword] = useState('')
     const [selectedStatus, setSelectedStatus] = useState<LibraryStatus | 'ALL'>('ALL')
+    const [selectedTagName, setSelectedTagName] = useState<string | 'ALL'>('ALL')
+    const [availableTags, setAvailableTags] = useState<TagResponse[]>([])
     const [selectedYear, setSelectedYear] = useState<number | 'ALL'>('ALL')
     const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter | 'ALL'>('ALL')
     const [currentPage, setCurrentPage] = useState(0)
@@ -144,6 +159,7 @@ function LibraryPage() {
         selectedYear,
         selectedQuarter,
         selectedStatus,
+        selectedTagName,
         keyword,
         currentPage,
     ].join('-')
@@ -179,6 +195,7 @@ function LibraryPage() {
                 year: selectedYear === 'ALL' ? undefined : selectedYear,
                 quarter: selectedQuarter === 'ALL' ? undefined : selectedQuarter,
                 status: selectedStatus === 'ALL' ? 'NORMAL' : selectedStatus,
+                tagName: selectedTagName === 'ALL' ? undefined : selectedTagName,
                 page: currentPage,
                 size: pageSize,
                 sort: 'RELEASE_NEWEST',
@@ -206,6 +223,7 @@ function LibraryPage() {
         selectedCategory,
         selectedQuarter,
         selectedStatus,
+        selectedTagName,
         selectedYear,
     ])
 
@@ -214,6 +232,19 @@ function LibraryPage() {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void loadSubjects()
     }, [loadSubjects])
+
+    useEffect(() => {
+        async function loadTags() {
+            try {
+                setAvailableTags(await getTags())
+            } catch (error) {
+                setFeedbackMessage(getApiErrorMessage(error, '标签列表加载失败'))
+            }
+        }
+
+        // 页面进入时读取标签库，供作品库筛选使用。
+        void loadTags()
+    }, [])
 
     const loadSubjectDetail = useCallback(
         async (subjectId: number, showLoading = true) => {
@@ -255,6 +286,11 @@ function LibraryPage() {
     function handleStatusChange(status: LibraryStatus | 'ALL') {
         resetPage()
         setSelectedStatus(status)
+    }
+
+    function handleTagChange(tagName: string | 'ALL') {
+        resetPage()
+        setSelectedTagName(tagName)
     }
 
     function handleYearChange(year: number | 'ALL') {
@@ -542,6 +578,14 @@ function LibraryPage() {
                                 onChange={handleStatusChange}
                             />
                         </div>
+
+                        <div className="mx-auto mt-5 max-w-[1180px] border-t border-white/65 pt-5">
+                            <TagFilterBar
+                                tags={availableTags}
+                                value={selectedTagName}
+                                onChange={handleTagChange}
+                            />
+                        </div>
                     </div>
                 </GlassCard>
 
@@ -681,3 +725,73 @@ function LibraryPage() {
 }
 
 export default LibraryPage
+
+type TagFilterBarProps = {
+    tags: TagResponse[]
+    value: string | 'ALL'
+    onChange: (tagName: string | 'ALL') => void
+}
+
+function TagFilterBar({ tags, value, onChange }: TagFilterBarProps) {
+    const visibleTags = tags.slice(0, 48)
+
+    return (
+        <div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p className="text-xs font-semibold text-slate-400">作品标签</p>
+                    <p className="mt-1 text-xs text-slate-300">
+                        用 #奇幻 #战斗 这类标签做细分类，也会作为后续 AI 兴趣分析的数据基础。
+                    </p>
+                </div>
+
+                {value !== 'ALL' ? (
+                    <button
+                        type="button"
+                        onClick={() => onChange('ALL')}
+                        className="rounded-full border border-white/80 bg-white/65 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white"
+                    >
+                        清除标签
+                    </button>
+                ) : null}
+            </div>
+
+            <div className="flex max-h-[116px] flex-wrap gap-2 overflow-y-auto pr-1">
+                <button
+                    type="button"
+                    onClick={() => onChange('ALL')}
+                    className={[
+                        'rounded-full border px-3.5 py-2 text-xs font-semibold transition-all duration-200',
+                        value === 'ALL'
+                            ? 'border-slate-200 bg-white/90 text-slate-700 shadow-sm'
+                            : 'border-white/75 bg-white/50 text-slate-400 hover:-translate-y-0.5 hover:bg-white/80 hover:text-slate-600',
+                    ].join(' ')}
+                >
+                    全部标签
+                </button>
+
+                {visibleTags.map((tag) => {
+                    const selected = value === tag.name
+                    const colorClassName =
+                        tagChipClassNames[tag.colorKey] ?? tagChipClassNames.slate
+
+                    return (
+                        <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => onChange(tag.name)}
+                            className={[
+                                'rounded-full border px-3.5 py-2 text-xs font-semibold transition-all duration-200',
+                                selected
+                                    ? `${colorClassName} shadow-sm ring-2 ring-white/70`
+                                    : 'border-white/75 bg-white/50 text-slate-400 hover:-translate-y-0.5 hover:bg-white/80 hover:text-slate-600',
+                            ].join(' ')}
+                        >
+                            #{tag.name}
+                        </button>
+                    )
+                })}
+            </div>
+        </div>
+    )
+}

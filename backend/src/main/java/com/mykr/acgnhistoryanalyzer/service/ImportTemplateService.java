@@ -30,7 +30,7 @@ public class ImportTemplateService {
         subjectItem.put("platformLink", "https://bgm.tv/subject/aot-final-part1");
         subjectItem.put("platformScore", 8.9);
         subjectItem.put("episodeCount", 16);
-        subjectItem.put("tags", "战斗,奇幻,漫画改");
+        subjectItem.put("tagNames", List.of("战斗", "奇幻", "漫画改"));
         subjectItem.put("sourcePlatform", "BANGUMI");
         subjectItem.put("sourceId", "aot-final-part1");
         subjectItem.put("status", "NORMAL");
@@ -46,7 +46,8 @@ public class ImportTemplateService {
                 "subject 的业务层唯一性规则为：titleCn + subtitle + seasonIndex + partIndex + category 全都一样，则视为重复作品。",
                 "franchiseId 和 franchiseName 二选一即可；如果都传，当前逻辑优先按 franchiseId 处理。",
                 "如果传 franchiseName，则后端会尝试匹配已有系列；匹配不到时会跳过。",
-                "preview 和正式 import 使用同一套判定规则。"
+                "preview 和正式 import 使用同一套判定规则。",
+                "作品标签使用 tagNames 数组，建议 3~7 个，最多 12 个；这些标签会进入结构化标签系统。"
         );
 
         List<ImportFieldDocResponse> fields = List.of(
@@ -66,7 +67,7 @@ public class ImportTemplateService {
                 new ImportFieldDocResponse("platformLink", false, "外部平台链接。", "https://bgm.tv/subject/xxx", "可为空。"),
                 new ImportFieldDocResponse("platformScore", false, "外部平台评分，例如 Bangumi 评分。", "8.9", "范围 0~10，可以为空。"),
                 new ImportFieldDocResponse("episodeCount", false, "集数、话数或章节数。", "16", "可以为空。"),
-                new ImportFieldDocResponse("tags", false, "作品标签，当前用逗号分隔字符串保存。", "战斗,奇幻,漫画改", "可以为空。"),
+                new ImportFieldDocResponse("tagNames", false, "结构化作品标签数组，适合后续筛选和 AI 分析。", "[\"战斗\", \"奇幻\", \"漫画改\"]", "推荐 3~7 个，最多 12 个。"),
                 new ImportFieldDocResponse("sourcePlatform", false, "数据来源平台。", "BANGUMI", "预留给后续平台导入和 AI 分析溯源。"),
                 new ImportFieldDocResponse("sourceId", false, "来源平台上的作品 ID。", "123456", "可以为空。"),
                 new ImportFieldDocResponse("status", true, "作品状态。", "NORMAL", "通常使用 NORMAL 或 HIDDEN。")

@@ -34,23 +34,27 @@ public class SubjectService {
     private final UserSubjectRecordService userSubjectRecordService;
     private final UserSubjectCollectionService userSubjectCollectionService;
     private final FranchiseRepository franchiseRepository;
+    private final TagService tagService;
 
     public SubjectService(SubjectRepository subjectRepository,
                           UserSubjectRecordRepository userSubjectRecordRepository,
                           UserSubjectCollectionRepository userSubjectCollectionRepository,
                           UserSubjectRecordService userSubjectRecordService,
                           UserSubjectCollectionService userSubjectCollectionService,
-                          FranchiseRepository franchiseRepository) {
+                          FranchiseRepository franchiseRepository,
+                          TagService tagService) {
         this.subjectRepository = subjectRepository;
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectCollectionRepository = userSubjectCollectionRepository;
         this.userSubjectRecordService = userSubjectRecordService;
         this.userSubjectCollectionService = userSubjectCollectionService;
         this.franchiseRepository = franchiseRepository;
+        this.tagService = tagService;
     }
 
     public SubjectResponse createSubject(SubjectCreateRequest request) {
         Subject subject = buildSubjectFromRequest(request, resolveFranchiseIdForCreate(request));
+        tagService.syncSubjectTags(subject, request.getTagNames());
         Subject savedSubject = subjectRepository.save(subject);
         return toResponse(savedSubject);
     }
@@ -63,11 +67,18 @@ public class SubjectService {
     public List<SubjectResponse> getSubjects(Integer year, Integer quarter,
                                              String category, String keyword,
                                              String status, String sortType) {
+        return getSubjects(year, quarter, category, keyword, status, sortType, null);
+    }
+
+    public List<SubjectResponse> getSubjects(Integer year, Integer quarter,
+                                             String category, String keyword,
+                                             String status, String sortType,
+                                             String tagName) {
         String subjectStatus = isLibraryStatus(status) ? "NORMAL" : status;
         LibraryStatus libraryStatus = parseLibraryStatus(status);
 
         Specification<Subject> specification =
-                buildSubjectSpecification(year, quarter, category, keyword, subjectStatus);
+                buildSubjectSpecification(year, quarter, category, keyword, subjectStatus, tagName);
 
         HomeLibrarySortType effectiveSortType = normalizeLibrarySort(sortType);
         Sort sort = buildHomeSubjectSort(effectiveSortType);
@@ -82,6 +93,14 @@ public class SubjectService {
                                                         String category, String keyword,
                                                         String status, Integer page,
                                                         Integer size, String sortType) {
+        return getSubjectPage(year, quarter, category, keyword, status, page, size, sortType, null);
+    }
+
+    public PageResponse<SubjectResponse> getSubjectPage(Integer year, Integer quarter,
+                                                        String category, String keyword,
+                                                        String status, Integer page,
+                                                        Integer size, String sortType,
+                                                        String tagName) {
         int effectivePage = normalizePage(page);
         int effectiveSize = normalizeSize(size);
         SubjectPageSortType effectiveSortType = normalizeSubjectPageSort(sortType);
@@ -89,7 +108,7 @@ public class SubjectService {
         String subjectStatus = isLibraryStatus(status) ? "NORMAL" : status;
 
         Specification<Subject> specification =
-                buildSubjectSpecification(year, quarter, category, keyword, subjectStatus);
+                buildSubjectSpecification(year, quarter, category, keyword, subjectStatus, tagName);
 
         if (libraryStatus != null) {
             List<SubjectResponse> filtered = subjectRepository
@@ -178,7 +197,7 @@ public class SubjectService {
                 subject.getPlatformLink(),
                 subject.getPlatformScore(),
                 subject.getEpisodeCount(),
-                subject.getTags(),
+                tagService.toResponses(subject.getStructuredTags()),
                 subject.getSourcePlatform(),
                 subject.getSourceId(),
                 subject.getStatus(),
@@ -224,7 +243,7 @@ public class SubjectService {
         existingSubject.setPlatformLink(request.getPlatformLink());
         existingSubject.setPlatformScore(request.getPlatformScore());
         existingSubject.setEpisodeCount(request.getEpisodeCount());
-        existingSubject.setTags(request.getTags());
+        tagService.syncSubjectTags(existingSubject, request.getTagNames());
         existingSubject.setSourcePlatform(request.getSourcePlatform());
         existingSubject.setSourceId(request.getSourceId());
         existingSubject.setStatus(request.getStatus());
@@ -289,6 +308,7 @@ public class SubjectService {
             }
 
             Subject subject = buildSubjectFromRequest(item, resolvedFranchiseId);
+            tagService.syncSubjectTags(subject, item.getTagNames());
             Subject savedSubject = subjectRepository.save(subject);
             importedCount++;
 
@@ -401,7 +421,6 @@ public class SubjectService {
                 request.getPlatformLink(),
                 request.getPlatformScore(),
                 request.getEpisodeCount(),
-                request.getTags(),
                 request.getSourcePlatform(),
                 request.getSourceId(),
                 request.getStatus()
@@ -527,13 +546,15 @@ public class SubjectService {
     }
 
     private Specification<Subject> buildSubjectSpecification(Integer year, Integer quarter,
-                                                             String category, String keyword, String status) {
+                                                             String category, String keyword,
+                                                             String status, String tagName) {
         return Specification.allOf(
                 SubjectSpecifications.hasReleaseYear(year),
                 SubjectSpecifications.hasReleaseQuarter(quarter),
                 SubjectSpecifications.hasCategory(category),
                 SubjectSpecifications.titleContainsKeyword(keyword),
-                SubjectSpecifications.hasStatus(status)
+                SubjectSpecifications.hasStatus(status),
+                SubjectSpecifications.hasTagName(tagName)
         );
     }
 
@@ -583,7 +604,7 @@ public class SubjectService {
                 subject.getPlatformLink(),
                 subject.getPlatformScore(),
                 subject.getEpisodeCount(),
-                subject.getTags(),
+                tagService.toResponses(subject.getStructuredTags()),
                 subject.getSourcePlatform(),
                 subject.getSourceId(),
                 subject.getStatus(),

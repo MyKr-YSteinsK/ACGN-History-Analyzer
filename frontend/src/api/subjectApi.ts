@@ -1,6 +1,7 @@
 import { apiDelete, apiGet, apiPost, apiPut } from './request'
 import type { UserSubjectCollectionResponse } from './collectionApi'
 import type { UserSubjectRecordResponse } from './recordApi'
+import type { TagResponse } from './tagApi'
 import type { AcgnCategory, LibraryStatus, ReleaseQuarter } from '../types/common'
 import type { PageQuery, PageResponse } from '../types/api'
 
@@ -35,7 +36,7 @@ export type SubjectResponse = {
     platformLink: string | null
     platformScore: number | null
     episodeCount: number | null
-    tags: string | null
+    tagList: TagResponse[]
     sourcePlatform: string | null
     sourceId: string | null
     status: SubjectStatus
@@ -71,7 +72,7 @@ export type SubjectCreateRequest = {
     platformLink?: string | null
     platformScore?: number | null
     episodeCount?: number | null
-    tags?: string | null
+    tagNames?: string[] | null
     sourcePlatform?: string | null
     sourceId?: string | null
     status: SubjectStatus
@@ -83,6 +84,7 @@ export type SubjectListParams = {
     category?: AcgnCategory
     keyword?: string
     status?: SubjectStatus | LibraryStatus
+    tagName?: string
 }
 
 export type SubjectPageParams = SubjectListParams &

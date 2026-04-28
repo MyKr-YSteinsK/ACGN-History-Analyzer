@@ -24,15 +24,18 @@ public class FranchiseService {
     private final SubjectRepository subjectRepository;
     private final UserSubjectRecordRepository userSubjectRecordRepository;
     private final UserSubjectCollectionRepository userSubjectCollectionRepository;
+    private final TagService tagService;
 
     public FranchiseService(FranchiseRepository franchiseRepository,
                             SubjectRepository subjectRepository,
                             UserSubjectRecordRepository userSubjectRecordRepository,
-                            UserSubjectCollectionRepository userSubjectCollectionRepository) {
+                            UserSubjectCollectionRepository userSubjectCollectionRepository,
+                            TagService tagService) {
         this.franchiseRepository = franchiseRepository;
         this.subjectRepository = subjectRepository;
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectCollectionRepository = userSubjectCollectionRepository;
+        this.tagService = tagService;
     }
 
     public FranchiseResponse createFranchise(FranchiseCreateRequest request) {
@@ -187,7 +190,7 @@ public class FranchiseService {
                 subject.getPlatformLink(),
                 subject.getPlatformScore(),
                 subject.getEpisodeCount(),
-                subject.getTags(),
+                tagService.toResponses(subject.getStructuredTags()),
                 subject.getSourcePlatform(),
                 subject.getSourceId(),
                 subject.getStatus(),

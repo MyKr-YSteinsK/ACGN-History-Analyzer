@@ -1,15 +1,8 @@
 import type { SubjectDetailResponse, SubjectResponse } from '../api/subjectApi'
 import type { SubjectCardView } from '../types/subject'
 
-function splitTags(tags?: string | null) {
-    if (!tags) {
-        return []
-    }
-
-    return tags
-        .split(/[,，]/)
-        .map((tag) => tag.trim())
-        .filter(Boolean)
+function resolveTagNames(subject: SubjectResponse) {
+    return subject.tagList?.map((tag) => tag.name) ?? []
 }
 
 export function mapSubjectResponseToCardView(
@@ -33,7 +26,7 @@ export function mapSubjectResponseToCardView(
         personalRecordQuarter: null,
         personalRecordNote: null,
         episodeCount: subject.episodeCount,
-        tags: splitTags(subject.tags),
+        tags: resolveTagNames(subject),
         libraryStatus: subject.libraryStatus,
         libraryStatusLabel: subject.libraryStatusLabel,
         summary: subject.summary,

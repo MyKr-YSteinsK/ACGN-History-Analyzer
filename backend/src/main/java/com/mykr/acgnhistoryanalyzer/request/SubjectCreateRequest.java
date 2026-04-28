@@ -3,6 +3,7 @@ package com.mykr.acgnhistoryanalyzer.request;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public class SubjectCreateRequest {
 
@@ -59,8 +60,8 @@ public class SubjectCreateRequest {
     @Min(value = 0, message = "集数不能小于0")
     private Integer episodeCount;
 
-    @Size(max = 1000, message = "标签不能超过1000个字符")
-    private String tags;
+    @Size(max = 12, message = "单个作品最多设置12个标签")
+    private List<@Size(max = 32, message = "单个标签不能超过32个字符") String> tagNames;
 
     @Size(max = 64, message = "来源平台不能超过64个字符")
     private String sourcePlatform;
@@ -108,7 +109,7 @@ public class SubjectCreateRequest {
 
     public Integer getEpisodeCount() { return episodeCount; }
 
-    public String getTags() { return tags; }
+    public List<String> getTagNames() { return tagNames; }
 
     public String getSourcePlatform() { return sourcePlatform; }
 
@@ -148,7 +149,7 @@ public class SubjectCreateRequest {
 
     public void setEpisodeCount(Integer episodeCount) { this.episodeCount = episodeCount; }
 
-    public void setTags(String tags) { this.tags = tags; }
+    public void setTagNames(List<String> tagNames) { this.tagNames = tagNames; }
 
     public void setSourcePlatform(String sourcePlatform) { this.sourcePlatform = sourcePlatform; }
 

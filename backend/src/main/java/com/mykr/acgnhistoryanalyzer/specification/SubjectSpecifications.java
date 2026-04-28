@@ -52,4 +52,21 @@ public class SubjectSpecifications {
             );
         };
     }
+
+    public static Specification<Subject> hasTagName(String tagName) {
+        return (root, query, criteriaBuilder) -> {
+            if (tagName == null || tagName.isBlank()) {
+                return null;
+            }
+
+            if (query != null) {
+                query.distinct(true);
+            }
+
+            return criteriaBuilder.equal(
+                    root.join("structuredTags").get("normalizedName"),
+                    tagName.trim().toLowerCase()
+            );
+        };
+    }
 }

@@ -6,6 +6,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "subject")
@@ -60,12 +62,16 @@ public class Subject {
     @Column(name = "episode_count")
     private Integer episodeCount;
 
-    /**
-     * 当前先用逗号分隔字符串保存标签，避免过早拆出标签表。
-     * 例如：战斗,奇幻,校园
-     */
-    @Column(name = "tags", length = 1000)
-    private String tags;
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "subject_tag",
+            joinColumns = @JoinColumn(name = "subject_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id"),
+            uniqueConstraints = {
+                    @UniqueConstraint(name = "uk_subject_tag", columnNames = {"subject_id", "tag_id"})
+            }
+    )
+    private Set<Tag> structuredTags = new LinkedHashSet<>();
 
     @Column(name = "source_platform", length = 64)
     private String sourcePlatform;
@@ -92,7 +98,7 @@ public class Subject {
                    String coverUrl, String summary, Integer releaseYear,
                    Integer releaseQuarter, String category, String studioName,
                    String platformLink, BigDecimal platformScore, Integer episodeCount,
-                   String tags, String sourcePlatform, String sourceId, String status) {
+                   String sourcePlatform, String sourceId, String status) {
         this.titleCn = titleCn;
         this.subtitle = subtitle;
         this.displayTitle = displayTitle;
@@ -108,7 +114,6 @@ public class Subject {
         this.platformLink = platformLink;
         this.platformScore = platformScore;
         this.episodeCount = episodeCount;
-        this.tags = tags;
         this.sourcePlatform = sourcePlatform;
         this.sourceId = sourceId;
         this.status = status;
@@ -146,7 +151,7 @@ public class Subject {
 
     public Integer getEpisodeCount() { return episodeCount; }
 
-    public String getTags() { return tags; }
+    public Set<Tag> getStructuredTags() { return structuredTags; }
 
     public String getSourcePlatform() { return sourcePlatform; }
 
@@ -188,7 +193,9 @@ public class Subject {
 
     public void setEpisodeCount(Integer episodeCount) { this.episodeCount = episodeCount; }
 
-    public void setTags(String tags) { this.tags = tags; }
+    public void setStructuredTags(Set<Tag> structuredTags) {
+        this.structuredTags = structuredTags == null ? new LinkedHashSet<>() : structuredTags;
+    }
 
     public void setSourcePlatform(String sourcePlatform) { this.sourcePlatform = sourcePlatform; }
 

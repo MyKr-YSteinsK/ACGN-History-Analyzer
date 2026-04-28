@@ -64,10 +64,11 @@ public class SubjectController {
             @RequestParam(required = false) Integer quarter,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String status
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String tagName
     ) {
         List<SubjectResponse> subjects =
-                subjectService.getSubjects(year, quarter, category, keyword, status);
+                subjectService.getSubjects(year, quarter, category, keyword, status, null, tagName);
         return ApiResponse.success(subjects);
     }
 
@@ -78,13 +79,14 @@ public class SubjectController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String tagName,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort
     ) {
         PageResponse<SubjectResponse> response =
                 subjectService.getSubjectPage(
-                        year, quarter, category, keyword, status, page, size, sort
+                        year, quarter, category, keyword, status, page, size, sort, tagName
                 );
         return ApiResponse.success(response);
     }
