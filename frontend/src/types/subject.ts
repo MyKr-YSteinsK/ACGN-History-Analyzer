@@ -2,6 +2,8 @@ import type { AcgnCategory, LibraryStatus, ReleaseQuarter } from './common'
 
 export type SubjectCardView = {
     id: number
+    recordId?: number | null
+    collectionId?: number | null
     displayTitle: string
     titleCn: string
     subtitle?: string | null
@@ -25,10 +27,13 @@ export type SubjectCardView = {
     episodeCount?: number | null
     tags: string[]
     libraryStatus: LibraryStatus
+    libraryStatusLabel?: string | null
 
     summary?: string | null
     platformLink?: string | null
     sourcePlatform?: string | null
     sourceId?: string | null
     franchiseName?: string | null
+    createdAt?: string | null
+    updatedAt?: string | null
 }

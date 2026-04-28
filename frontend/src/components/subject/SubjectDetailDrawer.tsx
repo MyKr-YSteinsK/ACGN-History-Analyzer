@@ -14,6 +14,10 @@ type SubjectDetailDrawerProps = {
     open: boolean
     onClose: () => void
     onAddRecord: (subject: SubjectCardView) => void
+    onAddToWant: (subject: SubjectCardView) => void
+    onAddToPaused: (subject: SubjectCardView) => void
+    collectionAction?: 'WANT' | 'PAUSED' | null
+    detailLoading?: boolean
 }
 
 function buildSeasonPartText(subject: SubjectCardView) {
@@ -35,6 +39,10 @@ function SubjectDetailDrawer({
                                  open,
                                  onClose,
                                  onAddRecord,
+                                 onAddToWant,
+                                 onAddToPaused,
+                                 collectionAction = null,
+                                 detailLoading = false,
                              }: SubjectDetailDrawerProps) {
     useEffect(() => {
         if (!open) {
@@ -60,6 +68,11 @@ function SubjectDetailDrawer({
 
     const category = categoryTheme[subject.category]
     const quarter = subject.releaseQuarter ? quarterTheme[subject.releaseQuarter] : null
+    const cannotCollect = subject.libraryStatus === 'WATCHED'
+    const wantDisabled =
+        cannotCollect || subject.libraryStatus === 'WANT' || collectionAction !== null
+    const pausedDisabled =
+        cannotCollect || subject.libraryStatus === 'PAUSED' || collectionAction !== null
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -182,28 +195,42 @@ function SubjectDetailDrawer({
                         <div className="grid grid-cols-2 gap-2">
                             <button
                                 type="button"
-                                disabled={subject.libraryStatus === 'WANT'}
+                                disabled={wantDisabled}
+                                onClick={() => onAddToWant(subject)}
                                 className={[
                                     'rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
-                                    subject.libraryStatus === 'WANT'
+                                    wantDisabled
                                         ? 'cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-400'
                                         : 'border-emerald-100 bg-emerald-50/85 text-emerald-700 hover:-translate-y-0.5 hover:bg-emerald-100',
                                 ].join(' ')}
                             >
-                                {subject.libraryStatus === 'WANT' ? '已想看' : '想看'}
+                                {collectionAction === 'WANT'
+                                    ? '保存中'
+                                    : subject.libraryStatus === 'WANT'
+                                      ? '已想看'
+                                      : cannotCollect
+                                        ? '已看过'
+                                        : '想看'}
                             </button>
 
                             <button
                                 type="button"
-                                disabled={subject.libraryStatus === 'PAUSED'}
+                                disabled={pausedDisabled}
+                                onClick={() => onAddToPaused(subject)}
                                 className={[
                                     'rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
-                                    subject.libraryStatus === 'PAUSED'
+                                    pausedDisabled
                                         ? 'cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-400'
                                         : 'border-orange-100 bg-orange-50/85 text-orange-700 hover:-translate-y-0.5 hover:bg-orange-100',
                                 ].join(' ')}
                             >
-                                {subject.libraryStatus === 'PAUSED' ? '已搁置' : '搁置'}
+                                {collectionAction === 'PAUSED'
+                                    ? '保存中'
+                                    : subject.libraryStatus === 'PAUSED'
+                                      ? '已搁置'
+                                      : cannotCollect
+                                        ? '已看过'
+                                        : '搁置'}
                             </button>
                         </div>
                     </div>
@@ -283,7 +310,9 @@ function SubjectDetailDrawer({
 
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-white/70 bg-white/45 p-4">
                         <p className="text-xs leading-5 text-slate-400">
-                            后续这里会接入编辑作品、添加记录和收藏状态更新接口。
+                            {detailLoading
+                                ? '正在加载后端完整详情...'
+                                : '详情、记录和收藏状态已接入后端接口。'}
                         </p>
 
                         {subject.platformLink ? (

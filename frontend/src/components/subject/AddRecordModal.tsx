@@ -19,7 +19,8 @@ type AddRecordModalProps = {
     subject: SubjectCardView | null
     open: boolean
     onClose: () => void
-    onSubmit: (subject: SubjectCardView, payload: AddRecordPayload) => void
+    onSubmit: (subject: SubjectCardView, payload: AddRecordPayload) => void | Promise<void>
+    submitting?: boolean
 }
 
 const quarterOptions: Array<{
@@ -39,7 +40,36 @@ function AddRecordModal({
                             open,
                             onClose,
                             onSubmit,
+                            submitting = false,
                         }: AddRecordModalProps) {
+    if (!open || !subject) {
+        return null
+    }
+
+    return (
+        <AddRecordModalContent
+            key={`${subject.id}-${subject.recordId ?? 'new'}`}
+            subject={subject}
+            onClose={onClose}
+            onSubmit={onSubmit}
+            submitting={submitting}
+        />
+    )
+}
+
+type AddRecordModalContentProps = {
+    subject: SubjectCardView
+    onClose: () => void
+    onSubmit: (subject: SubjectCardView, payload: AddRecordPayload) => void | Promise<void>
+    submitting: boolean
+}
+
+function AddRecordModalContent({
+                                   subject,
+                                   onClose,
+                                   onSubmit,
+                                   submitting,
+                               }: AddRecordModalContentProps) {
     const currentYear = new Date().getFullYear()
     const isEditMode = subject?.libraryStatus === 'WATCHED'
 
@@ -65,23 +95,6 @@ function AddRecordModal({
     const [note, setNote] = useState(subject?.personalRecordNote ?? '')
 
     useEffect(() => {
-        if (!open || !subject) {
-            return
-        }
-
-        const nextDefaultYear = subject.personalRecordYear ?? currentYear
-        const nextDefaultYearIndex = Math.max(0, years.indexOf(nextDefaultYear))
-        const nextStartIndex = Math.min(
-            Math.max(0, nextDefaultYearIndex - 1),
-            Math.max(0, years.length - visibleYearCount),
-        )
-
-        setYearStartIndex(nextStartIndex)
-        setRecordYear(nextDefaultYear)
-        setRecordQuarter(subject.personalRecordQuarter ?? 1)
-        setScoreValue(subject.personalScore ?? 40)
-        setNote(subject.personalRecordNote ?? '')
-
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 onClose()
@@ -93,11 +106,7 @@ function AddRecordModal({
         return () => {
             window.removeEventListener('keydown', handleKeyDown)
         }
-    }, [currentYear, onClose, open, subject, years])
-
-    if (!open || !subject) {
-        return null
-    }
+    }, [onClose])
 
     const category = categoryTheme[subject.category]
     const quarter = subject.releaseQuarter ? quarterTheme[subject.releaseQuarter] : null
@@ -376,6 +385,7 @@ function AddRecordModal({
                         <button
                             type="button"
                             onClick={onClose}
+                            disabled={submitting}
                             className="rounded-2xl border border-white/80 bg-white/70 px-5 py-3 text-sm font-semibold text-slate-500 transition hover:bg-white"
                         >
                             取消
@@ -384,9 +394,15 @@ function AddRecordModal({
                         <button
                             type="button"
                             onClick={handleSubmit}
-                            className="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700"
+                            disabled={submitting}
+                            className={[
+                                'rounded-2xl px-6 py-3 text-sm font-semibold text-white transition',
+                                submitting
+                                    ? 'cursor-not-allowed bg-slate-400'
+                                    : 'bg-slate-900 hover:-translate-y-0.5 hover:bg-slate-700',
+                            ].join(' ')}
                         >
-                            {isEditMode ? '保存修改' : '保存记录'}
+                            {submitting ? '保存中' : isEditMode ? '保存修改' : '保存记录'}
                         </button>
                     </div>
                 </main>
