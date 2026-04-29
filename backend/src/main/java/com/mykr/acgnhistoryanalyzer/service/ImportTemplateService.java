@@ -135,4 +135,51 @@ public class ImportTemplateService {
                 fields
         );
     }
+
+    public ImportTemplateResponse getCollectionImportTemplate() {
+        Map<String, Object> collectionItem = new LinkedHashMap<>();
+        collectionItem.put("subjectId", null);
+        collectionItem.put("subjectTitleCn", "进击的巨人");
+        collectionItem.put("subjectSubtitle", "The Final Season Part 1");
+        collectionItem.put("subjectSeasonIndex", 4);
+        collectionItem.put("subjectPartIndex", 1);
+        collectionItem.put("subjectCategory", "ANIME");
+        collectionItem.put("collectionType", "WANT");
+        collectionItem.put("note", "样例：之后补完最终季前半部分");
+
+        List<Map<String, Object>> collections = new ArrayList<>();
+        collections.add(collectionItem);
+
+        Map<String, Object> templateBody = new LinkedHashMap<>();
+        templateBody.put("collections", collections);
+
+        List<String> rules = List.of(
+                "collection 导入前，必须先保证对应 subject 已经存在。",
+                "可以用 subjectId 定位作品，也可以用 subjectTitleCn + subjectSubtitle + subjectSeasonIndex + subjectPartIndex + subjectCategory 定位作品。",
+                "collectionType 只能是 WANT 或 PAUSED。",
+                "如果作品已有正式记录，则收藏导入会跳过，因为正式记录优先于想看/搁置。",
+                "如果作品已经在收藏夹中，正式导入会更新清单类型和备注。",
+                "preview 和正式 import 使用同一套 subject 匹配逻辑。"
+        );
+
+        List<ImportFieldDocResponse> fields = List.of(
+                new ImportFieldDocResponse("subjectId", false, "目标作品 id。", "1", "如果提供则优先用 id 定位作品。"),
+                new ImportFieldDocResponse("subjectTitleCn", false, "目标作品主标题，用于定位 subject。", "进击的巨人", "subjectId 为空时建议填写。"),
+                new ImportFieldDocResponse("subjectSubtitle", false, "目标作品副标题，用于定位 subject。", "The Final Season Part 1", "参与作品定位。"),
+                new ImportFieldDocResponse("subjectSeasonIndex", false, "目标作品第几季，用于定位 subject。", "4", "参与作品定位。"),
+                new ImportFieldDocResponse("subjectPartIndex", false, "目标作品第几部分，用于定位 subject。", "1", "参与作品定位。"),
+                new ImportFieldDocResponse("subjectCategory", false, "目标作品类型，用于定位 subject。", "ANIME", "subjectId 为空时必填。"),
+                new ImportFieldDocResponse("collectionType", true, "收藏类型。", "WANT", "只能是 WANT 或 PAUSED。"),
+                new ImportFieldDocResponse("note", false, "收藏备注。", "样例：之后补完最终季前半部分", "可以为空。")
+        );
+
+        return new ImportTemplateResponse(
+                "COLLECTION_IMPORT",
+                "/api/collections/import",
+                "先 subject，后 collection；正式 record 会覆盖 collection 状态",
+                rules,
+                templateBody,
+                fields
+        );
+    }
 }

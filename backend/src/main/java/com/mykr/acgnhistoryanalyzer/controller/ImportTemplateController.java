@@ -26,4 +26,9 @@ public class ImportTemplateController {
     public ApiResponse<ImportTemplateResponse> getRecordImportTemplate() {
         return ApiResponse.success(importTemplateService.getRecordImportTemplate());
     }
+
+    @GetMapping("/collection")
+    public ApiResponse<ImportTemplateResponse> getCollectionImportTemplate() {
+        return ApiResponse.success(importTemplateService.getCollectionImportTemplate());
+    }
 }

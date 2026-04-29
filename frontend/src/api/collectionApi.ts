@@ -34,6 +34,48 @@ export type CollectionPageParams = PageQuery & {
     keyword?: string
 }
 
+export type UserSubjectCollectionImportItemRequest = {
+    subjectId?: number | null
+    subjectTitleCn?: string | null
+    subjectSubtitle?: string | null
+    subjectSeasonIndex?: number | null
+    subjectPartIndex?: number | null
+    subjectCategory?: AcgnCategory | null
+    collectionType: CollectionType
+    note?: string | null
+}
+
+export type UserSubjectCollectionBatchImportRequest = {
+    collections: UserSubjectCollectionImportItemRequest[]
+}
+
+export type UserSubjectCollectionImportPreviewItemResponse = {
+    subjectDisplayTitle: string
+    result: string
+    message: string
+}
+
+export type UserSubjectCollectionImportPreviewResponse = {
+    totalCount: number
+    canImportCount: number
+    skippedCount: number
+    items: UserSubjectCollectionImportPreviewItemResponse[]
+}
+
+export type UserSubjectCollectionImportItemResponse = {
+    collectionId: number | null
+    subjectDisplayTitle: string
+    result: string
+    message: string
+}
+
+export type UserSubjectCollectionImportResponse = {
+    totalCount: number
+    importedCount: number
+    skippedCount: number
+    items: UserSubjectCollectionImportItemResponse[]
+}
+
 export function createOrMoveCollection(payload: UserSubjectCollectionCreateRequest) {
     return apiPost<UserSubjectCollectionResponse, UserSubjectCollectionCreateRequest>(
         '/collections',
@@ -69,4 +111,18 @@ export function updateCollection(
 
 export function deleteCollection(id: number) {
     return apiDelete<string>(`/collections/${id}`)
+}
+
+export function previewImportCollections(payload: UserSubjectCollectionBatchImportRequest) {
+    return apiPost<
+        UserSubjectCollectionImportPreviewResponse,
+        UserSubjectCollectionBatchImportRequest
+    >('/collections/import/preview', payload)
+}
+
+export function importCollections(payload: UserSubjectCollectionBatchImportRequest) {
+    return apiPost<
+        UserSubjectCollectionImportResponse,
+        UserSubjectCollectionBatchImportRequest
+    >('/collections/import', payload)
 }

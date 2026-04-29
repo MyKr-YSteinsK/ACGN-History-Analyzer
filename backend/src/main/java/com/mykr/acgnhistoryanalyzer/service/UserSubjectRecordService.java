@@ -11,6 +11,8 @@ import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordImportItemRequest;
 import com.mykr.acgnhistoryanalyzer.response.*;
 import com.mykr.acgnhistoryanalyzer.specification.UserSubjectRecordSpecifications;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class UserSubjectRecordService {
@@ -30,17 +34,20 @@ public class UserSubjectRecordService {
     private final SubjectRepository subjectRepository;
     private final TagService tagService;
     private final FranchiseAutoLinkService franchiseAutoLinkService;
+    private final Validator validator;
 
     public UserSubjectRecordService(UserSubjectRecordRepository userSubjectRecordRepository,
                                     UserSubjectCollectionRepository userSubjectCollectionRepository,
                                     SubjectRepository subjectRepository,
                                     TagService tagService,
-                                    FranchiseAutoLinkService franchiseAutoLinkService) {
+                                    FranchiseAutoLinkService franchiseAutoLinkService,
+                                    Validator validator) {
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectCollectionRepository = userSubjectCollectionRepository;
         this.subjectRepository = subjectRepository;
         this.tagService = tagService;
         this.franchiseAutoLinkService = franchiseAutoLinkService;
+        this.validator = validator;
     }
 
     public boolean subjectExists(Long subjectId) {
@@ -81,7 +88,21 @@ public class UserSubjectRecordService {
         int importedCount = 0;
         int skippedCount = 0;
 
+        int rowNumber = 1;
         for (UserSubjectRecordImportItemRequest item : request.getRecords()) {
+            String validationMessage = validateRecordImportItem(item);
+            if (validationMessage != null) {
+                skippedCount++;
+                items.add(new UserSubjectRecordImportItemResponse(
+                        null,
+                        buildSubjectLabel(item, rowNumber),
+                        "ERROR",
+                        validationMessage
+                ));
+                rowNumber++;
+                continue;
+            }
+
             SubjectResolveResult resolveResult = resolveSubjectForRecordImport(
                     item.getSubjectTitleCn(),
                     item.getSubjectSubtitle(),
@@ -98,6 +119,7 @@ public class UserSubjectRecordService {
                         "SKIPPED",
                         resolveResult.getErrorMessage()
                 ));
+                rowNumber++;
                 continue;
             }
 
@@ -111,6 +133,7 @@ public class UserSubjectRecordService {
                         "SKIPPED",
                         "该作品已有正式记录，已跳过"
                 ));
+                rowNumber++;
                 continue;
             }
 
@@ -130,6 +153,7 @@ public class UserSubjectRecordService {
                     "IMPORTED",
                     "导入成功"
             ));
+            rowNumber++;
         }
 
         return new UserSubjectRecordImportResponse(
@@ -146,7 +170,20 @@ public class UserSubjectRecordService {
         int canImportCount = 0;
         int skippedCount = 0;
 
+        int rowNumber = 1;
         for (UserSubjectRecordImportItemRequest item : request.getRecords()) {
+            String validationMessage = validateRecordImportItem(item);
+            if (validationMessage != null) {
+                skippedCount++;
+                items.add(new UserSubjectRecordImportPreviewItemResponse(
+                        buildSubjectLabel(item, rowNumber),
+                        "ERROR",
+                        validationMessage
+                ));
+                rowNumber++;
+                continue;
+            }
+
             SubjectResolveResult resolveResult = resolveSubjectForRecordImport(
                     item.getSubjectTitleCn(),
                     item.getSubjectSubtitle(),
@@ -162,6 +199,7 @@ public class UserSubjectRecordService {
                         "SKIPPED",
                         resolveResult.getErrorMessage()
                 ));
+                rowNumber++;
                 continue;
             }
 
@@ -174,6 +212,7 @@ public class UserSubjectRecordService {
                         "SKIPPED",
                         "该作品已有正式记录，正式导入时会跳过"
                 ));
+                rowNumber++;
                 continue;
             }
 
@@ -183,6 +222,7 @@ public class UserSubjectRecordService {
                     "CAN_IMPORT",
                     "可以导入正式记录"
             ));
+            rowNumber++;
         }
 
         return new UserSubjectRecordImportPreviewResponse(
@@ -545,6 +585,33 @@ public class UserSubjectRecordService {
 
     private Integer normalizeNumberKey(Integer value) {
         return value == null ? -1 : value;
+    }
+
+    private String validateRecordImportItem(UserSubjectRecordImportItemRequest item) {
+        if (item == null) {
+            return "字段校验失败：导入行不能为空";
+        }
+
+        Set<ConstraintViolation<UserSubjectRecordImportItemRequest>> violations =
+                validator.validate(item);
+        if (violations.isEmpty()) {
+            return null;
+        }
+
+        return "字段校验失败：" + violations.stream()
+                .sorted((left, right) -> left.getPropertyPath().toString()
+                        .compareTo(right.getPropertyPath().toString()))
+                .map(violation -> violation.getPropertyPath() + " " + violation.getMessage())
+                .collect(Collectors.joining("；"));
+    }
+
+    private String buildSubjectLabel(UserSubjectRecordImportItemRequest item, int rowNumber) {
+        if (item == null) {
+            return "第 " + rowNumber + " 行";
+        }
+
+        String label = buildSubjectLabel(item);
+        return label.isBlank() ? "第 " + rowNumber + " 行" : label;
     }
 
     private String buildSubjectLabel(UserSubjectRecordImportItemRequest item) {

@@ -7,16 +7,21 @@
 1. 清空旧测试数据，重启后端，让 JPA 自动建表。
 2. 如果需要系列，先手动创建少量 `franchise`，或在作品 JSON 中填写 `franchiseName`。名称匹配不到时作品仍会导入，只是不关联系列。
 3. 导入作品库 `subjects.json`。
-4. 导入正式记录 `records.json`。
-5. 想看 / 搁置收藏夹后续单独处理。
+4. 如需保留想看 / 搁置，导入收藏夹 `collections.json`。
+5. 导入正式记录 `records.json`。
 
 正式记录导入成功后，后端会按作品主标题做一次轻量系列检测：同名多季、Part 或跨媒介作品会自动创建/复用系列并关联。这个检测只在作品产生正式记录后触发，不会把纯未记录作品批量塞进系列。
 
 推荐先调用 preview，再正式 import。
 
+导入接口按行处理数据：某一行字段不合法会返回 `ERROR`，重复或无法匹配会返回 `SKIPPED`，但不会阻塞其他合法行继续预览或写入。
+
 ```text
 POST /api/subjects/import/preview
 POST /api/subjects/import
+
+POST /api/collections/import/preview
+POST /api/collections/import
 
 POST /api/records/import/preview
 POST /api/records/import
@@ -228,6 +233,43 @@ subjectTitleCn + subjectSubtitle + subjectSeasonIndex + subjectPartIndex + subje
 
 这样它们在统计中是两个作品切片，但可以通过同一个 `franchiseName` 串回同一系列。
 
+## 收藏夹 JSON
+
+顶层必须是对象，字段必须叫 `collections`。收藏夹只表示想看 / 搁置，不表示正式完成记录。
+
+```json
+{
+  "collections": [
+    {
+      "subjectId": null,
+      "subjectTitleCn": "葬送的芙莉莲",
+      "subjectSubtitle": null,
+      "subjectSeasonIndex": 1,
+      "subjectPartIndex": 1,
+      "subjectCategory": "ANIME",
+      "collectionType": "WANT",
+      "note": "之后想补完。"
+    }
+  ]
+}
+```
+
+### 收藏字段
+
+| 字段 | 必填 | 格式 | 说明 |
+| --- | --- | --- | --- |
+| `subjectId` | 否 | 正整数或 null | 如果知道数据库作品 id，可直接定位作品 |
+| `subjectTitleCn` | 否 | 字符串 | `subjectId` 为空时，用于定位作品 |
+| `subjectSubtitle` | 否 | 字符串或 null | 用于定位作品 |
+| `subjectSeasonIndex` | 否 | 正整数或 null | 用于定位作品 |
+| `subjectPartIndex` | 否 | 正整数或 null | 用于定位作品 |
+| `subjectCategory` | 否 | `ANIME`/`COMIC`/`GAME`/`NOVEL` | `subjectId` 为空时必填 |
+| `collectionType` | 是 | `WANT`/`PAUSED` | WANT 想看，PAUSED 搁置 |
+| `note` | 否 | 字符串或 null，最长 500 | 收藏备注 |
+
+如果作品已有正式记录，收藏导入会跳过。  
+如果作品已经在收藏夹中，正式导入会更新为新的 `collectionType` 和 `note`。
+
 ## 给 GPT / Bangumi 整理器的提示词
 
 ```text
@@ -235,7 +277,8 @@ subjectTitleCn + subjectSubtitle + subjectSeasonIndex + subjectPartIndex + subje
 
 输出两个 JSON 文件：
 1. subjects.json
-2. records.json
+2. collections.json（如需要想看/搁置）
+3. records.json
 
 作品 category 只能是 ANIME / COMIC / GAME / NOVEL。
 月份档期规则：1 一月，2 四月，3 七月，4 十月。
@@ -247,4 +290,5 @@ sourcePlatform 固定为 BANGUMI。
 sourceId 填 Bangumi subject id。
 status 固定为 NORMAL。
 记录 JSON 必须用 subjectTitleCn、subjectSubtitle、subjectSeasonIndex、subjectPartIndex、subjectCategory 匹配作品。
+收藏 JSON 使用 collections 顶层字段，collectionType 只能是 WANT 或 PAUSED；已有正式记录的作品不要再生成收藏。
 ```

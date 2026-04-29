@@ -14,6 +14,8 @@ import com.mykr.acgnhistoryanalyzer.request.SubjectBatchImportRequest;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.*;
 import com.mykr.acgnhistoryanalyzer.specification.SubjectSpecifications;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +26,8 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class SubjectService {
@@ -36,6 +40,7 @@ public class SubjectService {
     private final FranchiseRepository franchiseRepository;
     private final TagService tagService;
     private final CoverStorageService coverStorageService;
+    private final Validator validator;
 
     public SubjectService(SubjectRepository subjectRepository,
                           UserSubjectRecordRepository userSubjectRecordRepository,
@@ -44,7 +49,8 @@ public class SubjectService {
                           UserSubjectCollectionService userSubjectCollectionService,
                           FranchiseRepository franchiseRepository,
                           TagService tagService,
-                          CoverStorageService coverStorageService) {
+                          CoverStorageService coverStorageService,
+                          Validator validator) {
         this.subjectRepository = subjectRepository;
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectCollectionRepository = userSubjectCollectionRepository;
@@ -53,6 +59,7 @@ public class SubjectService {
         this.franchiseRepository = franchiseRepository;
         this.tagService = tagService;
         this.coverStorageService = coverStorageService;
+        this.validator = validator;
     }
 
     public SubjectResponse createSubject(SubjectCreateRequest request) {
@@ -274,7 +281,21 @@ public class SubjectService {
         int importedCount = 0;
         int skippedCount = 0;
 
+        int rowNumber = 1;
         for (SubjectCreateRequest item : request.getSubjects()) {
+            String validationMessage = validateSubjectImportItem(item);
+            if (validationMessage != null) {
+                skippedCount++;
+                items.add(new SubjectImportItemResponse(
+                        null,
+                        buildSubjectImportLabel(item, rowNumber),
+                        "ERROR",
+                        validationMessage
+                ));
+                rowNumber++;
+                continue;
+            }
+
             Long resolvedFranchiseId = resolveFranchiseIdForImport(item);
 
             if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
@@ -285,6 +306,7 @@ public class SubjectService {
                         "SKIPPED",
                         "franchiseId 对应的系列不存在，已跳过"
                 ));
+                rowNumber++;
                 continue;
             }
 
@@ -297,6 +319,7 @@ public class SubjectService {
                         "SKIPPED",
                         "作品已存在，已跳过"
                 ));
+                rowNumber++;
                 continue;
             }
 
@@ -311,6 +334,7 @@ public class SubjectService {
                     "IMPORTED",
                     buildSubjectImportSuccessMessage(item, resolvedFranchiseId)
             ));
+            rowNumber++;
         }
 
         return new SubjectImportResponse(
@@ -327,7 +351,20 @@ public class SubjectService {
         int canImportCount = 0;
         int skippedCount = 0;
 
+        int rowNumber = 1;
         for (SubjectCreateRequest item : request.getSubjects()) {
+            String validationMessage = validateSubjectImportItem(item);
+            if (validationMessage != null) {
+                skippedCount++;
+                items.add(new SubjectImportPreviewItemResponse(
+                        buildSubjectImportLabel(item, rowNumber),
+                        "ERROR",
+                        validationMessage
+                ));
+                rowNumber++;
+                continue;
+            }
+
             if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
                 skippedCount++;
                 items.add(new SubjectImportPreviewItemResponse(
@@ -335,6 +372,7 @@ public class SubjectService {
                         "SKIPPED",
                         "franchiseId 对应的系列不存在，正式导入时会跳过"
                 ));
+                rowNumber++;
                 continue;
             }
 
@@ -346,6 +384,7 @@ public class SubjectService {
                         "SKIPPED",
                         "作品已存在，正式导入时会跳过"
                 ));
+                rowNumber++;
                 continue;
             }
 
@@ -356,6 +395,7 @@ public class SubjectService {
                     "CAN_IMPORT",
                     buildSubjectImportPreviewMessage(item, resolvedFranchiseId)
             ));
+            rowNumber++;
         }
 
         return new SubjectImportPreviewResponse(
@@ -475,6 +515,36 @@ public class SubjectService {
             return "导入成功；franchiseName 未匹配到已有系列，已按无系列作品导入";
         }
         return "导入成功";
+    }
+
+    private String validateSubjectImportItem(SubjectCreateRequest item) {
+        if (item == null) {
+            return "字段校验失败：导入行不能为空";
+        }
+
+        Set<ConstraintViolation<SubjectCreateRequest>> violations = validator.validate(item);
+        if (violations.isEmpty()) {
+            return null;
+        }
+
+        return "字段校验失败：" + violations.stream()
+                .sorted((left, right) -> left.getPropertyPath().toString()
+                        .compareTo(right.getPropertyPath().toString()))
+                .map(violation -> violation.getPropertyPath() + " " + violation.getMessage())
+                .collect(Collectors.joining("；"));
+    }
+
+    private String buildSubjectImportLabel(SubjectCreateRequest item, int rowNumber) {
+        if (item == null) {
+            return "第 " + rowNumber + " 行";
+        }
+        if (hasText(item.getDisplayTitle())) {
+            return item.getDisplayTitle().trim();
+        }
+        if (hasText(item.getTitleCn())) {
+            return item.getTitleCn().trim();
+        }
+        return "第 " + rowNumber + " 行";
     }
 
     private boolean hasText(String value) {

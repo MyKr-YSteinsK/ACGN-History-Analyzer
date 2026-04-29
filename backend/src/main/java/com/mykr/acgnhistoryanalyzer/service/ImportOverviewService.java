@@ -14,15 +14,15 @@ public class ImportOverviewService {
                 "先查看 subject 导入模板，确认作品字段结构。",
                 "先调用 subject preview，确认哪些作品能导入、哪些会跳过。",
                 "再调用 subject import，正式导入作品库。",
-                "作品库准备完成后，再查看 record 导入模板。",
-                "先调用 record preview，确认记录能否正确匹配已有作品。",
-                "最后调用 record import，正式导入个人记录。"
+                "作品库准备完成后，可以导入 collection 想看/搁置。",
+                "最后查看 record 导入模板，预览并正式导入个人记录。"
         );
 
         List<String> notes = List.of(
                 "subject 的业务层唯一性规则为：titleCn + subtitle + seasonIndex + partIndex + category 全都一样，则视为重复作品。",
                 "record 导入定位 subject 的规则，已经与 subject 的业务唯一性规则对齐。",
                 "当前系统规则是一作品一记录；如果某个 subject 已经有记录，则新的 record 导入会跳过。",
+                "collection 导入只管理 WANT / PAUSED；如果作品已有正式记录，则收藏导入会跳过。",
                 "franchiseId 和 franchiseName 在 subject 导入中二选一即可；如果都传，当前逻辑优先使用 franchiseId。",
                 "franchiseName 匹配不到已有系列时，subject 仍会导入，只是不关联系列；franchiseId 明确不存在时才会跳过。",
                 "record 正式导入成功后，会触发轻量系列检测，同名多季、Part 或跨媒介作品会自动关联系列。",
@@ -58,6 +58,24 @@ public class ImportOverviewService {
                         "返回 record 导入示例 JSON、字段说明和规则说明。"
                 ),
                 new ImportEndpointDocResponse(
+                        "collection 导入模板",
+                        "GET",
+                        "/api/import/templates/collection",
+                        "返回 collection 导入示例 JSON、字段说明和规则说明。"
+                ),
+                new ImportEndpointDocResponse(
+                        "collection 导入预览",
+                        "POST",
+                        "/api/collections/import/preview",
+                        "预检查 collection 导入结果，不写库。"
+                ),
+                new ImportEndpointDocResponse(
+                        "collection 正式导入",
+                        "POST",
+                        "/api/collections/import",
+                        "正式批量导入想看/搁置收藏到 user_subject_collection 表。"
+                ),
+                new ImportEndpointDocResponse(
                         "record 导入预览",
                         "POST",
                         "/api/records/import/preview",
@@ -73,7 +91,7 @@ public class ImportOverviewService {
 
         return new ImportOverviewResponse(
                 "IMPORT_OVERVIEW",
-                "推荐顺序：franchise（如需）→ subject preview → subject import → record preview → record import",
+                "推荐顺序：franchise（如需）→ subject → collection（如需）→ record",
                 steps,
                 notes,
                 endpoints

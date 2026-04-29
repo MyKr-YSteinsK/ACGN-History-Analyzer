@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+    getCollectionImportTemplate,
     getImportOverview,
     getRecordImportTemplate,
     getSubjectImportTemplate,
     type ImportOverviewResponse,
     type ImportTemplateResponse,
 } from '../api/importApi'
+import {
+    importCollections,
+    previewImportCollections,
+    type UserSubjectCollectionBatchImportRequest,
+    type UserSubjectCollectionImportItemResponse,
+    type UserSubjectCollectionImportPreviewItemResponse,
+    type UserSubjectCollectionImportPreviewResponse,
+    type UserSubjectCollectionImportResponse,
+} from '../api/collectionApi'
 import {
     importRecords,
     previewImportRecords,
@@ -27,11 +37,14 @@ import {
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
 
-type ImportTarget = 'SUBJECT' | 'RECORD'
+type ImportTarget = 'SUBJECT' | 'COLLECTION' | 'RECORD'
 
 type ImportMode = 'JSON' | 'CSV' | 'EXCEL' | 'BANGUMI' | 'BACKUP' | 'MANUAL'
 
-type ParsedPayload = SubjectBatchImportRequest | UserSubjectRecordBatchImportRequest
+type ParsedPayload =
+    | SubjectBatchImportRequest
+    | UserSubjectCollectionBatchImportRequest
+    | UserSubjectRecordBatchImportRequest
 
 type PreviewState =
     | {
@@ -41,6 +54,10 @@ type PreviewState =
     | {
           target: 'RECORD'
           data: UserSubjectRecordImportPreviewResponse
+      }
+    | {
+          target: 'COLLECTION'
+          data: UserSubjectCollectionImportPreviewResponse
       }
 
 type ImportResultState =
@@ -52,12 +69,18 @@ type ImportResultState =
           target: 'RECORD'
           data: UserSubjectRecordImportResponse
       }
+    | {
+          target: 'COLLECTION'
+          data: UserSubjectCollectionImportResponse
+      }
 
 type PreviewItem = {
     title: string
     result: string
     message: string
 }
+
+type ImportItemFilter = 'ALL' | 'SUCCESS' | 'WARNING' | 'ERROR'
 
 const importModes: Array<{
     value: ImportMode
@@ -104,6 +127,7 @@ const importModes: Array<{
 ]
 
 const numericFields = new Set([
+    'subjectId',
     'franchiseId',
     'seasonIndex',
     'partIndex',
@@ -134,8 +158,8 @@ const importTips = [
         description: '正式导入时后端会尝试下载到 uploads/covers，并返回 /api/assets/covers 路径。',
     },
     {
-        title: '记录先匹配作品',
-        description: '记录导入不直接写 subjectId，而是用作品唯一键定位已有作品。',
+        title: '收藏 / 记录匹配作品',
+        description: '收藏可用 subjectId 或作品唯一键；记录用作品唯一键定位已有作品。',
     },
 ]
 
@@ -148,11 +172,35 @@ function getErrorMessage(error: unknown) {
 }
 
 function getTargetRootKey(target: ImportTarget) {
-    return target === 'SUBJECT' ? 'subjects' : 'records'
+    if (target === 'SUBJECT') {
+        return 'subjects'
+    }
+    if (target === 'COLLECTION') {
+        return 'collections'
+    }
+    return 'records'
 }
 
 function getTargetTitle(target: ImportTarget) {
-    return target === 'SUBJECT' ? '作品库' : '个人记录'
+    if (target === 'SUBJECT') {
+        return '作品库'
+    }
+    if (target === 'COLLECTION') {
+        return '收藏夹'
+    }
+    return '个人记录'
+}
+
+function getImportItemFilter(item: PreviewItem): Exclude<ImportItemFilter, 'ALL'> {
+    if (item.result === 'CAN_IMPORT' || item.result === 'IMPORTED') {
+        return 'SUCCESS'
+    }
+
+    if (item.result === 'ERROR') {
+        return 'ERROR'
+    }
+
+    return 'WARNING'
 }
 
 function stringifyTemplate(template: ImportTemplateResponse | null) {
@@ -355,6 +403,14 @@ function getPreviewItems(preview: PreviewState | null): PreviewItem[] {
         }))
     }
 
+    if (preview.target === 'COLLECTION') {
+        return preview.data.items.map((item: UserSubjectCollectionImportPreviewItemResponse) => ({
+            title: item.subjectDisplayTitle,
+            result: item.result,
+            message: item.message,
+        }))
+    }
+
     return preview.data.items.map((item: UserSubjectRecordImportPreviewItemResponse) => ({
         title: item.subjectDisplayTitle,
         result: item.result,
@@ -375,6 +431,14 @@ function getImportResultItems(result: ImportResultState | null): PreviewItem[] {
         }))
     }
 
+    if (result.target === 'COLLECTION') {
+        return result.data.items.map((item: UserSubjectCollectionImportItemResponse) => ({
+            title: item.subjectDisplayTitle,
+            result: item.result,
+            message: item.message,
+        }))
+    }
+
     return result.data.items.map((item: UserSubjectRecordImportItemResponse) => ({
         title: item.subjectDisplayTitle,
         result: item.result,
@@ -382,9 +446,26 @@ function getImportResultItems(result: ImportResultState | null): PreviewItem[] {
     }))
 }
 
+function pickTemplate(
+    target: ImportTarget,
+    subjectTemplate: ImportTemplateResponse | null,
+    collectionTemplate: ImportTemplateResponse | null,
+    recordTemplate: ImportTemplateResponse | null,
+) {
+    if (target === 'SUBJECT') {
+        return subjectTemplate
+    }
+    if (target === 'COLLECTION') {
+        return collectionTemplate
+    }
+    return recordTemplate
+}
+
 function ImportPage() {
     const [overview, setOverview] = useState<ImportOverviewResponse | null>(null)
     const [subjectTemplate, setSubjectTemplate] = useState<ImportTemplateResponse | null>(null)
+    const [collectionTemplate, setCollectionTemplate] =
+        useState<ImportTemplateResponse | null>(null)
     const [recordTemplate, setRecordTemplate] = useState<ImportTemplateResponse | null>(null)
     const [selectedTarget, setSelectedTarget] = useState<ImportTarget>('SUBJECT')
     const [selectedMode, setSelectedMode] = useState<ImportMode>('JSON')
@@ -396,7 +477,12 @@ function ImportPage() {
     const [submitting, setSubmitting] = useState(false)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-    const selectedTemplate = selectedTarget === 'SUBJECT' ? subjectTemplate : recordTemplate
+    const selectedTemplate = pickTemplate(
+        selectedTarget,
+        subjectTemplate,
+        collectionTemplate,
+        recordTemplate,
+    )
     const selectedRootKey = getTargetRootKey(selectedTarget)
     const previewItems = getPreviewItems(preview)
     const resultItems = getImportResultItems(importResult)
@@ -415,15 +501,22 @@ function ImportPage() {
         setFeedbackMessage(null)
 
         try {
-            const [overviewResponse, subjectTemplateResponse, recordTemplateResponse] =
+            const [
+                overviewResponse,
+                subjectTemplateResponse,
+                collectionTemplateResponse,
+                recordTemplateResponse,
+            ] =
                 await Promise.all([
                     getImportOverview(),
                     getSubjectImportTemplate(),
+                    getCollectionImportTemplate(),
                     getRecordImportTemplate(),
                 ])
 
             setOverview(overviewResponse)
             setSubjectTemplate(subjectTemplateResponse)
+            setCollectionTemplate(collectionTemplateResponse)
             setRecordTemplate(recordTemplateResponse)
             setDraftText(JSON.stringify(subjectTemplateResponse.templateBody, null, 2))
         } catch (error) {
@@ -449,7 +542,12 @@ function ImportPage() {
         setSelectedTarget(target)
         resetResultState()
 
-        const nextTemplate = target === 'SUBJECT' ? subjectTemplate : recordTemplate
+        const nextTemplate = pickTemplate(
+            target,
+            subjectTemplate,
+            collectionTemplate,
+            recordTemplate,
+        )
 
         if (nextTemplate) {
             setDraftText(stringifyTemplate(nextTemplate))
@@ -483,6 +581,24 @@ function ImportPage() {
         )
     }
 
+    async function handleCopyTemplate() {
+        if (!selectedTemplate) {
+            return
+        }
+
+        const templateText =
+            selectedMode === 'CSV'
+                ? buildCsvTemplate(selectedTemplate)
+                : stringifyTemplate(selectedTemplate)
+
+        try {
+            await navigator.clipboard.writeText(templateText)
+            setFeedbackMessage('已复制当前模板')
+        } catch {
+            setFeedbackMessage('浏览器阻止了复制，请使用“载入模板”后手动复制文本框内容')
+        }
+    }
+
     async function handlePreview() {
         setSubmitting(true)
         setPreview(null)
@@ -495,6 +611,11 @@ function ImportPage() {
             if (selectedTarget === 'SUBJECT') {
                 const response = await previewImportSubjects(payload as SubjectBatchImportRequest)
                 setPreview({ target: 'SUBJECT', data: response })
+            } else if (selectedTarget === 'COLLECTION') {
+                const response = await previewImportCollections(
+                    payload as UserSubjectCollectionBatchImportRequest,
+                )
+                setPreview({ target: 'COLLECTION', data: response })
             } else {
                 const response = await previewImportRecords(
                     payload as UserSubjectRecordBatchImportRequest,
@@ -519,6 +640,12 @@ function ImportPage() {
                 const response = await importSubjects(payload as SubjectBatchImportRequest)
                 setImportResult({ target: 'SUBJECT', data: response })
                 setFeedbackMessage(`已导入 ${response.importedCount} 条作品`)
+            } else if (selectedTarget === 'COLLECTION') {
+                const response = await importCollections(
+                    payload as UserSubjectCollectionBatchImportRequest,
+                )
+                setImportResult({ target: 'COLLECTION', data: response })
+                setFeedbackMessage(`已导入 ${response.importedCount} 条收藏`)
             } else {
                 const response = await importRecords(
                     payload as UserSubjectRecordBatchImportRequest,
@@ -557,7 +684,7 @@ function ImportPage() {
             <PageHero
                 eyebrow="IMPORT"
                 title="导入中心"
-                description="先预览校验，再确认写入。当前优先支持作品库和个人记录的 JSON / CSV 导入。"
+                description="先预览校验，再确认写入。当前支持作品库、收藏夹和个人记录的 JSON / CSV 导入。"
             />
 
             <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -589,12 +716,18 @@ function ImportPage() {
                                 </div>
                             </div>
 
-                            <div className="grid gap-3 md:grid-cols-2">
+                            <div className="grid gap-3 md:grid-cols-3">
                                 <TargetCard
                                     title="作品库"
                                     description="导入作品本体，建议先于记录导入"
                                     active={selectedTarget === 'SUBJECT'}
                                     onClick={() => handleTargetChange('SUBJECT')}
+                                />
+                                <TargetCard
+                                    title="收藏夹"
+                                    description="导入想看 / 搁置，正式记录会覆盖收藏状态"
+                                    active={selectedTarget === 'COLLECTION'}
+                                    onClick={() => handleTargetChange('COLLECTION')}
                                 />
                                 <TargetCard
                                     title="个人记录"
@@ -694,6 +827,14 @@ function ImportPage() {
                                 </button>
                                 <button
                                     type="button"
+                                    onClick={() => void handleCopyTemplate()}
+                                    disabled={!selectedTemplate}
+                                    className="rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:text-slate-300"
+                                >
+                                    复制模板
+                                </button>
+                                <button
+                                    type="button"
                                     onClick={() => fileInputRef.current?.click()}
                                     className="rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:bg-white"
                                 >
@@ -734,6 +875,9 @@ function ImportPage() {
                                 </span>
                                 <span className="rounded-full bg-white/65 px-3 py-1.5">
                                     Import 才写入
+                                </span>
+                                <span className="rounded-full bg-white/65 px-3 py-1.5">
+                                    错误行不阻塞合法行
                                 </span>
                             </div>
 
@@ -837,15 +981,19 @@ function PreviewPanel({
                           items,
                           emptyText,
                       }: PreviewPanelProps) {
+    const errorCount = items.filter((item) => item.result === 'ERROR').length
+    const warningCount = Math.max(0, skippedCount - errorCount)
+
     return (
         <GlassCard className="overflow-hidden">
             <div className="bg-gradient-to-br from-white/62 via-white/45 to-emerald-50/45 p-5">
                 <h3 className="text-xl font-black text-slate-800">{title}</h3>
 
-                <div className="mt-4 grid grid-cols-3 gap-3">
+                <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <StatCard label="总数" value={totalCount} />
                     <StatCard label="可导入" value={canImportCount} tone="good" />
-                    <StatCard label="警告/跳过" value={skippedCount} tone="warn" />
+                    <StatCard label="警告" value={warningCount} tone="warn" />
+                    <StatCard label="错误" value={errorCount} tone="danger" />
                 </div>
 
                 <ImportItemList
@@ -860,21 +1008,26 @@ function PreviewPanel({
 type ResultPanelProps = {
     result:
         | SubjectImportResponse
+        | UserSubjectCollectionImportResponse
         | UserSubjectRecordImportResponse
         | null
     items: PreviewItem[]
 }
 
 function ResultPanel({ result, items }: ResultPanelProps) {
+    const errorCount = items.filter((item) => item.result === 'ERROR').length
+    const warningCount = Math.max(0, (result?.skippedCount ?? 0) - errorCount)
+
     return (
         <GlassCard className="overflow-hidden">
             <div className="bg-gradient-to-br from-white/62 via-white/45 to-amber-50/45 p-5">
                 <h3 className="text-xl font-black text-slate-800">写入结果</h3>
 
-                <div className="mt-4 grid grid-cols-3 gap-3">
+                <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <StatCard label="总数" value={result?.totalCount ?? 0} />
                     <StatCard label="已导入" value={result?.importedCount ?? 0} tone="good" />
-                    <StatCard label="跳过" value={result?.skippedCount ?? 0} tone="warn" />
+                    <StatCard label="跳过" value={warningCount} tone="warn" />
+                    <StatCard label="错误" value={errorCount} tone="danger" />
                 </div>
 
                 <ImportItemList
@@ -889,7 +1042,7 @@ function ResultPanel({ result, items }: ResultPanelProps) {
 type StatCardProps = {
     label: string
     value: number
-    tone?: 'normal' | 'good' | 'warn'
+    tone?: 'normal' | 'good' | 'warn' | 'danger'
 }
 
 function StatCard({ label, value, tone = 'normal' }: StatCardProps) {
@@ -898,6 +1051,8 @@ function StatCard({ label, value, tone = 'normal' }: StatCardProps) {
             ? 'text-emerald-600'
             : tone === 'warn'
               ? 'text-orange-600'
+              : tone === 'danger'
+                ? 'text-rose-600'
               : 'text-slate-800'
 
     return (
@@ -916,6 +1071,25 @@ type ImportItemListProps = {
 }
 
 function ImportItemList({ items, emptyText }: ImportItemListProps) {
+    const [filter, setFilter] = useState<ImportItemFilter>('ALL')
+    const successCount = items.filter((item) => getImportItemFilter(item) === 'SUCCESS').length
+    const warningCount = items.filter((item) => getImportItemFilter(item) === 'WARNING').length
+    const errorCount = items.filter((item) => getImportItemFilter(item) === 'ERROR').length
+    const filterOptions: Array<{
+        value: ImportItemFilter
+        label: string
+        count: number
+    }> = [
+        { value: 'ALL', label: '全部', count: items.length },
+        { value: 'SUCCESS', label: '可处理', count: successCount },
+        { value: 'WARNING', label: '跳过', count: warningCount },
+        { value: 'ERROR', label: '错误', count: errorCount },
+    ]
+    const visibleItems =
+        filter === 'ALL'
+            ? items
+            : items.filter((item) => getImportItemFilter(item) === filter)
+
     if (items.length === 0) {
         return (
             <div className="mt-4 rounded-[24px] border border-dashed border-slate-200 bg-white/45 p-8 text-center text-sm font-semibold text-slate-400">
@@ -925,11 +1099,43 @@ function ImportItemList({ items, emptyText }: ImportItemListProps) {
     }
 
     return (
-        <div className="mt-4 max-h-[320px] space-y-2 overflow-auto pr-1">
-            {items.map((item, index) => {
+        <div className="mt-4">
+            <div className="mb-3 flex flex-wrap gap-2">
+                {filterOptions.map((option) => {
+                    const selected = filter === option.value
+
+                    return (
+                        <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setFilter(option.value)}
+                            className={[
+                                'rounded-full border px-3 py-1.5 text-xs font-semibold transition',
+                                selected
+                                    ? 'border-slate-200 bg-slate-900 text-white shadow-sm'
+                                    : 'border-white/75 bg-white/62 text-slate-400 hover:bg-white hover:text-slate-600',
+                            ].join(' ')}
+                        >
+                            {option.label} {option.count}
+                        </button>
+                    )
+                })}
+            </div>
+
+            {visibleItems.length === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-slate-200 bg-white/45 p-8 text-center text-sm font-semibold text-slate-400">
+                    当前筛选下没有结果
+                </div>
+            ) : null}
+
+            <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
+            {visibleItems.map((item, index) => {
                 const canImport = item.result === 'CAN_IMPORT' || item.result === 'IMPORTED'
+                const hasError = item.result === 'ERROR'
                 const className = canImport
                     ? 'border-emerald-100 bg-emerald-50/70 text-emerald-700'
+                    : hasError
+                      ? 'border-rose-100 bg-rose-50/75 text-rose-700'
                     : 'border-orange-100 bg-orange-50/70 text-orange-700'
 
                 return (
@@ -954,6 +1160,7 @@ function ImportItemList({ items, emptyText }: ImportItemListProps) {
                     </div>
                 )
             })}
+            </div>
         </div>
     )
 }

@@ -43,3 +43,7 @@ export function getSubjectImportTemplate() {
 export function getRecordImportTemplate() {
     return apiGet<ImportTemplateResponse>('/import/templates/record')
 }
+
+export function getCollectionImportTemplate() {
+    return apiGet<ImportTemplateResponse>('/import/templates/collection')
+}

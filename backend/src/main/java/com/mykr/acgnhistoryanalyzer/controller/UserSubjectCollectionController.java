@@ -3,9 +3,12 @@ package com.mykr.acgnhistoryanalyzer.controller;
 import com.mykr.acgnhistoryanalyzer.common.enums.CollectionType;
 import com.mykr.acgnhistoryanalyzer.common.error.BusinessErrors;
 import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
+import com.mykr.acgnhistoryanalyzer.request.UserSubjectCollectionBatchImportRequest;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectCollectionCreateRequest;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectCollectionUpdateRequest;
 import com.mykr.acgnhistoryanalyzer.response.PageResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectCollectionImportPreviewResponse;
+import com.mykr.acgnhistoryanalyzer.response.UserSubjectCollectionImportResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectCollectionResponse;
 import com.mykr.acgnhistoryanalyzer.service.UserSubjectCollectionService;
 import jakarta.validation.Valid;
@@ -55,6 +58,20 @@ public class UserSubjectCollectionController {
         request.setSubjectId(subjectId);
         request.setCollectionType(CollectionType.PAUSED);
         return createOrMoveCollection(request);
+    }
+
+    @PostMapping("/import")
+    public ApiResponse<UserSubjectCollectionImportResponse> importCollections(
+            @Valid @RequestBody UserSubjectCollectionBatchImportRequest request
+    ) {
+        return ApiResponse.success(collectionService.importCollections(request));
+    }
+
+    @PostMapping("/import/preview")
+    public ApiResponse<UserSubjectCollectionImportPreviewResponse> previewImportCollections(
+            @Valid @RequestBody UserSubjectCollectionBatchImportRequest request
+    ) {
+        return ApiResponse.success(collectionService.previewImportCollections(request));
     }
 
     @GetMapping
