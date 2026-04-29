@@ -118,6 +118,27 @@ const numericFields = new Set([
     'recordQuarter',
 ])
 
+const arrayFields = new Set(['tagNames'])
+
+const importTips = [
+    {
+        title: '作品唯一键',
+        description: 'titleCn + subtitle + seasonIndex + partIndex + category 全部相同视为重复作品。',
+    },
+    {
+        title: '标签写 tagNames',
+        description: '推荐 3-7 个中文标签。JSON 用数组，CSV 可用 战斗|奇幻|漫画改。',
+    },
+    {
+        title: '封面可填远程 URL',
+        description: '正式导入时后端会尝试下载到 uploads/covers，并返回 /api/assets/covers 路径。',
+    },
+    {
+        title: '记录先匹配作品',
+        description: '记录导入不直接写 subjectId，而是用作品唯一键定位已有作品。',
+    },
+]
+
 function getErrorMessage(error: unknown) {
     if (error instanceof Error) {
         return error.message
@@ -202,12 +223,65 @@ function normalizeCsvValue(fieldName: string, value: string) {
         return null
     }
 
+    if (arrayFields.has(fieldName)) {
+        return parseCsvArrayValue(value)
+    }
+
     if (numericFields.has(fieldName)) {
         const numberValue = Number(value)
         return Number.isNaN(numberValue) ? value : numberValue
     }
 
     return value
+}
+
+function parseCsvArrayValue(value: string) {
+    const trimmedValue = value.trim()
+
+    if (!trimmedValue) {
+        return []
+    }
+
+    if (trimmedValue.startsWith('[')) {
+        const parsed = JSON.parse(trimmedValue) as unknown
+        if (!Array.isArray(parsed)) {
+            throw new Error('tagNames JSON 必须是数组')
+        }
+
+        return parsed
+            .map((item) => String(item).trim())
+            .filter(Boolean)
+    }
+
+    return trimmedValue
+        .split(/[|;；、，,]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+}
+
+function escapeCsvCell(value: string) {
+    if (/[",\r\n]/.test(value)) {
+        return `"${value.replaceAll('"', '""')}"`
+    }
+
+    return value
+}
+
+function getCsvExampleValue(fieldName: string, example?: string | null) {
+    if (fieldName === 'tagNames') {
+        return '战斗|奇幻|漫画改'
+    }
+
+    return example ?? ''
+}
+
+function buildCsvTemplate(template: ImportTemplateResponse) {
+    const headers = template.fields.map((field) => field.fieldName).join(',')
+    const values = template.fields
+        .map((field) => escapeCsvCell(getCsvExampleValue(field.fieldName, field.example)))
+        .join(',')
+
+    return `${headers}\n${values}`
 }
 
 function parseCsvPayload(text: string, target: ImportTarget) {
@@ -392,9 +466,7 @@ function ImportPage() {
         }
 
         if (mode === 'CSV' && selectedTemplate) {
-            const headers = selectedTemplate.fields.map((field) => field.fieldName).join(',')
-            const values = selectedTemplate.fields.map((field) => field.example ?? '').join(',')
-            setDraftText(`${headers}\n${values}`)
+            setDraftText(buildCsvTemplate(selectedTemplate))
         }
     }
 
@@ -406,7 +478,7 @@ function ImportPage() {
         resetResultState()
         setDraftText(
             selectedMode === 'CSV'
-                ? `${selectedTemplate.fields.map((field) => field.fieldName).join(',')}\n${selectedTemplate.fields.map((field) => field.example ?? '').join(',')}`
+                ? buildCsvTemplate(selectedTemplate)
                 : stringifyTemplate(selectedTemplate),
         )
     }
@@ -488,6 +560,20 @@ function ImportPage() {
                 description="先预览校验，再确认写入。当前优先支持作品库和个人记录的 JSON / CSV 导入。"
             />
 
+            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {importTips.map((tip) => (
+                    <div
+                        key={tip.title}
+                        className="rounded-[24px] border border-white/70 bg-white/50 p-4 shadow-sm backdrop-blur-xl"
+                    >
+                        <p className="text-sm font-black text-slate-700">{tip.title}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-400">
+                            {tip.description}
+                        </p>
+                    </div>
+                ))}
+            </section>
+
             <GlassCard className="overflow-hidden">
                 <div className="bg-gradient-to-br from-white/62 via-white/45 to-sky-50/45 p-6">
                     <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
@@ -534,6 +620,9 @@ function ImportPage() {
                                     </span>
                                 ))}
                             </div>
+                            <span className="mt-4 inline-flex rounded-full border border-white/80 bg-white/65 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                                文档位置：docs/import-guide.md
+                            </span>
                         </div>
                     </div>
                 </div>

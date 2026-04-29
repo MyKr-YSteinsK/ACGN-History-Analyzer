@@ -21,7 +21,7 @@ public class ImportTemplateService {
         subjectItem.put("franchiseName", "进击的巨人");
         subjectItem.put("seasonIndex", 4);
         subjectItem.put("partIndex", 1);
-        subjectItem.put("coverUrl", "https://example.com/aot-p1.jpg");
+        subjectItem.put("coverUrl", "https://lain.bgm.tv/pic/cover/l/example.jpg");
         subjectItem.put("summary", "样例：巨人最终季前半部分");
         subjectItem.put("releaseYear", 2020);
         subjectItem.put("releaseQuarter", 4);
@@ -48,6 +48,7 @@ public class ImportTemplateService {
                 "如果传 franchiseName，则后端会尝试匹配已有系列；匹配不到时会跳过。",
                 "preview 和正式 import 使用同一套判定规则。",
                 "作品标签使用 tagNames 数组，建议 3~7 个，最多 12 个；这些标签会进入结构化标签系统。",
+                "如果使用 CSV，tagNames 建议写成：战斗|奇幻|漫画改。",
                 "coverUrl 可以填写 Bangumi 等远程图片地址；正式导入时后端会尽量下载到本地 uploads/covers，并把作品封面地址改成本地访问路径。"
         );
 
@@ -59,7 +60,7 @@ public class ImportTemplateService {
                 new ImportFieldDocResponse("franchiseName", false, "已有系列名称，用于自动匹配 franchise。", "进击的巨人", "当 franchiseId 为空时可使用。"),
                 new ImportFieldDocResponse("seasonIndex", false, "第几季，参与作品唯一性判断。", "4", "可以为空。"),
                 new ImportFieldDocResponse("partIndex", false, "第几部分，参与作品唯一性判断。", "1", "可以为空。"),
-                new ImportFieldDocResponse("coverUrl", false, "封面地址。", "https://example.com/aot-p1.jpg", "推荐填 Bangumi 图片 URL，后端会尝试缓存到本地。"),
+                new ImportFieldDocResponse("coverUrl", false, "封面地址。", "https://lain.bgm.tv/pic/cover/l/example.jpg", "推荐填 Bangumi 图片 URL，后端会尝试缓存到本地。"),
                 new ImportFieldDocResponse("summary", false, "作品简介。", "样例：巨人最终季前半部分", "仅展示用途。"),
                 new ImportFieldDocResponse("releaseYear", true, "作品发行年份。", "2020", "用于展示和检索。"),
                 new ImportFieldDocResponse("releaseQuarter", true, "作品发行季度，只能是 1~4。", "4", "用于展示和检索。"),
@@ -68,7 +69,7 @@ public class ImportTemplateService {
                 new ImportFieldDocResponse("platformLink", false, "外部平台链接。", "https://bgm.tv/subject/xxx", "可为空。"),
                 new ImportFieldDocResponse("platformScore", false, "外部平台评分，例如 Bangumi 评分。", "8.9", "范围 0~10，可以为空。"),
                 new ImportFieldDocResponse("episodeCount", false, "集数、话数或章节数。", "16", "可以为空。"),
-                new ImportFieldDocResponse("tagNames", false, "结构化作品标签数组，适合后续筛选和 AI 分析。", "[\"战斗\", \"奇幻\", \"漫画改\"]", "推荐 3~7 个，最多 12 个。"),
+                new ImportFieldDocResponse("tagNames", false, "结构化作品标签数组，适合后续筛选和 AI 分析。", "[\"战斗\", \"奇幻\", \"漫画改\"]", "JSON 使用数组；CSV 可写 战斗|奇幻|漫画改。推荐 3~7 个，最多 12 个。"),
                 new ImportFieldDocResponse("sourcePlatform", false, "数据来源平台。", "BANGUMI", "预留给后续平台导入和 AI 分析溯源。"),
                 new ImportFieldDocResponse("sourceId", false, "来源平台上的作品 ID。", "123456", "可以为空。"),
                 new ImportFieldDocResponse("status", true, "作品状态。", "NORMAL", "通常使用 NORMAL 或 HIDDEN。")
