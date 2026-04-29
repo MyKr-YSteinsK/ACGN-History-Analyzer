@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getRecordPage, type UserSubjectRecordResponse } from '../api/recordApi'
 import { getSubjectById } from '../api/subjectApi'
+import CoverImage from '../components/common/CoverImage'
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
 import SubjectDetailDrawer from '../components/subject/SubjectDetailDrawer'
@@ -448,13 +449,11 @@ function TopRecordCard({ record, category, onOpenDetail }: TopRecordCardProps) {
             ].join(' ')}
         >
             <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
-                {record.subjectCoverUrl ? (
-                    <img
-                        src={record.subjectCoverUrl}
-                        alt={record.subjectTitle}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                    />
-                ) : (
+                <CoverImage
+                    src={record.subjectCoverUrl}
+                    alt={record.subjectTitle}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                    fallback={
                     <div
                         className={[
                             'flex h-full w-full items-center justify-center bg-gradient-to-br',
@@ -465,7 +464,8 @@ function TopRecordCard({ record, category, onOpenDetail }: TopRecordCardProps) {
                             {theme.letter}
                         </span>
                     </div>
-                )}
+                    }
+                />
 
                 <span
                     className={[

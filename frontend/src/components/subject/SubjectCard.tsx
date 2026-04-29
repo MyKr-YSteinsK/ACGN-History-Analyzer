@@ -1,4 +1,5 @@
 import StatusBadge from '../common/StatusBadge'
+import CoverImage from '../common/CoverImage'
 import {
     categoryTheme,
     personalScoreTheme,
@@ -45,13 +46,11 @@ function SubjectCard({ subject, onOpenDetail }: SubjectCardProps) {
             ].join(' ')}
         >
             <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
-                {subject.coverUrl ? (
-                    <img
-                        src={subject.coverUrl}
-                        alt={subject.displayTitle}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                    />
-                ) : (
+                <CoverImage
+                    src={subject.coverUrl}
+                    alt={subject.displayTitle}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                    fallback={
                     <div
                         className={[
                             'flex h-full w-full items-center justify-center bg-gradient-to-br',
@@ -67,7 +66,8 @@ function SubjectCard({ subject, onOpenDetail }: SubjectCardProps) {
                             </p>
                         </div>
                     </div>
-                )}
+                    }
+                />
 
                 <div className="absolute left-3 top-3">
                     <StatusBadge status={subject.libraryStatus} />

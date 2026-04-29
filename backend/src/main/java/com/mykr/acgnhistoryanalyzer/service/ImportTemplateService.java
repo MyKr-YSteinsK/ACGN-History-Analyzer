@@ -47,7 +47,8 @@ public class ImportTemplateService {
                 "franchiseId 和 franchiseName 二选一即可；如果都传，当前逻辑优先按 franchiseId 处理。",
                 "如果传 franchiseName，则后端会尝试匹配已有系列；匹配不到时会跳过。",
                 "preview 和正式 import 使用同一套判定规则。",
-                "作品标签使用 tagNames 数组，建议 3~7 个，最多 12 个；这些标签会进入结构化标签系统。"
+                "作品标签使用 tagNames 数组，建议 3~7 个，最多 12 个；这些标签会进入结构化标签系统。",
+                "coverUrl 可以填写 Bangumi 等远程图片地址；正式导入时后端会尽量下载到本地 uploads/covers，并把作品封面地址改成本地访问路径。"
         );
 
         List<ImportFieldDocResponse> fields = List.of(
@@ -58,7 +59,7 @@ public class ImportTemplateService {
                 new ImportFieldDocResponse("franchiseName", false, "已有系列名称，用于自动匹配 franchise。", "进击的巨人", "当 franchiseId 为空时可使用。"),
                 new ImportFieldDocResponse("seasonIndex", false, "第几季，参与作品唯一性判断。", "4", "可以为空。"),
                 new ImportFieldDocResponse("partIndex", false, "第几部分，参与作品唯一性判断。", "1", "可以为空。"),
-                new ImportFieldDocResponse("coverUrl", false, "封面地址。", "https://example.com/aot-p1.jpg", "仅展示用途。"),
+                new ImportFieldDocResponse("coverUrl", false, "封面地址。", "https://example.com/aot-p1.jpg", "推荐填 Bangumi 图片 URL，后端会尝试缓存到本地。"),
                 new ImportFieldDocResponse("summary", false, "作品简介。", "样例：巨人最终季前半部分", "仅展示用途。"),
                 new ImportFieldDocResponse("releaseYear", true, "作品发行年份。", "2020", "用于展示和检索。"),
                 new ImportFieldDocResponse("releaseQuarter", true, "作品发行季度，只能是 1~4。", "4", "用于展示和检索。"),

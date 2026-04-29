@@ -4,6 +4,7 @@ import {
     type UserSubjectRecordResponse,
 } from '../api/recordApi'
 import { getSubjectById } from '../api/subjectApi'
+import CoverImage from '../components/common/CoverImage'
 import GlassCard from '../components/common/GlassCard'
 import SubjectDetailDrawer from '../components/subject/SubjectDetailDrawer'
 import { mapSubjectDetailToCardView } from '../mappers/subjectMapper'
@@ -759,13 +760,11 @@ function TopScoreCard({ record, category, onOpenDetail }: TopScoreCardProps) {
             ].join(' ')}
         >
             <div className="relative aspect-[3/4] overflow-hidden rounded-[20px] bg-white/50">
-                {record.subjectCoverUrl ? (
-                    <img
-                        src={record.subjectCoverUrl}
-                        alt={record.subjectTitle}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                    />
-                ) : (
+                <CoverImage
+                    src={record.subjectCoverUrl}
+                    alt={record.subjectTitle}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                    fallback={
                     <div
                         className={[
                             'flex h-full w-full items-center justify-center bg-gradient-to-br',
@@ -776,7 +775,8 @@ function TopScoreCard({ record, category, onOpenDetail }: TopScoreCardProps) {
                             {theme.letter}
                         </span>
                     </div>
-                )}
+                    }
+                />
 
                 <span
                     className={[

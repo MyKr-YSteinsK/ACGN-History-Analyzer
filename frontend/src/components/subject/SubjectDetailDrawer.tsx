@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import CoverImage from '../common/CoverImage'
 import StatusBadge from '../common/StatusBadge'
 import {
     categoryTheme,
@@ -108,13 +109,11 @@ function SubjectDetailDrawer({
                             category.softGradient,
                         ].join(' ')}
                     >
-                        {subject.coverUrl ? (
-                            <img
-                                src={subject.coverUrl}
-                                alt={subject.displayTitle}
-                                className="h-full w-full object-cover"
-                            />
-                        ) : (
+                        <CoverImage
+                            src={subject.coverUrl}
+                            alt={subject.displayTitle}
+                            className="h-full w-full object-cover"
+                            fallback={
                             <div className="flex h-full w-full items-center justify-center">
                                 <div className="text-center">
                   <span className={['text-8xl font-black', category.text].join(' ')}>
@@ -125,7 +124,8 @@ function SubjectDetailDrawer({
                                     </p>
                                 </div>
                             </div>
-                        )}
+                            }
+                        />
 
                         <div className="absolute left-4 top-4">
                             <StatusBadge status={subject.libraryStatus} />

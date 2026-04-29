@@ -8,6 +8,7 @@ import {
 import { createRecord } from '../api/recordApi'
 import { getSubjectById } from '../api/subjectApi'
 import ConfirmDialog from '../components/common/ConfirmDialog'
+import CoverImage from '../components/common/CoverImage'
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
 import AddRecordModal, {
@@ -655,13 +656,11 @@ function CollectionCard({
                 className="block text-left"
             >
                 <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
-                    {collection.subjectCoverUrl ? (
-                        <img
-                            src={collection.subjectCoverUrl}
-                            alt={collection.subjectTitle}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                        />
-                    ) : (
+                    <CoverImage
+                        src={collection.subjectCoverUrl}
+                        alt={collection.subjectTitle}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                        fallback={
                         <div
                             className={[
                                 'flex h-full w-full items-center justify-center bg-gradient-to-br',
@@ -672,7 +671,8 @@ function CollectionCard({
                                 {category.letter}
                             </span>
                         </div>
-                    )}
+                        }
+                    />
 
                     <div className="absolute left-3 top-3">
                         <span

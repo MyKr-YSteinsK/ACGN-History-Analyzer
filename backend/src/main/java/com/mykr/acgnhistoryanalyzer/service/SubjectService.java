@@ -35,6 +35,7 @@ public class SubjectService {
     private final UserSubjectCollectionService userSubjectCollectionService;
     private final FranchiseRepository franchiseRepository;
     private final TagService tagService;
+    private final CoverStorageService coverStorageService;
 
     public SubjectService(SubjectRepository subjectRepository,
                           UserSubjectRecordRepository userSubjectRecordRepository,
@@ -42,7 +43,8 @@ public class SubjectService {
                           UserSubjectRecordService userSubjectRecordService,
                           UserSubjectCollectionService userSubjectCollectionService,
                           FranchiseRepository franchiseRepository,
-                          TagService tagService) {
+                          TagService tagService,
+                          CoverStorageService coverStorageService) {
         this.subjectRepository = subjectRepository;
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectCollectionRepository = userSubjectCollectionRepository;
@@ -50,6 +52,7 @@ public class SubjectService {
         this.userSubjectCollectionService = userSubjectCollectionService;
         this.franchiseRepository = franchiseRepository;
         this.tagService = tagService;
+        this.coverStorageService = coverStorageService;
     }
 
     public SubjectResponse createSubject(SubjectCreateRequest request) {
@@ -234,7 +237,7 @@ public class SubjectService {
         existingSubject.setSeasonIndex(request.getSeasonIndex());
         existingSubject.setPartIndex(request.getPartIndex());
         existingSubject.setFranchiseId(resolveFranchiseIdForUpdate(request));
-        existingSubject.setCoverUrl(request.getCoverUrl());
+        existingSubject.setCoverUrl(resolveCoverUrl(request));
         existingSubject.setSummary(request.getSummary());
         existingSubject.setReleaseYear(request.getReleaseYear());
         existingSubject.setReleaseQuarter(request.getReleaseQuarter());
@@ -412,7 +415,7 @@ public class SubjectService {
                 request.getSeasonIndex(),
                 request.getPartIndex(),
                 franchiseId,
-                request.getCoverUrl(),
+                resolveCoverUrl(request),
                 request.getSummary(),
                 request.getReleaseYear(),
                 request.getReleaseQuarter(),
@@ -424,6 +427,15 @@ public class SubjectService {
                 request.getSourcePlatform(),
                 request.getSourceId(),
                 request.getStatus()
+        );
+    }
+
+    private String resolveCoverUrl(SubjectCreateRequest request) {
+        return coverStorageService.cacheCover(
+                request.getCoverUrl(),
+                request.getSourcePlatform(),
+                request.getSourceId(),
+                request.getDisplayTitle()
         );
     }
 
