@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
     getLlmStatus,
     getQuarterlyAnalysis,
+    getScoreStructureAnalysis,
+    getTagPreferenceAnalysis,
     getTypePreferenceAnalysis,
     getYearlyAnalysis,
     type LlmAnalysisResponse,
@@ -18,7 +20,12 @@ import { categoryTheme, neutralPanelGradient } from '../theme/acgnTheme'
 import { categoryOrder, getReleaseQuarterLabel, type AcgnCategory, type ReleaseQuarter } from '../types/common'
 
 type CategoryFilter = AcgnCategory | 'ALL'
-type AnalysisMode = 'YEARLY' | 'QUARTERLY' | 'TYPE_PREFERENCE'
+type AnalysisMode =
+    | 'YEARLY'
+    | 'QUARTERLY'
+    | 'TYPE_PREFERENCE'
+    | 'SCORE_STRUCTURE'
+    | 'TAG_PREFERENCE'
 
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
 const quarterOptions: ReleaseQuarter[] = [1, 2, 3, 4]
@@ -42,6 +49,16 @@ const analysisModes: Array<{
         value: 'TYPE_PREFERENCE',
         label: '类型偏好',
         description: '长期分析动画、漫画、游戏或小说偏好',
+    },
+    {
+        value: 'SCORE_STRUCTURE',
+        label: '评分结构',
+        description: '观察高分段、中分段和低分段分布',
+    },
+    {
+        value: 'TAG_PREFERENCE',
+        label: '标签偏好',
+        description: '区分经常看、真正喜欢和风险题材',
     },
 ]
 
@@ -69,6 +86,14 @@ function AnalysisPage() {
 
         if (analysisMode === 'TYPE_PREFERENCE') {
             return `${categoryName} · 长期偏好`
+        }
+
+        if (analysisMode === 'SCORE_STRUCTURE') {
+            return `${categoryName} · 评分结构`
+        }
+
+        if (analysisMode === 'TAG_PREFERENCE') {
+            return `${categoryName} · 标签偏好`
         }
 
         if (analysisMode === 'QUARTERLY') {
@@ -110,6 +135,14 @@ function AnalysisPage() {
                       ? await getTypePreferenceAnalysis({
                             category: selectedCategory === 'ALL' ? 'ANIME' : selectedCategory,
                         })
+                      : analysisMode === 'SCORE_STRUCTURE'
+                        ? await getScoreStructureAnalysis({
+                              category,
+                          })
+                        : analysisMode === 'TAG_PREFERENCE'
+                          ? await getTagPreferenceAnalysis({
+                                category,
+                            })
                       : await getYearlyAnalysis({
                             year: selectedYear,
                             category,
@@ -170,7 +203,7 @@ function AnalysisPage() {
                         </div>
                     </div>
 
-                    <div className="mt-6 grid gap-3 md:grid-cols-3">
+                    <div className="mt-6 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
                         {analysisModes.map((mode) => {
                             const selected = analysisMode === mode.value
 

@@ -80,6 +80,30 @@ public class LlmAnalysisService {
         ));
     }
 
+    public LlmAnalysisResponse generateScoreStructure(String category) {
+        String normalizedCategory = normalizeBlankToNull(category);
+        String prompt = llmPromptService.buildScoreStructurePrompt(normalizedCategory);
+        Map<String, Object> context = llmContextBuilder.buildScoreStructureContext(normalizedCategory);
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "SCORE_STRUCTURE",
+                prompt,
+                context
+        ));
+    }
+
+    public LlmAnalysisResponse generateTagPreference(String category) {
+        String normalizedCategory = normalizeBlankToNull(category);
+        String prompt = llmPromptService.buildTagPreferencePrompt(normalizedCategory);
+        Map<String, Object> context = llmContextBuilder.buildTagPreferenceContext(normalizedCategory);
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "TAG_PREFERENCE",
+                prompt,
+                context
+        ));
+    }
+
     private String normalizeBlankToNull(String value) {
         if (value == null || value.isBlank()) {
             return null;

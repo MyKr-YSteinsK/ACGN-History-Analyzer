@@ -147,6 +147,64 @@ public class LlmContextBuilder {
         return context;
     }
 
+    public Map<String, Object> buildScoreStructureContext(String category) {
+        List<UserSubjectRecordResponse> records = filterByCategory(
+                userSubjectRecordService.getRecords(null, null, null, null),
+                category
+        );
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "SCORE_STRUCTURE");
+        context.put("category", category);
+        context.put("comparisonLabel", "全部评分记录");
+        context.put("totalRecords", records.size());
+        context.put("previousYearTotalRecords", records.size());
+        context.put("yearOverYearDiff", records.size());
+        context.put("averageScore", averageScore(records));
+        context.put("highScoreCount", countScoreAtLeast(records, 45));
+        context.put("lowScoreCount", countScoreBelow(records, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(records));
+        context.put("quarterDistribution", buildQuarterDistribution(records));
+        context.put("scoreBands", buildScoreBands(records));
+        context.put("categoryScoreStats", buildCategoryScoreStats(records));
+        context.put("yearScoreTrend", buildYearScoreTrend(records));
+        context.put("topRecords", buildRecordHighlights(records, true));
+        context.put("lowScoreRecords", buildRecordHighlights(records, false));
+        context.put("topTags", buildTagStats(records));
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
+    public Map<String, Object> buildTagPreferenceContext(String category) {
+        List<UserSubjectRecordResponse> records = filterByCategory(
+                userSubjectRecordService.getRecords(null, null, null, null),
+                category
+        );
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "TAG_PREFERENCE");
+        context.put("category", category);
+        context.put("comparisonLabel", "全部带标签记录");
+        context.put("totalRecords", records.size());
+        context.put("previousYearTotalRecords", records.size());
+        context.put("yearOverYearDiff", records.size());
+        context.put("averageScore", averageScore(records));
+        context.put("highScoreCount", countScoreAtLeast(records, 45));
+        context.put("lowScoreCount", countScoreBelow(records, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(records));
+        context.put("quarterDistribution", buildQuarterDistribution(records));
+        context.put("topRecords", buildRecordHighlights(records, true));
+        context.put("lowScoreRecords", buildRecordHighlights(records, false));
+        context.put("topTags", buildTagStats(records));
+        context.put("tagPreferenceGroups", buildTagPreferenceGroups(records));
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
     private List<UserSubjectRecordResponse> filterByCategory(
             List<UserSubjectRecordResponse> records,
             String category
@@ -276,6 +334,123 @@ public class LlmContextBuilder {
                 .toList();
     }
 
+    private Map<String, Long> buildScoreBands(List<UserSubjectRecordResponse> records) {
+        Map<String, Long> bands = new LinkedHashMap<>();
+        bands.put("47-50", 0L);
+        bands.put("40-46", 0L);
+        bands.put("30-39", 0L);
+        bands.put("0-29", 0L);
+        bands.put("未评分", 0L);
+
+        for (UserSubjectRecordResponse record : records) {
+            Integer score = record.getScoreValue();
+            if (score == null) {
+                bands.computeIfPresent("未评分", (key, value) -> value + 1);
+            } else if (score >= 47) {
+                bands.computeIfPresent("47-50", (key, value) -> value + 1);
+            } else if (score >= 40) {
+                bands.computeIfPresent("40-46", (key, value) -> value + 1);
+            } else if (score >= 30) {
+                bands.computeIfPresent("30-39", (key, value) -> value + 1);
+            } else {
+                bands.computeIfPresent("0-29", (key, value) -> value + 1);
+            }
+        }
+
+        return bands;
+    }
+
+    private List<Map<String, Object>> buildCategoryScoreStats(List<UserSubjectRecordResponse> records) {
+        return CATEGORY_ORDER.stream()
+                .map(category -> {
+                    List<UserSubjectRecordResponse> categoryRecords = filterByCategory(records, category);
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("category", category);
+                    item.put("count", categoryRecords.size());
+                    item.put("averageScore", averageScore(categoryRecords));
+                    item.put("highScoreCount", countScoreAtLeast(categoryRecords, 45));
+                    item.put("lowScoreCount", countScoreBelow(categoryRecords, 30));
+                    return item;
+                })
+                .toList();
+    }
+
+    private List<Map<String, Object>> buildYearScoreTrend(List<UserSubjectRecordResponse> records) {
+        return records.stream()
+                .filter(record -> record.getRecordYear() != null)
+                .collect(Collectors.groupingBy(
+                        UserSubjectRecordResponse::getRecordYear,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ))
+                .entrySet()
+                .stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("year", entry.getKey());
+                    item.put("count", entry.getValue().size());
+                    item.put("averageScore", averageScore(entry.getValue()));
+                    item.put("highScoreCount", countScoreAtLeast(entry.getValue(), 45));
+                    return item;
+                })
+                .toList();
+    }
+
+    private Map<String, List<Map<String, Object>>> buildTagPreferenceGroups(
+            List<UserSubjectRecordResponse> records
+    ) {
+        Map<String, TagScoreBucket> bucketMap = new HashMap<>();
+
+        for (UserSubjectRecordResponse record : records) {
+            if (record.getTagList() == null || record.getTagList().isEmpty()) {
+                continue;
+            }
+
+            for (TagResponse tag : record.getTagList()) {
+                TagScoreBucket bucket = bucketMap.computeIfAbsent(tag.getName(), TagScoreBucket::new);
+                bucket.add(record.getScoreValue());
+            }
+        }
+
+        int maxCount = bucketMap.values().stream()
+                .mapToInt(TagScoreBucket::count)
+                .max()
+                .orElse(0);
+        int highFrequencyThreshold = Math.max(2, (int) Math.ceil(maxCount * 0.5));
+
+        Map<String, List<Map<String, Object>>> groups = new LinkedHashMap<>();
+        groups.put("highFrequencyHighScore", filterTagBuckets(bucketMap, highFrequencyThreshold, true, true));
+        groups.put("highFrequencyLowScore", filterTagBuckets(bucketMap, highFrequencyThreshold, true, false));
+        groups.put("lowFrequencyHighScore", filterTagBuckets(bucketMap, highFrequencyThreshold, false, true));
+        groups.put("lowFrequencyLowScore", filterTagBuckets(bucketMap, highFrequencyThreshold, false, false));
+        return groups;
+    }
+
+    private List<Map<String, Object>> filterTagBuckets(
+            Map<String, TagScoreBucket> bucketMap,
+            int highFrequencyThreshold,
+            boolean highFrequency,
+            boolean highScore
+    ) {
+        return bucketMap.values().stream()
+                .filter(bucket -> highFrequency
+                        ? bucket.count() >= highFrequencyThreshold
+                        : bucket.count() < highFrequencyThreshold)
+                .filter(bucket -> highScore
+                        ? bucket.averageScore().compareTo(BigDecimal.valueOf(42)) >= 0
+                        : bucket.averageScore().compareTo(BigDecimal.valueOf(35)) < 0)
+                .sorted(Comparator
+                        .comparing(TagScoreBucket::averageScore, highScore
+                                ? Comparator.reverseOrder()
+                                : Comparator.naturalOrder())
+                        .thenComparing(TagScoreBucket::count, Comparator.reverseOrder())
+                        .thenComparing(TagScoreBucket::name))
+                .limit(5)
+                .map(TagScoreBucket::toMap)
+                .toList();
+    }
+
     private Map<String, Long> buildCollectionCandidateStats(String category) {
         List<UserSubjectCollection> collections = userSubjectCollectionRepository.findAll().stream()
                 .filter(collection -> matchesCollectionCategory(collection, category))
@@ -325,6 +500,10 @@ public class LlmContextBuilder {
 
         if ("TYPE_PREFERENCE".equals(analysisType)) {
             evidence.add(scope + " 长期正式记录 " + context.get("totalRecords") + " 条");
+        } else if ("SCORE_STRUCTURE".equals(analysisType)) {
+            evidence.add(scope + " 评分结构样本 " + context.get("totalRecords") + " 条");
+        } else if ("TAG_PREFERENCE".equals(analysisType)) {
+            evidence.add(scope + " 标签偏好样本 " + context.get("totalRecords") + " 条");
         } else if ("QUARTERLY".equals(analysisType)) {
             evidence.add(year + " 年 " + QUARTER_LABELS.getOrDefault(quarter, "未知月份")
                     + "档期 " + scope + " 正式记录 " + context.get("totalRecords") + " 条");
@@ -349,6 +528,14 @@ public class LlmContextBuilder {
             evidence.add("高频标签：" + topTags.stream()
                     .limit(5)
                     .map(tag -> tag.get("name") + "×" + tag.get("count"))
+                    .collect(Collectors.joining("、")));
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, Long> scoreBands = (Map<String, Long>) context.get("scoreBands");
+        if (scoreBands != null && !scoreBands.isEmpty()) {
+            evidence.add("评分分段：" + scoreBands.entrySet().stream()
+                    .map(entry -> entry.getKey() + " " + entry.getValue() + " 条")
                     .collect(Collectors.joining("、")));
         }
 

@@ -32,6 +32,22 @@ public class LlmPromptService {
         return buildBasePrompt(category + " 长期类型偏好");
     }
 
+    public String buildScoreStructurePrompt(String category) {
+        String scope = category == null || category.isBlank()
+                ? "全部 ACGN 个人评分结构"
+                : category + " 个人评分结构";
+
+        return buildBasePrompt(scope);
+    }
+
+    public String buildTagPreferencePrompt(String category) {
+        String scope = category == null || category.isBlank()
+                ? "全部 ACGN 标签偏好"
+                : category + " 标签偏好";
+
+        return buildBasePrompt(scope);
+    }
+
     private String buildBasePrompt(String scope) {
         return """
                 你是一个个人 ACGN 历史数据分析助手。

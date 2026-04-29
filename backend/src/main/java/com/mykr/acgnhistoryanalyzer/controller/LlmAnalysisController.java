@@ -60,4 +60,18 @@ public class LlmAnalysisController {
     ) {
         return ApiResponse.success(llmAnalysisService.generateTypePreference(category));
     }
+
+    @GetMapping("/analysis/score-structure")
+    public ApiResponse<LlmAnalysisResponse> generateScoreStructure(
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(llmAnalysisService.generateScoreStructure(category));
+    }
+
+    @GetMapping("/analysis/tag-preference")
+    public ApiResponse<LlmAnalysisResponse> generateTagPreference(
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(llmAnalysisService.generateTagPreference(category));
+    }
 }

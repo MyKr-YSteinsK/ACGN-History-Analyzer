@@ -53,6 +53,14 @@ public class MockLlmClient implements LlmClient {
             return displayCategory + " 长期类型偏好分析";
         }
 
+        if ("SCORE_STRUCTURE".equals(analysisType)) {
+            return displayCategory + " 个人评分结构分析";
+        }
+
+        if ("TAG_PREFERENCE".equals(analysisType)) {
+            return displayCategory + " 标签偏好分析";
+        }
+
         if ("QUARTERLY".equals(analysisType)) {
             return year + " 年 " + quarterLabel(quarter) + "档期 " + displayCategory + " 智能总结";
         }
@@ -79,6 +87,18 @@ public class MockLlmClient implements LlmClient {
             return scope + " 暂时没有正式记录。系统已经跑通真实统计上下文，后续有数据后会自动生成更具体的偏好解释。";
         }
 
+        if ("SCORE_STRUCTURE".equals(analysisType)) {
+            return scope + " 共纳入 " + totalRecords
+                    + " 条正式记录，均分约 " + averageScore
+                    + " / 50，高分记录 " + highScoreCount
+                    + " 条。这个模块重点解释你的评分分布，而不是评价作品本身。";
+        }
+
+        if ("TAG_PREFERENCE".equals(analysisType)) {
+            return scope + " 共纳入 " + totalRecords
+                    + " 条正式记录，系统会根据标签出现次数、标签均分和高分命中数量，区分“经常看”和“真正容易打高分”的方向。";
+        }
+
         return scope + " 共整理到 " + totalRecords
                 + " 条正式记录，个人均分约 " + averageScore
                 + " / 50，其中 45 分以上高分记录 " + highScoreCount
@@ -91,6 +111,8 @@ public class MockLlmClient implements LlmClient {
         keywords.add(switch (analysisType) {
             case "QUARTERLY" -> "月份总结";
             case "TYPE_PREFERENCE" -> "类型偏好";
+            case "SCORE_STRUCTURE" -> "评分结构";
+            case "TAG_PREFERENCE" -> "标签偏好";
             default -> "年度总结";
         });
 
@@ -118,6 +140,48 @@ public class MockLlmClient implements LlmClient {
             Integer yearOverYearDiff
     ) {
         String comparisonLabel = readStringValue(context, "comparisonLabel", "上一年同范围");
+
+        if ("SCORE_STRUCTURE".equals(readStringValue(context, "analysisType", ""))) {
+            return List.of(
+                    new LlmAnalysisSectionResponse(
+                            "评分分布",
+                            buildScoreBandContent(context, totalRecords, averageScore, highScoreCount, lowScoreCount)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "类型差异",
+                            buildCategoryScoreContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "年份变化",
+                            buildYearScoreTrendContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "高低分样本",
+                            buildHighLowRecordContent(context)
+                    )
+            );
+        }
+
+        if ("TAG_PREFERENCE".equals(readStringValue(context, "analysisType", ""))) {
+            return List.of(
+                    new LlmAnalysisSectionResponse(
+                            "高频标签",
+                            buildTopTagContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "偏好分组",
+                            buildTagPreferenceGroupContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "高分线索",
+                            buildTopRecordContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "使用建议",
+                            "标签偏好适合后续推荐系统使用：高频高分标签可以作为强偏好，低频高分标签可以作为探索方向，高频低分标签则应被视为风险提示。"
+                    )
+            );
+        }
 
         return List.of(
                 new LlmAnalysisSectionResponse(
@@ -199,6 +263,78 @@ public class MockLlmClient implements LlmClient {
                 + " 条未记录候选。下一阶段可以用高分标签和类型偏好为这些候选打分。";
     }
 
+    private String buildScoreBandContent(
+            Map<String, Object> context,
+            Integer totalRecords,
+            String averageScore,
+            Integer highScoreCount,
+            Integer lowScoreCount
+    ) {
+        return "当前样本共 " + totalRecords + " 条，均分 " + averageScore
+                + " / 50，高分记录 " + highScoreCount
+                + " 条，低分记录 " + lowScoreCount
+                + " 条。评分分段为：" + formatMap(readLongMap(context, "scoreBands"))
+                + "。如果高分段集中，说明评分标准偏认可型；如果中段较多，说明你更常给出保留判断。";
+    }
+
+    private String buildCategoryScoreContent(Map<String, Object> context) {
+        List<Map<String, Object>> categoryStats = readMapList(context, "categoryScoreStats");
+        if (categoryStats.isEmpty()) {
+            return "当前没有足够的类型评分数据。";
+        }
+
+        return categoryStats.stream()
+                .map(item -> item.get("category") + "："
+                        + item.get("count") + " 条，均分 "
+                        + item.get("averageScore") + "，高分 "
+                        + item.get("highScoreCount") + " 条")
+                .collect(java.util.stream.Collectors.joining("；"));
+    }
+
+    private String buildYearScoreTrendContent(Map<String, Object> context) {
+        List<Map<String, Object>> trend = readMapList(context, "yearScoreTrend");
+        if (trend.isEmpty()) {
+            return "当前没有跨年份评分趋势样本。";
+        }
+
+        return trend.stream()
+                .map(item -> item.get("year") + " 年："
+                        + item.get("count") + " 条，均分 "
+                        + item.get("averageScore") + "，高分 "
+                        + item.get("highScoreCount") + " 条")
+                .collect(java.util.stream.Collectors.joining("；"));
+    }
+
+    private String buildHighLowRecordContent(Map<String, Object> context) {
+        String highRecords = formatRecordList(readMapList(context, "topRecords"));
+        String lowRecords = formatRecordList(readMapList(context, "lowScoreRecords"));
+
+        return "高分样本：" + highRecords + "。低分样本：" + lowRecords
+                + "。这两组样本后续可以帮助真实模型解释你的评分边界。";
+    }
+
+    private String buildTopTagContent(Map<String, Object> context) {
+        List<Map<String, Object>> topTags = readMapList(context, "topTags");
+        if (topTags.isEmpty()) {
+            return "当前作品标签还不够完整，暂时无法稳定分析标签偏好。";
+        }
+
+        return topTags.stream()
+                .map(item -> item.get("name") + "：出现 "
+                        + item.get("count") + " 次，均分 "
+                        + item.get("averageScore") + "，高分命中 "
+                        + item.get("highScoreCount") + " 次")
+                .collect(java.util.stream.Collectors.joining("；"));
+    }
+
+    private String buildTagPreferenceGroupContent(Map<String, Object> context) {
+        Map<String, List<Map<String, Object>>> groups = readTagPreferenceGroups(context);
+        return "高频高分：" + formatTagGroup(groups.get("highFrequencyHighScore"))
+                + "。高频低分：" + formatTagGroup(groups.get("highFrequencyLowScore"))
+                + "。低频高分：" + formatTagGroup(groups.get("lowFrequencyHighScore"))
+                + "。低频低分：" + formatTagGroup(groups.get("lowFrequencyLowScore")) + "。";
+    }
+
     private List<String> buildEvidence(Map<String, Object> context, LlmGenerateRequest request) {
         List<String> evidence = new java.util.ArrayList<>(readStringList(context, "evidence"));
         evidence.add("当前模型提供者：" + properties.getProvider());
@@ -214,6 +350,14 @@ public class MockLlmClient implements LlmClient {
     ) {
         if ("TYPE_PREFERENCE".equals(analysisType)) {
             return displayCategory + " 长期类型偏好范围";
+        }
+
+        if ("SCORE_STRUCTURE".equals(analysisType)) {
+            return displayCategory + " 评分结构范围";
+        }
+
+        if ("TAG_PREFERENCE".equals(analysisType)) {
+            return displayCategory + " 标签偏好范围";
         }
 
         if ("QUARTERLY".equals(analysisType)) {
@@ -291,6 +435,33 @@ public class MockLlmClient implements LlmClient {
                 .toList();
     }
 
+    private Map<String, List<Map<String, Object>>> readTagPreferenceGroups(
+            Map<String, Object> context
+    ) {
+        Object value = context.get("tagPreferenceGroups");
+        if (!(value instanceof Map<?, ?> map)) {
+            return Map.of();
+        }
+
+        java.util.Map<String, List<Map<String, Object>>> result = new java.util.LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            Object rawValue = entry.getValue();
+            if (rawValue instanceof List<?> list) {
+                List<Map<String, Object>> items = list.stream()
+                        .filter(Map.class::isInstance)
+                        .map(item -> {
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> typedItem = (Map<String, Object>) item;
+                            return typedItem;
+                        })
+                        .toList();
+                result.put(String.valueOf(entry.getKey()), items);
+            }
+        }
+
+        return result;
+    }
+
     private Map<String, Long> readLongMap(Map<String, Object> context, String key) {
         Object value = context.get(key);
         if (!(value instanceof Map<?, ?> map)) {
@@ -322,5 +493,26 @@ public class MockLlmClient implements LlmClient {
             return "0";
         }
         return diff > 0 ? "+" + diff : String.valueOf(diff);
+    }
+
+    private String formatRecordList(List<Map<String, Object>> records) {
+        if (records == null || records.isEmpty()) {
+            return "暂无";
+        }
+
+        return records.stream()
+                .map(item -> item.get("title") + "（" + item.get("score") + "）")
+                .collect(java.util.stream.Collectors.joining("、"));
+    }
+
+    private String formatTagGroup(List<Map<String, Object>> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return "暂无稳定样本";
+        }
+
+        return tags.stream()
+                .map(item -> item.get("name") + "（" + item.get("count")
+                        + " 次，均分 " + item.get("averageScore") + "）")
+                .collect(java.util.stream.Collectors.joining("、"));
     }
 }

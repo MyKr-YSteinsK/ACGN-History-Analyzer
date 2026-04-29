@@ -1,7 +1,13 @@
 import { apiGet } from './request'
 import type { AcgnCategory, ReleaseQuarter } from '../types/common'
 
-export type LlmAnalysisType = 'YEARLY' | 'QUARTERLY' | 'TYPE_PREFERENCE' | 'RECOMMENDATION'
+export type LlmAnalysisType =
+    | 'YEARLY'
+    | 'QUARTERLY'
+    | 'TYPE_PREFERENCE'
+    | 'SCORE_STRUCTURE'
+    | 'TAG_PREFERENCE'
+    | 'RECOMMENDATION'
 
 export type LlmAnalysisScope = {
     year: number | null
@@ -48,6 +54,14 @@ export type TypePreferenceAnalysisParams = {
     category?: AcgnCategory
 }
 
+export type ScoreStructureAnalysisParams = {
+    category?: AcgnCategory
+}
+
+export type TagPreferenceAnalysisParams = {
+    category?: AcgnCategory
+}
+
 export function getLlmStatus() {
     return apiGet<LlmStatusResponse>('/llm/status')
 }
@@ -62,4 +76,12 @@ export function getQuarterlyAnalysis(params: QuarterlyAnalysisParams) {
 
 export function getTypePreferenceAnalysis(params: TypePreferenceAnalysisParams) {
     return apiGet<LlmAnalysisResponse>('/llm/analysis/type-preference', params)
+}
+
+export function getScoreStructureAnalysis(params: ScoreStructureAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/score-structure', params)
+}
+
+export function getTagPreferenceAnalysis(params: TagPreferenceAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/tag-preference', params)
 }
