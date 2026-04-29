@@ -12,6 +12,21 @@ public interface SubjectRepository
 
     List<Subject> findByFranchiseId(Long franchiseId);
 
+    @Query("""
+        select s
+        from Subject s
+        where lower(trim(coalesce(s.titleCn, ''))) = :titleCnKey
+          and s.status = 'NORMAL'
+        order by s.titleCn asc,
+                 s.category asc,
+                 s.seasonIndex asc,
+                 s.partIndex asc,
+                 s.releaseYear asc,
+                 s.releaseQuarter asc,
+                 s.id asc
+        """)
+    List<Subject> findAllNormalByNormalizedTitleCn(@Param("titleCnKey") String titleCnKey);
+
     boolean existsByDisplayTitleAndReleaseYearAndReleaseQuarterAndCategory(
             String displayTitle,
             Integer releaseYear,

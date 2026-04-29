@@ -25,6 +25,7 @@ public class ImportOverviewService {
                 "当前系统规则是一作品一记录；如果某个 subject 已经有记录，则新的 record 导入会跳过。",
                 "franchiseId 和 franchiseName 在 subject 导入中二选一即可；如果都传，当前逻辑优先使用 franchiseId。",
                 "franchiseName 匹配不到已有系列时，subject 仍会导入，只是不关联系列；franchiseId 明确不存在时才会跳过。",
+                "record 正式导入成功后，会触发轻量系列检测，同名多季、Part 或跨媒介作品会自动关联系列。",
                 "月份档期规则：1=一月，2=四月，3=七月，4=十月。",
                 "subject 导入时 tagNames 会写入结构化标签系统，后续作品库可按标签筛选。",
                 "subject 导入时 coverUrl 可以填写 Bangumi 图片地址，正式导入会尝试缓存成本地 /api/assets/covers 路径。",

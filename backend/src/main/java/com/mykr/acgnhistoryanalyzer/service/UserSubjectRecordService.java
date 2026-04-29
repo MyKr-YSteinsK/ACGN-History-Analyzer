@@ -29,15 +29,18 @@ public class UserSubjectRecordService {
     private final UserSubjectCollectionRepository userSubjectCollectionRepository;
     private final SubjectRepository subjectRepository;
     private final TagService tagService;
+    private final FranchiseAutoLinkService franchiseAutoLinkService;
 
     public UserSubjectRecordService(UserSubjectRecordRepository userSubjectRecordRepository,
                                     UserSubjectCollectionRepository userSubjectCollectionRepository,
                                     SubjectRepository subjectRepository,
-                                    TagService tagService) {
+                                    TagService tagService,
+                                    FranchiseAutoLinkService franchiseAutoLinkService) {
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectCollectionRepository = userSubjectCollectionRepository;
         this.subjectRepository = subjectRepository;
         this.tagService = tagService;
+        this.franchiseAutoLinkService = franchiseAutoLinkService;
     }
 
     public boolean subjectExists(Long subjectId) {
@@ -66,6 +69,8 @@ public class UserSubjectRecordService {
         if (userSubjectCollectionRepository.existsBySubjectId(subject.getId())) {
             userSubjectCollectionRepository.deleteBySubjectId(subject.getId());
         }
+
+        franchiseAutoLinkService.detectAndLinkForRecordedSubject(subject.getId());
 
         return toResponse(savedRecord);
     }
