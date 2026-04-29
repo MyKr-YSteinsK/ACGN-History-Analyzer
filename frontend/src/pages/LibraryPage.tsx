@@ -43,25 +43,25 @@ const quarterOptions: Array<{
     label: string
     className?: string
 }> = [
-    { value: 'ALL', label: '全部季度' },
+    { value: 'ALL', label: '全部月份' },
     {
         value: 1,
-        label: '冬 · 1月新番',
+        label: '一月',
         className: 'border-blue-200 bg-blue-100/80 text-blue-700 shadow-sm',
     },
     {
         value: 2,
-        label: '春 · 4月新番',
+        label: '四月',
         className: 'border-green-200 bg-green-100/85 text-green-700 shadow-sm',
     },
     {
         value: 3,
-        label: '夏 · 7月新番',
+        label: '七月',
         className: 'border-cyan-200 bg-cyan-100/85 text-cyan-700 shadow-sm',
     },
     {
         value: 4,
-        label: '秋 · 10月新番',
+        label: '十月',
         className: 'border-orange-200 bg-orange-100/85 text-orange-700 shadow-sm',
     },
 ]
@@ -198,7 +198,7 @@ function LibraryPage() {
                 tagName: selectedTagName === 'ALL' ? undefined : selectedTagName,
                 page: currentPage,
                 size: pageSize,
-                sort: 'RELEASE_NEWEST',
+                sort: 'TITLE_ASC',
             })
 
             setSubjects(response.content.map(mapSubjectResponseToCardView))
@@ -565,7 +565,7 @@ function LibraryPage() {
                             />
 
                             <FilterPillGroup
-                                label="季度"
+                            label="月份"
                                 value={selectedQuarter}
                                 options={quarterOptions}
                                 onChange={handleQuarterChange}
@@ -642,7 +642,7 @@ function LibraryPage() {
                             ) : (
                                 <EmptyState
                                     title="没有匹配的作品"
-                                    description="可以尝试切换类型、年份、季度、状态或搜索关键词。"
+                        description="可以尝试切换类型、年份、月份、状态或搜索关键词。"
                                 />
                             )}
                         </div>

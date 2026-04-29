@@ -19,7 +19,6 @@ import { mapSubjectDetailToCardView } from '../mappers/subjectMapper'
 import {
     categoryTheme,
     libraryStatusTheme,
-    quarterTheme,
     yearChipClassName,
 } from '../theme/acgnTheme'
 import {
@@ -82,7 +81,7 @@ function getReleaseText(collection: UserSubjectCollectionResponse) {
         : ''
 
     return quarterLabel
-        ? `${collection.subjectReleaseYear} ${quarterLabel}`
+        ? `${collection.subjectReleaseYear}${quarterLabel}`
         : String(collection.subjectReleaseYear)
 }
 
@@ -284,7 +283,7 @@ function CollectionsPage() {
                 <PageHero
                     eyebrow="COLLECTIONS"
                     title="收藏夹"
-                    description="收藏夹只管理想看和搁置，不按年份季度展示。"
+            description="收藏夹只管理想看和搁置，不按年份月份展示。"
                 />
 
                 <GlassCard className="overflow-hidden">
@@ -637,9 +636,6 @@ function CollectionCard({
                             onAddRecord,
                         }: CollectionCardProps) {
     const category = categoryTheme[collection.subjectCategory ?? fallbackCategory]
-    const releaseQuarter = collection.subjectReleaseQuarter
-        ? quarterTheme[collection.subjectReleaseQuarter]
-        : null
     const releaseText = getReleaseText(collection)
     const typeTheme = libraryStatusTheme[collection.collectionType]
     const moveTargetText = collection.collectionType === 'WANT' ? '搁置' : '想看'
@@ -740,18 +736,6 @@ function CollectionCard({
                         </span>
                     ) : null}
 
-                    {releaseQuarter ? (
-                        <span
-                            className={[
-                                'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
-                                releaseQuarter.bg,
-                                releaseQuarter.text,
-                                releaseQuarter.border,
-                            ].join(' ')}
-                        >
-                            {releaseQuarter.shortName}
-                        </span>
-                    ) : null}
                 </div>
 
                 <p className="mt-3 min-h-[40px] line-clamp-2 text-xs leading-5 text-slate-400">

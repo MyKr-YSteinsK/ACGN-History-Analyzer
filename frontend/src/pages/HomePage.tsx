@@ -82,7 +82,7 @@ function getReleaseText(record: UserSubjectRecordResponse) {
         : ''
 
     return quarterLabel
-        ? `${record.subjectReleaseYear} ${quarterLabel}`
+        ? `${record.subjectReleaseYear}${quarterLabel}`
         : String(record.subjectReleaseYear)
 }
 
@@ -188,7 +188,7 @@ function HomePage() {
     }, [])
 
     useEffect(() => {
-        // 首页默认定位到已有正式记录中的最新年份和最新季度。
+    // 首页默认定位到已有正式记录中的最新年份和月份档期。
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void loadRecords()
     }, [loadRecords])
@@ -325,7 +325,7 @@ function HomePage() {
                             <div className="grid min-w-[360px] gap-3 sm:grid-cols-3">
                                 <MetricPill label="年度记录" value={totalYearRecords} />
                                 <MetricPill label="当前类型" value={selectedCategoryTotal} />
-                                <MetricPill label="本季本类" value={selectedQuarterTotal} />
+                                <MetricPill label="本月本类" value={selectedQuarterTotal} />
                             </div>
                         </div>
                     </div>
@@ -383,9 +383,9 @@ function HomePage() {
                             ].join(' ')}
                         >
                             <SectionHeader
-                                eyebrow="season distribution"
-                                title={`${selectedCategoryTheme.cnName}新番季度分布`}
-                                description="按 1/4/7/10 月新番口径统计，点击有数据的季度切换。"
+                                eyebrow="month distribution"
+                                title={`${selectedCategoryTheme.cnName}月份分布`}
+                                description="按一月、四月、七月、十月口径统计，点击有数据的月份切换。"
                             />
 
                             <SeasonBarChart
@@ -681,10 +681,7 @@ function SeasonBarChart({
                                 selected ? `${theme.bg} ${theme.text}` : 'text-slate-400',
                             ].join(' ')}
                         >
-                            <span>{theme.cnName}</span>
-                            <span className="mt-0.5 block text-[10px] font-semibold leading-none opacity-80">
-                                {theme.monthLabel}
-                            </span>
+                            {theme.cnName}
                         </span>
 
                         <span className="text-xs font-semibold text-slate-400">

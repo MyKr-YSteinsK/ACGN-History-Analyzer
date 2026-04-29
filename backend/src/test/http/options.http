@@ -7,7 +7,7 @@
 ### 1. 类型选项
 GET {{baseUrl}}/api/options/categories
 
-### 2. 季度选项
+### 2. 月份档期选项
 GET {{baseUrl}}/api/options/quarters
 
 ### 3. 收藏类型选项

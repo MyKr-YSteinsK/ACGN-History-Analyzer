@@ -5,7 +5,6 @@ import {
     personalScoreTheme,
     platformScoreTheme,
     quarterTheme,
-    yearChipClassName,
 } from '../../theme/acgnTheme'
 import type { SubjectCardView } from '../../types/subject'
 
@@ -36,6 +35,9 @@ function SubjectCard({ subject, onOpenDetail }: SubjectCardProps) {
     const category = categoryTheme[subject.category]
     const quarter = subject.releaseQuarter ? quarterTheme[subject.releaseQuarter] : null
     const metaTitle = buildSubjectMetaTitle(subject)
+    const releaseText = subject.releaseYear
+        ? `${subject.releaseYear}${quarter?.monthLabel ?? ''}`
+        : null
 
     return (
         <article
@@ -86,7 +88,7 @@ function SubjectCard({ subject, onOpenDetail }: SubjectCardProps) {
                         </div>
                     ) : null}
 
-                    {subject.platformScore ? (
+                    {subject.platformScore !== null && subject.platformScore !== undefined ? (
                         <div
                             className={[
                                 'rounded-2xl border px-2.5 py-1 text-[11px] font-black',
@@ -126,27 +128,16 @@ function SubjectCard({ subject, onOpenDetail }: SubjectCardProps) {
             {category.cnName}
           </span>
 
-                    {subject.releaseYear ? (
+                    {releaseText ? (
                         <span
                             className={[
                                 'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
-                                yearChipClassName,
+                                quarter
+                                    ? `${quarter.bg} ${quarter.text} ${quarter.border}`
+                                    : 'border-amber-200/75 bg-amber-50/90 text-amber-700',
                             ].join(' ')}
                         >
-              {subject.releaseYear}
-            </span>
-                    ) : null}
-
-                    {quarter ? (
-                        <span
-                            className={[
-                                'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
-                                quarter.bg,
-                                quarter.text,
-                                quarter.border,
-                            ].join(' ')}
-                        >
-              {quarter.shortName}
+              {releaseText}
             </span>
                     ) : null}
 

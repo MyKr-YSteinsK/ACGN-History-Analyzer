@@ -1,6 +1,7 @@
 package com.mykr.acgnhistoryanalyzer.response;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class UserSubjectRecordResponse {
 
@@ -11,6 +12,7 @@ public class UserSubjectRecordResponse {
     private Integer subjectReleaseYear;
     private Integer subjectReleaseQuarter;
     private String subjectCoverUrl;
+    private List<TagResponse> tagList;
     private Integer scoreValue;
     private Integer recordYear;
     private Integer recordQuarter;
@@ -21,6 +23,7 @@ public class UserSubjectRecordResponse {
     public UserSubjectRecordResponse(Long id, Long subjectId, String subjectTitle,
                                      String subjectCategory, Integer subjectReleaseYear,
                                      Integer subjectReleaseQuarter, String subjectCoverUrl,
+                                     List<TagResponse> tagList,
                                      Integer scoreValue, Integer recordYear,
                                      Integer recordQuarter, String note,
                                      LocalDateTime createdAt, LocalDateTime updatedAt) {
@@ -31,6 +34,7 @@ public class UserSubjectRecordResponse {
         this.subjectReleaseYear = subjectReleaseYear;
         this.subjectReleaseQuarter = subjectReleaseQuarter;
         this.subjectCoverUrl = subjectCoverUrl;
+        this.tagList = tagList;
         this.scoreValue = scoreValue;
         this.recordYear = recordYear;
         this.recordQuarter = recordQuarter;
@@ -52,6 +56,8 @@ public class UserSubjectRecordResponse {
     public Integer getSubjectReleaseQuarter() { return subjectReleaseQuarter; }
 
     public String getSubjectCoverUrl() { return subjectCoverUrl; }
+
+    public List<TagResponse> getTagList() { return tagList; }
 
     public Integer getScoreValue() { return scoreValue; }
 

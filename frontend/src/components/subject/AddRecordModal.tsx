@@ -27,10 +27,10 @@ const quarterOptions: Array<{
     value: ReleaseQuarter
     label: string
 }> = [
-    { value: 1, label: '冬 · 1月' },
-    { value: 2, label: '春 · 4月' },
-    { value: 3, label: '夏 · 7月' },
-    { value: 4, label: '秋 · 10月' },
+    { value: 1, label: '一月' },
+    { value: 2, label: '四月' },
+    { value: 3, label: '七月' },
+    { value: 4, label: '十月' },
 ]
 
 const visibleYearCount = 3
@@ -150,7 +150,7 @@ function AddRecordModalContent({
                     </h2>
 
                     <p className="mt-2 text-sm leading-6 text-slate-400">
-                        作品信息来自作品库，只读展示。这里只记录你的观看年份、季度、评分和备注。
+                        作品信息来自作品库，只读展示。这里只记录你的观看年份、月份档期、评分和备注。
                     </p>
 
                     <div
@@ -235,7 +235,7 @@ function AddRecordModalContent({
                                 valueClassName={yearChipClassName}
                             />
                             <ReadonlyField
-                                label="发行季度"
+                                label="发行月份"
                                 value={quarter ? quarter.displayName : '未知'}
                                 valueClassName={quarter ? `${quarter.bg} ${quarter.text} ${quarter.border}` : ''}
                             />
@@ -314,7 +314,7 @@ function AddRecordModalContent({
 
                             <div>
                 <span className="mb-2 block text-xs font-semibold text-slate-400">
-                  观看季度
+                  记录月份
                 </span>
                                 <div className="flex gap-2">
                                     {quarterOptions.map((option) => {

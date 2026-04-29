@@ -28,13 +28,16 @@ public class UserSubjectRecordService {
     private final UserSubjectRecordRepository userSubjectRecordRepository;
     private final UserSubjectCollectionRepository userSubjectCollectionRepository;
     private final SubjectRepository subjectRepository;
+    private final TagService tagService;
 
     public UserSubjectRecordService(UserSubjectRecordRepository userSubjectRecordRepository,
                                     UserSubjectCollectionRepository userSubjectCollectionRepository,
-                                    SubjectRepository subjectRepository) {
+                                    SubjectRepository subjectRepository,
+                                    TagService tagService) {
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectCollectionRepository = userSubjectCollectionRepository;
         this.subjectRepository = subjectRepository;
+        this.tagService = tagService;
     }
 
     public boolean subjectExists(Long subjectId) {
@@ -621,6 +624,7 @@ public class UserSubjectRecordService {
         Integer subjectReleaseYear = null;
         Integer subjectReleaseQuarter = null;
         String subjectCoverUrl = null;
+        List<TagResponse> tagList = List.of();
 
         if (record.getSubjectId() != null) {
             Subject subject = subjectRepository.findById(record.getSubjectId()).orElse(null);
@@ -630,6 +634,7 @@ public class UserSubjectRecordService {
                 subjectReleaseYear = subject.getReleaseYear();
                 subjectReleaseQuarter = subject.getReleaseQuarter();
                 subjectCoverUrl = subject.getCoverUrl();
+                tagList = tagService.toResponses(subject.getStructuredTags());
             }
         }
 
@@ -641,6 +646,7 @@ public class UserSubjectRecordService {
                 subjectReleaseYear,
                 subjectReleaseQuarter,
                 subjectCoverUrl,
+                tagList,
                 record.getScoreValue(),
                 record.getRecordYear(),
                 record.getRecordQuarter(),

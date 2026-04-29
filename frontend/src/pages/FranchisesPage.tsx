@@ -22,7 +22,6 @@ import {
     libraryStatusTheme,
     neutralPanelGradient,
     platformScoreTheme,
-    quarterTheme,
     yearChipClassName,
 } from '../theme/acgnTheme'
 import {
@@ -85,7 +84,7 @@ function formatRelease(subject: SubjectCardView) {
         : ''
 
     return quarterLabel
-        ? `${subject.releaseYear} ${quarterLabel}`
+        ? `${subject.releaseYear}${quarterLabel}`
         : String(subject.releaseYear)
 }
 
@@ -673,7 +672,6 @@ type TimelineSubjectCardProps = {
 
 function TimelineSubjectCard({ subject, onOpen }: TimelineSubjectCardProps) {
     const category = categoryTheme[subject.category]
-    const quarter = subject.releaseQuarter ? quarterTheme[subject.releaseQuarter] : null
     const seasonPart = formatSeasonPart(subject)
 
     return (
@@ -757,18 +755,6 @@ function TimelineSubjectCard({ subject, onOpen }: TimelineSubjectCardProps) {
                         </span>
                     ) : null}
 
-                    {quarter ? (
-                        <span
-                            className={[
-                                'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
-                                quarter.bg,
-                                quarter.text,
-                                quarter.border,
-                            ].join(' ')}
-                        >
-                            {quarter.shortName}
-                        </span>
-                    ) : null}
                 </div>
 
                 <button

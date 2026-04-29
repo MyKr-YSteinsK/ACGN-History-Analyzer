@@ -84,39 +84,18 @@ a {
 
 .subject-grid {
     display: grid;
-    grid-template-columns: repeat(4, 238px);
-    justify-content: space-between;
+    grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
     gap: 1rem;
-}
-
-@media (max-width: 1450px) {
-    .subject-grid {
-        grid-template-columns: repeat(4, 230px);
-    }
-}
-
-@media (max-width: 1320px) {
-    .subject-grid {
-        grid-template-columns: repeat(3, 238px);
-    }
-}
-
-@media (max-width: 1080px) {
-    .subject-grid {
-        grid-template-columns: repeat(3, 220px);
-    }
 }
 
 @media (max-width: 860px) {
     .subject-grid {
-        grid-template-columns: repeat(2, 220px);
-        justify-content: space-between;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
 }
 
 @media (max-width: 620px) {
     .subject-grid {
-        grid-template-columns: minmax(0, 260px);
-        justify-content: center;
+        grid-template-columns: minmax(0, 1fr);
     }
 }

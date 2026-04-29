@@ -17,9 +17,9 @@ public class UserSubjectRecordCreateRequest {
     @Max(value = 2100, message = "记录年份不合法")
     private Integer recordYear;
 
-    @NotNull(message = "记录季度不能为空")
-    @Min(value = 1, message = "记录季度只能是1到4：1冬/1月，2春/4月，3夏/7月，4秋/10月")
-    @Max(value = 4, message = "记录季度只能是1到4：1冬/1月，2春/4月，3夏/7月，4秋/10月")
+    @NotNull(message = "记录月份档期不能为空")
+    @Min(value = 1, message = "记录月份档期只能是1到4：1一月，2四月，3七月，4十月")
+    @Max(value = 4, message = "记录月份档期只能是1到4：1一月，2四月，3七月，4十月")
     private Integer recordQuarter;
 
     @Size(max = 500, message = "备注不能超过500个字符")

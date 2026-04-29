@@ -9,7 +9,6 @@ import { mapSubjectDetailToCardView } from '../mappers/subjectMapper'
 import {
     categoryTheme,
     personalScoreTheme,
-    quarterTheme,
     yearChipClassName,
 } from '../theme/acgnTheme'
 import {
@@ -110,7 +109,7 @@ function getReleaseText(record: UserSubjectRecordResponse) {
         : ''
 
     return quarterLabel
-        ? `${record.subjectReleaseYear} ${quarterLabel}`
+        ? `${record.subjectReleaseYear}${quarterLabel}`
         : String(record.subjectReleaseYear)
 }
 
@@ -436,10 +435,6 @@ type TopRecordCardProps = {
 
 function TopRecordCard({ record, category, onOpenDetail }: TopRecordCardProps) {
     const theme = categoryTheme[record.subjectCategory ?? category]
-    const quarter = record.subjectReleaseQuarter
-        ? quarterTheme[record.subjectReleaseQuarter]
-        : null
-
     return (
         <button
             type="button"
@@ -504,18 +499,6 @@ function TopRecordCard({ record, category, onOpenDetail }: TopRecordCardProps) {
                         {getReleaseText(record)}
                     </span>
 
-                    {quarter ? (
-                        <span
-                            className={[
-                                'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
-                                quarter.bg,
-                                quarter.text,
-                                quarter.border,
-                            ].join(' ')}
-                        >
-                            {quarter.shortName}
-                        </span>
-                    ) : null}
                 </div>
 
                 <p className="mt-3 min-h-[40px] line-clamp-2 text-xs leading-5 text-slate-400">

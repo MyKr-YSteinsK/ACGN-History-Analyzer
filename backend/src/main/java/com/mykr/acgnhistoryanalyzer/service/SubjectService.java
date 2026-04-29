@@ -544,9 +544,15 @@ public class SubjectService {
 
     private Sort buildSubjectPageSort(SubjectPageSortType sortType) {
         return switch (sortType) {
-            case TITLE_ASC -> Sort.by("displayTitle").ascending()
+            case TITLE_ASC -> Sort.by("titleCn").ascending()
+                    .and(Sort.by("seasonIndex").ascending())
+                    .and(Sort.by("partIndex").ascending())
+                    .and(Sort.by("displayTitle").ascending())
                     .and(Sort.by("id").ascending());
-            case TITLE_DESC -> Sort.by("displayTitle").descending()
+            case TITLE_DESC -> Sort.by("titleCn").descending()
+                    .and(Sort.by("seasonIndex").descending())
+                    .and(Sort.by("partIndex").descending())
+                    .and(Sort.by("displayTitle").descending())
                     .and(Sort.by("id").descending());
             case RELEASE_NEWEST -> Sort.by("releaseYear").descending()
                     .and(Sort.by("releaseQuarter").descending())

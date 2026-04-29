@@ -35,7 +35,7 @@ GET {{baseUrl}}/api/records/high-score?year=2024&quarter=1
 ### 9. 统计全部评分分层
 GET {{baseUrl}}/api/records/stats/score-bands
 
-### 10. 查询 2024 年 Q1 季度概览
+### 10. 查询 2024 年 Q1 月份档期概览
 GET {{baseUrl}}/api/records/stats/quarter-overview?year=2024&quarter=1
 
 ### 11. 查询 2025 年年度概览
@@ -43,7 +43,7 @@ GET {{baseUrl}}/api/records/stats/year-overview?year=2025
 
 ### ========== 校验与业务冲突 ==========
 
-### 12. 非法新增：季度非法
+### 12. 非法新增：月份档期非法
 POST {{baseUrl}}/api/records
 Content-Type: application/json
 
@@ -52,7 +52,7 @@ Content-Type: application/json
   "scoreValue": 48,
   "recordYear": 2024,
   "recordQuarter": 5,
-  "note": "非法季度"
+  "note": "非法月份档期"
 }
 
 ### 13. 非法新增：作品不存在

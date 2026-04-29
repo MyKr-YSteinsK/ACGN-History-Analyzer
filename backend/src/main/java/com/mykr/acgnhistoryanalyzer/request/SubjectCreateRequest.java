@@ -38,9 +38,9 @@ public class SubjectCreateRequest {
     @Max(value = 2100, message = "发行年份不合法")
     private Integer releaseYear;
 
-    @NotNull(message = "发行季度不能为空")
-    @Min(value = 1, message = "发行季度只能是1到4：1冬/1月，2春/4月，3夏/7月，4秋/10月")
-    @Max(value = 4, message = "发行季度只能是1到4：1冬/1月，2春/4月，3夏/7月，4秋/10月")
+    @NotNull(message = "发行月份档期不能为空")
+    @Min(value = 1, message = "发行月份档期只能是1到4：1一月，2四月，3七月，4十月")
+    @Max(value = 4, message = "发行月份档期只能是1到4：1一月，2四月，3七月，4十月")
     private Integer releaseQuarter;
 
     @NotBlank(message = "主类型不能为空")

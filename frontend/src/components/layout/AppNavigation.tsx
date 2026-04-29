@@ -10,7 +10,7 @@ const navItems: NavItem[] = [
     {
         path: '/',
         label: '首页统计',
-        description: '年度与季度总览',
+        description: '年度与月份总览',
     },
     {
         path: '/records',

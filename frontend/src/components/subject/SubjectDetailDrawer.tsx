@@ -36,7 +36,7 @@ function buildSeasonPartText(subject: SubjectCardView) {
         parts.push(`Part ${subject.partIndex}`)
     }
 
-    return parts.length > 0 ? parts.join(' · ') : '无季度 / Part 信息'
+    return parts.length > 0 ? parts.join(' · ') : '无季数 / Part 信息'
 }
 
 function SubjectDetailDrawer({
@@ -311,7 +311,7 @@ function SubjectDetailDrawer({
 
                                 <div className="mt-4 grid gap-2.5 text-sm">
                                     <InfoRow label="主标题" value={subject.titleCn} />
-                                    <InfoRow label="季度/Part" value={buildSeasonPartText(subject)} />
+                                    <InfoRow label="季数/Part" value={buildSeasonPartText(subject)} />
                                     <InfoRow label="系列" value={subject.franchiseName ?? '未关联系列'} />
                                     <InfoRow label="制作方" value={subject.studioName ?? '未知'} />
                                     <InfoRow label="来源平台" value={subject.sourcePlatform ?? '未设置'} />

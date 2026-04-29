@@ -20,18 +20,18 @@ POST /api/records/import/preview
 POST /api/records/import
 ```
 
-## 季度口径
+## 月份档期口径
 
-本项目按 ACGN 新番常用说法记录季度，不按“春夏秋冬”自然顺序写：
+本项目按 1/4/7/10 月档期记录作品和个人记录：
 
 ```text
-1 = 冬 · 1月新番
-2 = 春 · 4月新番
-3 = 夏 · 7月新番
-4 = 秋 · 10月新番
+1 = 一月
+2 = 四月
+3 = 七月
+4 = 十月
 ```
 
-所以页面展示顺序是：冬、春、夏、秋。
+页面展示顺序是：一月、四月、七月、十月。
 
 ## 作品库 JSON
 
@@ -75,11 +75,11 @@ POST /api/records/import
 | `franchiseId` | 否 | 正整数或 null | 已有系列 id。与 `franchiseName` 同时存在时优先使用 |
 | `franchiseName` | 否 | 字符串或 null，最长 200 | 用系列名称匹配已有系列 |
 | `seasonIndex` | 否 | 正整数或 null | 第几季，参与唯一性判断 |
-| `partIndex` | 否 | 正整数或 null | 第几 Part，参与唯一性判断。半年番按季度切割时可用 P1/P2 |
+| `partIndex` | 否 | 正整数或 null | 第几 Part，参与唯一性判断。半年番按月份档期切割时可用 P1/P2 |
 | `coverUrl` | 否 | URL 或 `/api/assets/covers/...` | 远程 URL 会在正式导入时尝试缓存到本地 |
 | `summary` | 否 | 字符串或 null，最长 2000 | 简介 |
 | `releaseYear` | 是 | 1900-2100 | 发行年份 |
-| `releaseQuarter` | 是 | 1/2/3/4 | 1 冬/1月新番，2 春/4月新番，3 夏/7月新番，4 秋/10月新番 |
+| `releaseQuarter` | 是 | 1/2/3/4 | 1 一月，2 四月，3 七月，4 十月 |
 | `category` | 是 | `ANIME`/`COMIC`/`GAME`/`NOVEL` | ACGN 类型 |
 | `studioName` | 否 | 字符串或 null，最长 255 | 制作方、出版社、开发商等 |
 | `platformLink` | 否 | 字符串或 null，最长 500 | Bangumi 等外部链接 |
@@ -183,7 +183,7 @@ JSON 写：
 | `subjectCategory` | 是 | `ANIME`/`COMIC`/`GAME`/`NOVEL` | 用于定位作品 |
 | `scoreValue` | 否 | 0-50 或 null | 个人评分 |
 | `recordYear` | 是 | 1900-2100 | 记录年份，不一定等于发行年份 |
-| `recordQuarter` | 是 | 1/2/3/4 | 记录季度：1 冬/1月新番，2 春/4月新番，3 夏/7月新番，4 秋/10月新番 |
+| `recordQuarter` | 是 | 1/2/3/4 | 记录月份档期：1 一月，2 四月，3 七月，4 十月 |
 | `note` | 否 | 字符串或 null，最长 500 | 评价/备注 |
 
 记录导入使用作品唯一键匹配作品：
@@ -194,9 +194,9 @@ subjectTitleCn + subjectSubtitle + subjectSeasonIndex + subjectPartIndex + subje
 
 如果找不到作品，记录会跳过。一个作品只能有一条正式记录。
 
-## 半年番和跨季度作品
+## 半年番和跨档期作品
 
-如果你习惯按季度统计，可以人为切成 P1/P2：
+如果你习惯按月份档期统计，可以人为切成 P1/P2：
 
 ```json
 {
@@ -224,7 +224,7 @@ subjectTitleCn + subjectSubtitle + subjectSeasonIndex + subjectPartIndex + subje
 }
 ```
 
-这样它们在季度统计中是两个作品切片，但可以通过同一个 `franchiseName` 串回同一系列。
+这样它们在统计中是两个作品切片，但可以通过同一个 `franchiseName` 串回同一系列。
 
 ## 给 GPT / Bangumi 整理器的提示词
 
@@ -236,7 +236,7 @@ subjectTitleCn + subjectSubtitle + subjectSeasonIndex + subjectPartIndex + subje
 2. records.json
 
 作品 category 只能是 ANIME / COMIC / GAME / NOVEL。
-季度规则采用新番月份口径：1 冬/1月新番，2 春/4月新番，3 夏/7月新番，4 秋/10月新番。
+月份档期规则：1 一月，2 四月，3 七月，4 十月。
 作品唯一键是 titleCn + subtitle + seasonIndex + partIndex + category。
 不要生成 tags 字符串，只生成 tagNames 数组。
 tagNames 使用中文标签，推荐 3-7 个，最多 12 个。

@@ -113,7 +113,7 @@ Content-Type: application/json
   "titleCn": "葬送的芙莉莲",
   "displayTitle": "葬送的芙莉莲",
   "coverUrl": "https://example.com/frieren.jpg",
-  "summary": "样例：2023 Q4 新番",
+    "summary": "样例：2023 Q4 作品",
   "releaseYear": 2023,
   "releaseQuarter": 4,
   "category": "ANIME",

@@ -35,7 +35,7 @@ GET {{baseUrl}}/api/subjects/999999
 
 ### ========== 校验失败 ==========
 
-### 10. 非法新增：发行季度非法
+### 10. 非法新增：发行月份档期非法
 POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 

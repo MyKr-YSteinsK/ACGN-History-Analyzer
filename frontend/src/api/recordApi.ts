@@ -1,6 +1,7 @@
 import { apiDelete, apiGet, apiPost, apiPut } from './request'
 import type { AcgnCategory, ReleaseQuarter } from '../types/common'
 import type { PageQuery, PageResponse } from '../types/api'
+import type { TagResponse } from './tagApi'
 
 export type RecordPageSort =
     | 'RECORD_TIME_DESC'
@@ -18,6 +19,7 @@ export type UserSubjectRecordResponse = {
     subjectReleaseYear: number | null
     subjectReleaseQuarter: ReleaseQuarter | null
     subjectCoverUrl: string | null
+    tagList: TagResponse[]
     scoreValue: number | null
     recordYear: number
     recordQuarter: ReleaseQuarter

@@ -19,11 +19,9 @@ import {
     neutralPanelGradient,
     personalScoreTheme,
     quarterTheme,
-    yearChipClassName,
 } from '../theme/acgnTheme'
 import {
     categoryOrder,
-    getReleaseQuarterLabel,
     type AcgnCategory,
     type ReleaseQuarter,
 } from '../types/common'
@@ -87,18 +85,33 @@ function compareRecordsBySort(
     return second.id - first.id
 }
 
-function getReleaseText(record: UserSubjectRecordResponse) {
+function compareRecordTitle(first: UserSubjectRecordResponse, second: UserSubjectRecordResponse) {
+    return first.subjectTitle.localeCompare(second.subjectTitle, 'zh-Hans-CN', {
+        numeric: true,
+        sensitivity: 'base',
+    })
+}
+
+function compareRecordsForDisplay(
+    first: UserSubjectRecordResponse,
+    second: UserSubjectRecordResponse,
+    sort: RecordPageSort,
+) {
+    return compareRecordTitle(first, second) || compareRecordsBySort(first, second, sort)
+}
+
+function getReleaseMonthText(record: UserSubjectRecordResponse) {
     if (!record.subjectReleaseYear) {
         return null
     }
 
-    const quarterLabel = record.subjectReleaseQuarter
-        ? getReleaseQuarterLabel(record.subjectReleaseQuarter)
+    const releaseMonth = record.subjectReleaseQuarter
+        ? quarterTheme[record.subjectReleaseQuarter].monthLabel
         : ''
 
-    return quarterLabel
-        ? `发行 ${record.subjectReleaseYear} ${quarterLabel}`
-        : `发行 ${record.subjectReleaseYear}`
+    return releaseMonth
+        ? `${record.subjectReleaseYear}${releaseMonth}`
+        : String(record.subjectReleaseYear)
 }
 
 function RecordsPage() {
@@ -177,7 +190,7 @@ function RecordsPage() {
 
                 return matchCategory && matchYear && matchQuarter && matchKeyword
             })
-            .sort((first, second) => compareRecordsBySort(first, second, sort))
+            .sort((first, second) => compareRecordsForDisplay(first, second, sort))
     }, [keyword, records, selectedCategory, selectedQuarter, selectedYear, sort])
 
     const selectedCategoryTheme = categoryTheme[selectedCategory]
@@ -264,7 +277,7 @@ function RecordsPage() {
                 <PageHero
                     eyebrow="MY RECORDS"
                     title="我的记录"
-                    description="固定年份与季度查看正式记录，按 ACGN 类型切换浏览。"
+            description="固定年份与月份查看正式记录，按 ACGN 类型切换浏览。"
                 />
 
                 <GlassCard className="overflow-hidden">
@@ -297,7 +310,7 @@ function RecordsPage() {
 
                             <div>
                                 <span className="mb-2 block text-xs font-semibold text-slate-400">
-                                    季度
+                                    月份
                                 </span>
                                 <div className="grid grid-cols-4 gap-2">
                                     {([1, 2, 3, 4] as ReleaseQuarter[]).map((quarter) => {
@@ -316,10 +329,7 @@ function RecordsPage() {
                                                         : 'border-white/80 bg-white/62 text-slate-400 hover:-translate-y-0.5 hover:bg-white',
                                                 ].join(' ')}
                                             >
-                                                <span className="block leading-tight">{theme.cnName}</span>
-                                                <span className="mt-0.5 block text-[10px] leading-none opacity-80">
-                                                    {theme.monthLabel}
-                                                </span>
+                                                {theme.cnName}
                                             </button>
                                         )
                                     })}
@@ -353,7 +363,7 @@ function RecordsPage() {
                                     {selectedCategoryTheme.cnName}记录
                                 </h3>
                                 <p className="mt-1 text-sm text-slate-400">
-                                    {selectedYear} · {selectedQuarterTheme.displayName} · {filteredRecords.length} 条
+                        {selectedYear} · {selectedQuarterTheme.displayName} · {filteredRecords.length} 条
                                 </p>
                             </div>
 
@@ -417,7 +427,7 @@ function RecordsPage() {
                                 <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/50 p-12 text-center">
                                     <p className="text-base font-semibold text-slate-500">没有匹配的记录</p>
                                     <p className="mt-2 text-sm text-slate-400">
-                                        可以切换年份、季度、类型或调整搜索关键词。
+                        可以切换年份、月份、类型或调整搜索关键词。
                                     </p>
                                 </div>
                             )}
@@ -623,8 +633,11 @@ type RecordCardProps = {
 
 function RecordCard({ record, category, onOpenDetail }: RecordCardProps) {
     const theme = categoryTheme[record.subjectCategory ?? category]
-    const recordQuarter = quarterTheme[record.recordQuarter]
-    const releaseText = getReleaseText(record)
+    const releaseQuarter = record.subjectReleaseQuarter
+        ? quarterTheme[record.subjectReleaseQuarter]
+        : null
+    const releaseText = getReleaseMonthText(record)
+    const visibleTags = (record.tagList ?? []).slice(0, 4)
 
     return (
         <button
@@ -689,31 +702,33 @@ function RecordCard({ record, category, onOpenDetail }: RecordCardProps) {
                         {theme.cnName}
                     </span>
 
-                    <span
-                        className={[
-                            'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
-                            yearChipClassName,
-                        ].join(' ')}
-                    >
-                        记录 {record.recordYear}
-                    </span>
-
-                    <span
-                        className={[
-                            'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
-                            recordQuarter.bg,
-                            recordQuarter.text,
-                            recordQuarter.border,
-                        ].join(' ')}
-                    >
-                        {recordQuarter.shortName}
-                    </span>
-
                     {releaseText ? (
-                        <span className="rounded-full border border-white/75 bg-white/70 px-2.5 py-0.5 text-[11px] font-semibold text-slate-400">
+                        <span
+                            className={[
+                                'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
+                                releaseQuarter
+                                    ? `${releaseQuarter.bg} ${releaseQuarter.text} ${releaseQuarter.border}`
+                                    : 'border-amber-200/75 bg-amber-50/90 text-amber-700',
+                            ].join(' ')}
+                        >
                             {releaseText}
                         </span>
                     ) : null}
+                </div>
+
+                <div className="mt-3 flex h-[24px] min-w-0 flex-nowrap gap-1.5 overflow-hidden">
+                    {visibleTags.length > 0 ? (
+                        visibleTags.map((tag) => (
+                            <span
+                                key={tag.id}
+                                className="shrink-0 rounded-full bg-white/75 px-2 py-0.5 text-[11px] text-slate-400"
+                            >
+                                #{tag.name}
+                            </span>
+                        ))
+                    ) : (
+                        <span className="text-[11px] text-slate-300">暂无标签</span>
+                    )}
                 </div>
 
                 <p className="mt-3 min-h-[40px] line-clamp-2 text-xs leading-5 text-slate-400">
