@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getRecordPage, type UserSubjectRecordResponse } from '../api/recordApi'
 import { getSubjectById } from '../api/subjectApi'
 import CoverImage from '../components/common/CoverImage'
+import {
+    EmptyState,
+    FeedbackBanner,
+    LoadingGrid,
+} from '../components/common/FeedbackState'
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
 import SubjectDetailDrawer from '../components/subject/SubjectDetailDrawer'
@@ -204,9 +209,7 @@ function TopPage() {
                 />
 
                 {error ? (
-                    <div className="rounded-[24px] border border-rose-100 bg-white/62 px-5 py-4 text-sm font-semibold text-rose-600 shadow-sm backdrop-blur-xl">
-                        {error}
-                    </div>
+                    <FeedbackBanner tone="error">{error}</FeedbackBanner>
                 ) : null}
 
                 <GlassCard className="overflow-hidden">
@@ -234,14 +237,7 @@ function TopPage() {
                                 </div>
 
                                 {loading ? (
-                                    <div className="grid gap-4 md:grid-cols-3">
-                                        {Array.from({ length: 3 }, (_, index) => (
-                                            <div
-                                                key={index}
-                                                className="h-[330px] animate-pulse rounded-[26px] border border-white/70 bg-white/50"
-                                            />
-                                        ))}
-                                    </div>
+                                    <LoadingGrid count={3} cardClassName="h-[330px]" />
                                 ) : featuredRecords.length > 0 ? (
                                     <div key={resultAnimationKey} className="grid gap-4 md:grid-cols-3 content-enter">
                                         {featuredRecords.map((record) => (
@@ -254,11 +250,7 @@ function TopPage() {
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/50 p-10 text-center">
-                                        <p className="text-base font-semibold text-slate-500">
-                                            暂无高分记录
-                                        </p>
-                                    </div>
+                                    <EmptyState title="暂无高分记录" />
                                 )}
                             </section>
 
@@ -303,14 +295,7 @@ function TopPage() {
                         </div>
 
                         {loading ? (
-                            <div className="subject-grid">
-                                {Array.from({ length: 8 }, (_, index) => (
-                                    <div
-                                        key={index}
-                                        className="h-[430px] animate-pulse rounded-[24px] border border-white/70 bg-white/50 shadow-sm"
-                                    />
-                                ))}
-                            </div>
+                            <LoadingGrid />
                         ) : displayRecords.length > 0 ? (
                             <div className="subject-grid content-enter">
                                 {displayRecords.map((record) => (
@@ -323,14 +308,10 @@ function TopPage() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/50 p-12 text-center">
-                                <p className="text-base font-semibold text-slate-500">
-                                    没有可展示的榜单记录
-                                </p>
-                                <p className="mt-2 text-sm text-slate-400">
-                                    先在作品库或我的记录中添加正式记录和个人评分。
-                                </p>
-                            </div>
+                            <EmptyState
+                                title="没有可展示的榜单记录"
+                                description="先在作品库或我的记录中添加正式记录和个人评分。"
+                            />
                         )}
                     </div>
                 </GlassCard>

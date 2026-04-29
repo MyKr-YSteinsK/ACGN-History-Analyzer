@@ -381,8 +381,8 @@ function FranchisesPage() {
                 <FeedbackBanner>{feedbackMessage}</FeedbackBanner>
             ) : null}
 
-            <section className="grid gap-5 xl:grid-cols-[360px_1fr]">
-                <GlassCard className="space-y-5 p-5">
+            <section className="grid gap-5 xl:grid-cols-[minmax(300px,340px)_1fr] xl:items-start">
+                <GlassCard className="overflow-hidden p-5 xl:sticky xl:top-6 xl:max-h-[calc(100vh-2rem)]">
                     <div>
                         <p className="text-xs font-semibold tracking-[0.22em] text-slate-400">
                             SERIES SEARCH
@@ -442,7 +442,15 @@ function FranchisesPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="border-t border-white/65 pt-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                            <p className="text-sm font-bold text-slate-700">系列列表</p>
+                            <span className="max-w-[180px] truncate rounded-full border border-white/70 bg-white/60 px-3 py-1 text-xs font-semibold text-slate-400">
+                                {selectedFranchise ? getFranchiseTitle(selectedFranchise) : '未选择'}
+                            </span>
+                        </div>
+
+                        <div className="space-y-3 xl:max-h-[calc(100vh-340px)] xl:overflow-y-auto xl:pr-1">
                         {loading ? (
                             <FeedbackBanner>正在加载系列数据...</FeedbackBanner>
                         ) : null}
@@ -518,6 +526,7 @@ function FranchisesPage() {
                                 </button>
                             )
                         })}
+                        </div>
                     </div>
                 </GlassCard>
 

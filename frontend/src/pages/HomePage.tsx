@@ -5,6 +5,7 @@ import {
 } from '../api/recordApi'
 import { getSubjectById } from '../api/subjectApi'
 import CoverImage from '../components/common/CoverImage'
+import { FeedbackBanner } from '../components/common/FeedbackState'
 import GlassCard from '../components/common/GlassCard'
 import SubjectDetailDrawer from '../components/subject/SubjectDetailDrawer'
 import { mapSubjectDetailToCardView } from '../mappers/subjectMapper'
@@ -332,9 +333,7 @@ function HomePage() {
                 </GlassCard>
 
                 {error ? (
-                    <div className="rounded-[24px] border border-rose-100 bg-white/62 px-5 py-4 text-sm font-semibold text-rose-600 shadow-sm backdrop-blur-xl">
-                        {error}
-                    </div>
+                    <FeedbackBanner tone="error">{error}</FeedbackBanner>
                 ) : null}
 
                 <GlassCard className="overflow-hidden">

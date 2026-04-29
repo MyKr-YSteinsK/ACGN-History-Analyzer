@@ -9,6 +9,12 @@ import { createRecord } from '../api/recordApi'
 import { getSubjectById } from '../api/subjectApi'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import CoverImage from '../components/common/CoverImage'
+import {
+    EmptyState,
+    ErrorState,
+    FeedbackBanner,
+    LoadingGrid,
+} from '../components/common/FeedbackState'
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
 import AddRecordModal, {
@@ -325,9 +331,7 @@ function CollectionsPage() {
                 />
 
                 {feedbackMessage ? (
-                    <div className="rounded-[24px] border border-sky-100 bg-white/62 px-5 py-4 text-sm font-semibold text-sky-700 shadow-sm backdrop-blur-xl">
-                        {feedbackMessage}
-                    </div>
+                    <FeedbackBanner>{feedbackMessage}</FeedbackBanner>
                 ) : null}
 
                 <GlassCard className="overflow-hidden">
@@ -359,28 +363,13 @@ function CollectionsPage() {
 
                         <div key={resultAnimationKey} className="content-enter">
                             {loading ? (
-                                <div className="subject-grid">
-                                    {Array.from({ length: 8 }, (_, index) => (
-                                        <div
-                                            key={index}
-                                            className="h-[410px] animate-pulse rounded-[24px] border border-white/70 bg-white/50 shadow-sm"
-                                        />
-                                    ))}
-                                </div>
+                                <LoadingGrid cardClassName="h-[410px]" />
                             ) : listError ? (
-                                <div className="rounded-[28px] border border-rose-100 bg-white/58 p-10 text-center">
-                                    <p className="text-base font-semibold text-rose-600">
-                                        收藏夹加载失败
-                                    </p>
-                                    <p className="mt-2 text-sm text-slate-400">{listError}</p>
-                                    <button
-                                        type="button"
-                                        onClick={() => void loadCollections()}
-                                        className="mt-5 rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700"
-                                    >
-                                        重新加载
-                                    </button>
-                                </div>
+                                <ErrorState
+                                    title="收藏夹加载失败"
+                                    message={listError}
+                                    onRetry={() => void loadCollections()}
+                                />
                             ) : collections.length > 0 ? (
                                 <div className="subject-grid">
                                     {collections.map((collection) => (
@@ -406,14 +395,10 @@ function CollectionsPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/50 p-12 text-center">
-                                    <p className="text-base font-semibold text-slate-500">
-                                        没有匹配的收藏
-                                    </p>
-                                    <p className="mt-2 text-sm text-slate-400">
-                                        可以切换清单、类型，或调整搜索关键词。
-                                    </p>
-                                </div>
+                                <EmptyState
+                                    title="没有匹配的收藏"
+                                    description="可以切换清单、类型，或调整搜索关键词。"
+                                />
                             )}
                         </div>
 

@@ -34,6 +34,7 @@ import {
     type SubjectImportPreviewResponse,
     type SubjectImportResponse,
 } from '../api/subjectApi'
+import { FeedbackBanner } from '../components/common/FeedbackState'
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
 
@@ -910,9 +911,7 @@ function ImportPage() {
             </div>
 
             {feedbackMessage ? (
-                <div className="rounded-[24px] border border-sky-100 bg-white/62 px-5 py-4 text-sm font-semibold text-sky-700 shadow-sm backdrop-blur-xl">
-                    {feedbackMessage}
-                </div>
+                <FeedbackBanner>{feedbackMessage}</FeedbackBanner>
             ) : null}
 
             <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">

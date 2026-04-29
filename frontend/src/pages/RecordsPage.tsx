@@ -9,6 +9,12 @@ import {
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import { getSubjectById } from '../api/subjectApi'
 import CoverImage from '../components/common/CoverImage'
+import {
+    EmptyState,
+    ErrorState,
+    FeedbackBanner,
+    LoadingGrid,
+} from '../components/common/FeedbackState'
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
 import AddRecordModal, {
@@ -397,9 +403,7 @@ function RecordsPage() {
                 />
 
                 {feedbackMessage ? (
-                    <div className="rounded-[24px] border border-sky-100 bg-white/62 px-5 py-4 text-sm font-semibold text-sky-700 shadow-sm backdrop-blur-xl">
-                        {feedbackMessage}
-                    </div>
+                    <FeedbackBanner>{feedbackMessage}</FeedbackBanner>
                 ) : null}
 
                 <GlassCard className="overflow-hidden">
@@ -444,26 +448,13 @@ function RecordsPage() {
 
                         <div className="mt-5">
                             {loading ? (
-                                <div className="subject-grid">
-                                    {Array.from({ length: 8 }, (_, index) => (
-                                        <div
-                                            key={index}
-                                            className="h-[430px] animate-pulse rounded-[24px] border border-white/70 bg-white/50 shadow-sm"
-                                        />
-                                    ))}
-                                </div>
+                                <LoadingGrid />
                             ) : listError ? (
-                                <div className="rounded-[28px] border border-rose-100 bg-white/58 p-10 text-center">
-                                    <p className="text-base font-semibold text-rose-600">记录加载失败</p>
-                                    <p className="mt-2 text-sm text-slate-400">{listError}</p>
-                                    <button
-                                        type="button"
-                                        onClick={() => void loadRecords()}
-                                        className="mt-5 rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700"
-                                    >
-                                        重新加载
-                                    </button>
-                                </div>
+                                <ErrorState
+                                    title="记录加载失败"
+                                    message={listError}
+                                    onRetry={() => void loadRecords()}
+                                />
                             ) : filteredRecords.length > 0 ? (
                                 <div className="subject-grid">
                                     {filteredRecords.map((record) => (
@@ -476,12 +467,10 @@ function RecordsPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/50 p-12 text-center">
-                                    <p className="text-base font-semibold text-slate-500">没有匹配的记录</p>
-                                    <p className="mt-2 text-sm text-slate-400">
-                        可以切换年份、月份、类型或调整搜索关键词。
-                                    </p>
-                                </div>
+                                <EmptyState
+                                    title="没有匹配的记录"
+                                    description="可以切换年份、月份、类型或调整搜索关键词。"
+                                />
                             )}
                         </div>
                     </div>
