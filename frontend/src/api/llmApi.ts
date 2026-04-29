@@ -40,10 +40,26 @@ export type YearlyAnalysisParams = {
     category?: AcgnCategory
 }
 
+export type QuarterlyAnalysisParams = YearlyAnalysisParams & {
+    quarter?: ReleaseQuarter
+}
+
+export type TypePreferenceAnalysisParams = {
+    category?: AcgnCategory
+}
+
 export function getLlmStatus() {
     return apiGet<LlmStatusResponse>('/llm/status')
 }
 
 export function getYearlyAnalysis(params: YearlyAnalysisParams) {
     return apiGet<LlmAnalysisResponse>('/llm/analysis/yearly', params)
+}
+
+export function getQuarterlyAnalysis(params: QuarterlyAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/quarterly', params)
+}
+
+export function getTypePreferenceAnalysis(params: TypePreferenceAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/type-preference', params)
 }

@@ -22,6 +22,7 @@ public class MockLlmClient implements LlmClient {
         Integer year = readInteger(context, "year");
         Integer quarter = readInteger(context, "quarter");
         String category = readString(context, "category");
+        String analysisType = readStringValue(context, "analysisType", request.analysisType());
         String displayCategory = category == null ? "全部类型" : category;
         Integer totalRecords = readInteger(context, "totalRecords");
         Integer highScoreCount = readInteger(context, "highScoreCount");
@@ -31,9 +32,9 @@ public class MockLlmClient implements LlmClient {
 
         return new LlmAnalysisResponse(
                 request.analysisType(),
-                buildTitle(year, displayCategory),
-                buildSummary(year, displayCategory, totalRecords, averageScore, highScoreCount),
-                buildKeywords(context),
+                buildTitle(analysisType, year, quarter, displayCategory),
+                buildSummary(analysisType, year, quarter, displayCategory, totalRecords, averageScore, highScoreCount),
+                buildKeywords(context, analysisType),
                 buildSections(context, totalRecords, averageScore, highScoreCount, lowScoreCount, yearOverYearDiff),
                 buildEvidence(context, request),
                 List.of(
@@ -47,35 +48,51 @@ public class MockLlmClient implements LlmClient {
         );
     }
 
-    private String buildTitle(Integer year, String displayCategory) {
+    private String buildTitle(String analysisType, Integer year, Integer quarter, String displayCategory) {
+        if ("TYPE_PREFERENCE".equals(analysisType)) {
+            return displayCategory + " 长期类型偏好分析";
+        }
+
+        if ("QUARTERLY".equals(analysisType)) {
+            return year + " 年 " + quarterLabel(quarter) + "档期 " + displayCategory + " 智能总结";
+        }
+
         if (year == null) {
             return displayCategory + " ACGN 智能分析预览";
         }
 
-        return year + " 年 " + displayCategory + " 智能分析预览";
+        return year + " 年 " + displayCategory + " 年度智能总结";
     }
 
     private String buildSummary(
+            String analysisType,
             Integer year,
+            Integer quarter,
             String displayCategory,
             Integer totalRecords,
             String averageScore,
             Integer highScoreCount
     ) {
+        String scope = buildScopeText(analysisType, year, quarter, displayCategory);
+
         if (totalRecords == null || totalRecords == 0) {
-            return year + " 年 " + displayCategory + " 暂时没有正式记录。系统已经跑通真实统计上下文，后续有数据后会自动生成更具体的偏好解释。";
+            return scope + " 暂时没有正式记录。系统已经跑通真实统计上下文，后续有数据后会自动生成更具体的偏好解释。";
         }
 
-        return year + " 年 " + displayCategory + " 共整理到 " + totalRecords
+        return scope + " 共整理到 " + totalRecords
                 + " 条正式记录，个人均分约 " + averageScore
                 + " / 50，其中 45 分以上高分记录 " + highScoreCount
                 + " 条。下面的结论来自数据库统计，不来自模型臆测。";
     }
 
-    private List<String> buildKeywords(Map<String, Object> context) {
+    private List<String> buildKeywords(Map<String, Object> context, String analysisType) {
         List<String> keywords = new java.util.ArrayList<>();
         keywords.add("真实统计");
-        keywords.add("年度总结");
+        keywords.add(switch (analysisType) {
+            case "QUARTERLY" -> "月份总结";
+            case "TYPE_PREFERENCE" -> "类型偏好";
+            default -> "年度总结";
+        });
 
         for (Map<String, Object> tag : readMapList(context, "topTags")) {
             Object name = tag.get("name");
@@ -100,10 +117,19 @@ public class MockLlmClient implements LlmClient {
             Integer lowScoreCount,
             Integer yearOverYearDiff
     ) {
+        String comparisonLabel = readStringValue(context, "comparisonLabel", "上一年同范围");
+
         return List.of(
                 new LlmAnalysisSectionResponse(
                         "整体趋势",
-                        buildTrendContent(totalRecords, averageScore, highScoreCount, lowScoreCount, yearOverYearDiff)
+                        buildTrendContent(
+                                totalRecords,
+                                averageScore,
+                                highScoreCount,
+                                lowScoreCount,
+                                yearOverYearDiff,
+                                comparisonLabel
+                        )
                 ),
                 new LlmAnalysisSectionResponse(
                         "类型与月份结构",
@@ -127,7 +153,8 @@ public class MockLlmClient implements LlmClient {
             String averageScore,
             Integer highScoreCount,
             Integer lowScoreCount,
-            Integer yearOverYearDiff
+            Integer yearOverYearDiff,
+            String comparisonLabel
     ) {
         if (totalRecords == null || totalRecords == 0) {
             return "这个范围内还没有正式记录，因此系统只保留分析入口，不做偏好判断。";
@@ -136,7 +163,7 @@ public class MockLlmClient implements LlmClient {
         return "本范围内共有 " + totalRecords + " 条正式记录，个人均分 " + averageScore
                 + " / 50，高分记录 " + highScoreCount
                 + " 条，低分记录 " + lowScoreCount
-                + " 条。与上一年同范围相比变化 " + formatDiff(yearOverYearDiff)
+                + " 条。与" + comparisonLabel + "相比变化 " + formatDiff(yearOverYearDiff)
                 + " 条，可以作为活跃度变化的第一层解释。";
     }
 
@@ -177,6 +204,37 @@ public class MockLlmClient implements LlmClient {
         evidence.add("当前模型提供者：" + properties.getProvider());
         evidence.add("Prompt 已生成，长度约 " + request.prompt().length() + " 字");
         return evidence;
+    }
+
+    private String buildScopeText(
+            String analysisType,
+            Integer year,
+            Integer quarter,
+            String displayCategory
+    ) {
+        if ("TYPE_PREFERENCE".equals(analysisType)) {
+            return displayCategory + " 长期类型偏好范围";
+        }
+
+        if ("QUARTERLY".equals(analysisType)) {
+            return year + " 年 " + quarterLabel(quarter) + "档期 " + displayCategory;
+        }
+
+        return year + " 年 " + displayCategory;
+    }
+
+    private String quarterLabel(Integer quarter) {
+        if (quarter == null) {
+            return "未知月份";
+        }
+
+        return switch (quarter) {
+            case 1 -> "一月";
+            case 2 -> "四月";
+            case 3 -> "七月";
+            case 4 -> "十月";
+            default -> "未知月份";
+        };
     }
 
     private Integer readInteger(Map<String, Object> context, String key) {

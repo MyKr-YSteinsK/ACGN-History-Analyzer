@@ -10,6 +10,29 @@ public class LlmPromptService {
                 ? year + " 年全部 ACGN 类型"
                 : year + " 年 " + category;
 
+        return buildBasePrompt(scope);
+    }
+
+    public String buildQuarterlySummaryPrompt(Integer year, Integer quarter, String category) {
+        String monthLabel = switch (quarter) {
+            case 1 -> "一月";
+            case 2 -> "四月";
+            case 3 -> "七月";
+            case 4 -> "十月";
+            default -> "未知月份";
+        };
+        String scope = category == null || category.isBlank()
+                ? year + " 年 " + monthLabel + "档期全部 ACGN 类型"
+                : year + " 年 " + monthLabel + "档期 " + category;
+
+        return buildBasePrompt(scope);
+    }
+
+    public String buildTypePreferencePrompt(String category) {
+        return buildBasePrompt(category + " 长期类型偏好");
+    }
+
+    private String buildBasePrompt(String scope) {
         return """
                 你是一个个人 ACGN 历史数据分析助手。
                 请只根据后端提供的结构化上下文生成中文分析，不要编造作品、标签或评分。

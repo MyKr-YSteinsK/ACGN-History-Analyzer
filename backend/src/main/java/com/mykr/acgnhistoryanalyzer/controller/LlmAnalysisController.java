@@ -42,4 +42,22 @@ public class LlmAnalysisController {
     ) {
         return ApiResponse.success(llmAnalysisService.generateYearlySummary(year, category));
     }
+
+    @GetMapping("/analysis/quarterly")
+    public ApiResponse<LlmAnalysisResponse> generateQuarterlySummary(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer quarter,
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(
+                llmAnalysisService.generateQuarterlySummary(year, quarter, category)
+        );
+    }
+
+    @GetMapping("/analysis/type-preference")
+    public ApiResponse<LlmAnalysisResponse> generateTypePreference(
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(llmAnalysisService.generateTypePreference(category));
+    }
 }

@@ -41,10 +41,57 @@ public class LlmAnalysisService {
         ));
     }
 
+    public LlmAnalysisResponse generateQuarterlySummary(Integer year, Integer quarter, String category) {
+        Integer effectiveYear = year == null ? LocalDate.now().getYear() : year;
+        Integer effectiveQuarter = normalizeQuarter(quarter);
+        String normalizedCategory = normalizeBlankToNull(category);
+        String prompt = llmPromptService.buildQuarterlySummaryPrompt(
+                effectiveYear,
+                effectiveQuarter,
+                normalizedCategory
+        );
+
+        Map<String, Object> context = llmContextBuilder.buildQuarterlyContext(
+                effectiveYear,
+                effectiveQuarter,
+                normalizedCategory
+        );
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "QUARTERLY",
+                prompt,
+                context
+        ));
+    }
+
+    public LlmAnalysisResponse generateTypePreference(String category) {
+        String normalizedCategory = normalizeBlankToNull(category);
+        if (normalizedCategory == null) {
+            normalizedCategory = "ANIME";
+        }
+
+        String prompt = llmPromptService.buildTypePreferencePrompt(normalizedCategory);
+        Map<String, Object> context = llmContextBuilder.buildTypePreferenceContext(normalizedCategory);
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "TYPE_PREFERENCE",
+                prompt,
+                context
+        ));
+    }
+
     private String normalizeBlankToNull(String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
         return value.trim().toUpperCase();
+    }
+
+    private Integer normalizeQuarter(Integer quarter) {
+        if (quarter == null || quarter < 1 || quarter > 4) {
+            return 1;
+        }
+
+        return quarter;
     }
 }

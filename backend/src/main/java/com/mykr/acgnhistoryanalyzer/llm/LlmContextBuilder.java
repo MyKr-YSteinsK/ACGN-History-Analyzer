@@ -60,8 +60,10 @@ public class LlmContextBuilder {
         );
 
         Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "YEARLY");
         context.put("year", year);
         context.put("category", category);
+        context.put("comparisonLabel", "上一年同范围");
         context.put("totalRecords", yearRecords.size());
         context.put("previousYearTotalRecords", previousYearRecords.size());
         context.put("yearOverYearDiff", yearRecords.size() - previousYearRecords.size());
@@ -73,6 +75,72 @@ public class LlmContextBuilder {
         context.put("topRecords", buildRecordHighlights(yearRecords, true));
         context.put("lowScoreRecords", buildRecordHighlights(yearRecords, false));
         context.put("topTags", buildTagStats(yearRecords));
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
+    public Map<String, Object> buildQuarterlyContext(Integer year, Integer quarter, String category) {
+        List<UserSubjectRecordResponse> quarterRecords = filterByCategory(
+                userSubjectRecordService.getRecords(year, quarter, null, null),
+                category
+        );
+        QuarterPosition previousQuarter = previousQuarter(year, quarter);
+        List<UserSubjectRecordResponse> previousQuarterRecords = filterByCategory(
+                userSubjectRecordService.getRecords(
+                        previousQuarter.year(),
+                        previousQuarter.quarter(),
+                        null,
+                        null
+                ),
+                category
+        );
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "QUARTERLY");
+        context.put("year", year);
+        context.put("quarter", quarter);
+        context.put("quarterLabel", QUARTER_LABELS.getOrDefault(quarter, "未知月份"));
+        context.put("category", category);
+        context.put("comparisonLabel", "上一档期");
+        context.put("totalRecords", quarterRecords.size());
+        context.put("previousYearTotalRecords", previousQuarterRecords.size());
+        context.put("yearOverYearDiff", quarterRecords.size() - previousQuarterRecords.size());
+        context.put("averageScore", averageScore(quarterRecords));
+        context.put("highScoreCount", countScoreAtLeast(quarterRecords, 45));
+        context.put("lowScoreCount", countScoreBelow(quarterRecords, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(quarterRecords));
+        context.put("quarterDistribution", buildQuarterDistribution(quarterRecords));
+        context.put("topRecords", buildRecordHighlights(quarterRecords, true));
+        context.put("lowScoreRecords", buildRecordHighlights(quarterRecords, false));
+        context.put("topTags", buildTagStats(quarterRecords));
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
+    public Map<String, Object> buildTypePreferenceContext(String category) {
+        List<UserSubjectRecordResponse> allRecords =
+                userSubjectRecordService.getRecords(null, null, null, null);
+        List<UserSubjectRecordResponse> categoryRecords = filterByCategory(allRecords, category);
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "TYPE_PREFERENCE");
+        context.put("category", category);
+        context.put("comparisonLabel", "全部记录中的该类型");
+        context.put("totalRecords", categoryRecords.size());
+        context.put("previousYearTotalRecords", allRecords.size());
+        context.put("yearOverYearDiff", categoryRecords.size());
+        context.put("averageScore", averageScore(categoryRecords));
+        context.put("highScoreCount", countScoreAtLeast(categoryRecords, 45));
+        context.put("lowScoreCount", countScoreBelow(categoryRecords, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(allRecords));
+        context.put("quarterDistribution", buildQuarterDistribution(categoryRecords));
+        context.put("topRecords", buildRecordHighlights(categoryRecords, true));
+        context.put("lowScoreRecords", buildRecordHighlights(categoryRecords, false));
+        context.put("topTags", buildTagStats(categoryRecords));
         context.put("collectionCandidates", buildCollectionCandidateStats(category));
         context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
         context.put("evidence", buildEvidence(context));
@@ -249,13 +317,25 @@ public class LlmContextBuilder {
 
     private List<String> buildEvidence(Map<String, Object> context) {
         List<String> evidence = new ArrayList<>();
+        String analysisType = (String) context.get("analysisType");
         Integer year = (Integer) context.get("year");
+        Integer quarter = (Integer) context.get("quarter");
         String category = (String) context.get("category");
         String scope = category == null ? "全部类型" : category;
-        evidence.add(year + " 年 " + scope + " 正式记录 " + context.get("totalRecords") + " 条");
+
+        if ("TYPE_PREFERENCE".equals(analysisType)) {
+            evidence.add(scope + " 长期正式记录 " + context.get("totalRecords") + " 条");
+        } else if ("QUARTERLY".equals(analysisType)) {
+            evidence.add(year + " 年 " + QUARTER_LABELS.getOrDefault(quarter, "未知月份")
+                    + "档期 " + scope + " 正式记录 " + context.get("totalRecords") + " 条");
+        } else {
+            evidence.add(year + " 年 " + scope + " 正式记录 " + context.get("totalRecords") + " 条");
+        }
+
         evidence.add("个人评分均值 " + context.get("averageScore") + " / 50，高分记录 "
                 + context.get("highScoreCount") + " 条，低分记录 " + context.get("lowScoreCount") + " 条");
-        evidence.add("相对上一年同范围变化 " + formatDiff((Integer) context.get("yearOverYearDiff")) + " 条");
+        evidence.add("相对" + context.get("comparisonLabel") + "变化 "
+                + formatDiff((Integer) context.get("yearOverYearDiff")) + " 条");
 
         @SuppressWarnings("unchecked")
         Map<String, Long> collectionCandidates = (Map<String, Long>) context.get("collectionCandidates");
@@ -280,6 +360,17 @@ public class LlmContextBuilder {
             return "0";
         }
         return diff > 0 ? "+" + diff : String.valueOf(diff);
+    }
+
+    private QuarterPosition previousQuarter(Integer year, Integer quarter) {
+        if (quarter == null || quarter <= 1) {
+            return new QuarterPosition(year - 1, 4);
+        }
+
+        return new QuarterPosition(year, quarter - 1);
+    }
+
+    private record QuarterPosition(Integer year, Integer quarter) {
     }
 
     private record TagScoreBucket(String name, List<Integer> scores) {

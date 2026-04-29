@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
     getLlmStatus,
+    getQuarterlyAnalysis,
+    getTypePreferenceAnalysis,
     getYearlyAnalysis,
     type LlmAnalysisResponse,
     type LlmStatusResponse,
@@ -13,14 +15,40 @@ import {
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
 import { categoryTheme, neutralPanelGradient } from '../theme/acgnTheme'
-import { categoryOrder, type AcgnCategory } from '../types/common'
+import { categoryOrder, getReleaseQuarterLabel, type AcgnCategory, type ReleaseQuarter } from '../types/common'
 
 type CategoryFilter = AcgnCategory | 'ALL'
+type AnalysisMode = 'YEARLY' | 'QUARTERLY' | 'TYPE_PREFERENCE'
 
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
+const quarterOptions: ReleaseQuarter[] = [1, 2, 3, 4]
+
+const analysisModes: Array<{
+    value: AnalysisMode
+    label: string
+    description: string
+}> = [
+    {
+        value: 'YEARLY',
+        label: '年度总结',
+        description: '按年份观察整体记录、评分和标签线索',
+    },
+    {
+        value: 'QUARTERLY',
+        label: '月份档期总结',
+        description: '聚焦一月 / 四月 / 七月 / 十月档期',
+    },
+    {
+        value: 'TYPE_PREFERENCE',
+        label: '类型偏好',
+        description: '长期分析动画、漫画、游戏或小说偏好',
+    },
+]
 
 function AnalysisPage() {
+    const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('YEARLY')
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+    const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(1)
     const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('ALL')
     const [status, setStatus] = useState<LlmStatusResponse | null>(null)
     const [report, setReport] = useState<LlmAnalysisResponse | null>(null)
@@ -39,8 +67,18 @@ function AnalysisPage() {
                 ? '全部类型'
                 : categoryTheme[selectedCategory].cnName
 
+        if (analysisMode === 'TYPE_PREFERENCE') {
+            return `${categoryName} · 长期偏好`
+        }
+
+        if (analysisMode === 'QUARTERLY') {
+            return `${selectedYear} 年 · ${getReleaseQuarterLabel(selectedQuarter)} · ${categoryName}`
+        }
+
         return `${selectedYear} 年 · ${categoryName}`
-    }, [selectedCategory, selectedYear])
+    }, [analysisMode, selectedCategory, selectedQuarter, selectedYear])
+
+    const activeMode = analysisModes.find((item) => item.value === analysisMode) ?? analysisModes[0]
 
     useEffect(() => {
         async function loadStatus() {
@@ -59,10 +97,23 @@ function AnalysisPage() {
         setError(null)
 
         try {
-            const response = await getYearlyAnalysis({
-                year: selectedYear,
-                category: selectedCategory === 'ALL' ? undefined : selectedCategory,
-            })
+            const category =
+                selectedCategory === 'ALL' ? undefined : selectedCategory
+            const response =
+                analysisMode === 'QUARTERLY'
+                    ? await getQuarterlyAnalysis({
+                          year: selectedYear,
+                          quarter: selectedQuarter,
+                          category,
+                      })
+                    : analysisMode === 'TYPE_PREFERENCE'
+                      ? await getTypePreferenceAnalysis({
+                            category: selectedCategory === 'ALL' ? 'ANIME' : selectedCategory,
+                        })
+                      : await getYearlyAnalysis({
+                            year: selectedYear,
+                            category,
+                        })
             setReport(response)
         } catch (generateError) {
             setReport(null)
@@ -70,7 +121,15 @@ function AnalysisPage() {
         } finally {
             setLoading(false)
         }
-    }, [selectedCategory, selectedYear])
+    }, [analysisMode, selectedCategory, selectedQuarter, selectedYear])
+
+    function handleModeChange(mode: AnalysisMode) {
+        setAnalysisMode(mode)
+
+        if (mode === 'TYPE_PREFERENCE' && selectedCategory === 'ALL') {
+            setSelectedCategory('ANIME')
+        }
+    }
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -98,7 +157,7 @@ function AnalysisPage() {
                                 analysis control
                             </p>
                             <h2 className="mt-2 text-2xl font-black text-slate-800">
-                                年度智能总结
+                                {activeMode.label}
                             </h2>
                             <p className="mt-2 text-sm text-slate-500">
                                 当前范围：{scopeText}
@@ -111,7 +170,33 @@ function AnalysisPage() {
                         </div>
                     </div>
 
-                    <div className="mt-6 grid gap-4 xl:grid-cols-[360px_1fr_150px]">
+                    <div className="mt-6 grid gap-3 md:grid-cols-3">
+                        {analysisModes.map((mode) => {
+                            const selected = analysisMode === mode.value
+
+                            return (
+                                <button
+                                    key={mode.value}
+                                    type="button"
+                                    onClick={() => handleModeChange(mode.value)}
+                                    className={[
+                                        'rounded-[24px] border p-4 text-left transition-all duration-200',
+                                        selected
+                                            ? 'scale-[1.01] border-sky-200 bg-white/82 text-sky-700 shadow-sm'
+                                            : 'border-white/75 bg-white/50 text-slate-500 hover:-translate-y-0.5 hover:bg-white/75',
+                                    ].join(' ')}
+                                >
+                                    <p className="text-sm font-black">{mode.label}</p>
+                                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                                        {mode.description}
+                                    </p>
+                                </button>
+                            )
+                        })}
+                    </div>
+
+                    <div className="mt-6 grid gap-4 xl:grid-cols-[320px_1fr_150px]">
+                        {analysisMode !== 'TYPE_PREFERENCE' ? (
                         <div>
                             <p className="mb-2 text-xs font-semibold text-slate-400">年份</p>
                             <div className="flex flex-wrap gap-2">
@@ -136,15 +221,45 @@ function AnalysisPage() {
                                 })}
                             </div>
                         </div>
+                        ) : null}
+
+                        {analysisMode === 'QUARTERLY' ? (
+                            <div>
+                                <p className="mb-2 text-xs font-semibold text-slate-400">月份</p>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {quarterOptions.map((quarter) => {
+                                        const selected = selectedQuarter === quarter
+
+                                        return (
+                                            <button
+                                                key={quarter}
+                                                type="button"
+                                                onClick={() => setSelectedQuarter(quarter)}
+                                                className={[
+                                                    'rounded-2xl border px-4 py-2.5 text-sm font-black transition-all duration-200',
+                                                    selected
+                                                        ? 'border-cyan-200 bg-cyan-100/85 text-cyan-700 shadow-sm'
+                                                        : 'border-white/75 bg-white/55 text-slate-400 hover:-translate-y-0.5 hover:bg-white',
+                                                ].join(' ')}
+                                            >
+                                                {getReleaseQuarterLabel(quarter)}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        ) : null}
 
                         <div>
                             <p className="mb-2 text-xs font-semibold text-slate-400">类型</p>
                             <div className="grid gap-2 sm:grid-cols-5">
-                                <CategoryButton
-                                    label="全部"
-                                    active={selectedCategory === 'ALL'}
-                                    onClick={() => setSelectedCategory('ALL')}
-                                />
+                                {analysisMode !== 'TYPE_PREFERENCE' ? (
+                                    <CategoryButton
+                                        label="全部"
+                                        active={selectedCategory === 'ALL'}
+                                        onClick={() => setSelectedCategory('ALL')}
+                                    />
+                                ) : null}
                                 {categoryOrder.map((category) => (
                                     <CategoryButton
                                         key={category}
@@ -185,7 +300,7 @@ function AnalysisPage() {
             ) : (
                 <EmptyState
                     title="还没有分析报告"
-                    description="选择年份和类型后点击生成分析，系统会返回一份结构化 Mock 报告。"
+                    description="选择分析类型和范围后点击生成分析，系统会返回一份结构化 Mock 报告。"
                 />
             )}
         </div>
