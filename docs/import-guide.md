@@ -5,7 +5,7 @@
 ## 推荐顺序
 
 1. 清空旧测试数据，重启后端，让 JPA 自动建表。
-2. 如果需要系列，先手动创建少量 `franchise`，或在作品 JSON 中填写可匹配的 `franchiseName`。
+2. 如果需要系列，先手动创建少量 `franchise`，或在作品 JSON 中填写 `franchiseName`。名称匹配不到时作品仍会导入，只是不关联系列。
 3. 导入作品库 `subjects.json`。
 4. 导入正式记录 `records.json`。
 5. 想看 / 搁置收藏夹后续单独处理。
@@ -73,7 +73,7 @@ POST /api/records/import
 | `subtitle` | 否 | 字符串或 null，最长 255 | 副标题，参与唯一性判断 |
 | `displayTitle` | 是 | 字符串，最长 500 | 页面展示标题 |
 | `franchiseId` | 否 | 正整数或 null | 已有系列 id。与 `franchiseName` 同时存在时优先使用 |
-| `franchiseName` | 否 | 字符串或 null，最长 200 | 用系列名称匹配已有系列 |
+| `franchiseName` | 否 | 字符串或 null，最长 200 | 用系列名称匹配已有系列；匹配不到时按无系列作品导入 |
 | `seasonIndex` | 否 | 正整数或 null | 第几季，参与唯一性判断 |
 | `partIndex` | 否 | 正整数或 null | 第几 Part，参与唯一性判断。半年番按月份档期切割时可用 P1/P2 |
 | `coverUrl` | 否 | URL 或 `/api/assets/covers/...` | 远程 URL 会在正式导入时尝试缓存到本地 |

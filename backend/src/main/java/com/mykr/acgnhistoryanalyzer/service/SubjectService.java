@@ -276,16 +276,6 @@ public class SubjectService {
 
         for (SubjectCreateRequest item : request.getSubjects()) {
             Long resolvedFranchiseId = resolveFranchiseIdForImport(item);
-            if (hasText(item.getFranchiseName()) && resolvedFranchiseId == null && item.getFranchiseId() == null) {
-                skippedCount++;
-                items.add(new SubjectImportItemResponse(
-                        null,
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "franchiseName 未匹配到已有系列，已跳过"
-                ));
-                continue;
-            }
 
             if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
                 skippedCount++;
@@ -319,7 +309,7 @@ public class SubjectService {
                     savedSubject.getId(),
                     savedSubject.getDisplayTitle(),
                     "IMPORTED",
-                    "导入成功"
+                    buildSubjectImportSuccessMessage(item, resolvedFranchiseId)
             ));
         }
 
@@ -348,17 +338,6 @@ public class SubjectService {
                 continue;
             }
 
-            if (item.getFranchiseId() == null && hasText(item.getFranchiseName())
-                    && resolveFranchiseIdByName(item.getFranchiseName()) == null) {
-                skippedCount++;
-                items.add(new SubjectImportPreviewItemResponse(
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "franchiseName 未匹配到已有系列，正式导入时会跳过"
-                ));
-                continue;
-            }
-
             boolean exists = subjectBusinessUniqueExistsForCreate(item);
             if (exists) {
                 skippedCount++;
@@ -371,10 +350,11 @@ public class SubjectService {
             }
 
             canImportCount++;
+            Long resolvedFranchiseId = resolveFranchiseIdForImport(item);
             items.add(new SubjectImportPreviewItemResponse(
                     item.getDisplayTitle(),
                     "CAN_IMPORT",
-                    "可以导入"
+                    buildSubjectImportPreviewMessage(item, resolvedFranchiseId)
             ));
         }
 
@@ -481,6 +461,20 @@ public class SubjectService {
         }
 
         return null;
+    }
+
+    private String buildSubjectImportPreviewMessage(SubjectCreateRequest request, Long resolvedFranchiseId) {
+        if (request.getFranchiseId() == null && hasText(request.getFranchiseName()) && resolvedFranchiseId == null) {
+            return "可以导入；franchiseName 未匹配到已有系列，将按无系列作品导入";
+        }
+        return "可以导入";
+    }
+
+    private String buildSubjectImportSuccessMessage(SubjectCreateRequest request, Long resolvedFranchiseId) {
+        if (request.getFranchiseId() == null && hasText(request.getFranchiseName()) && resolvedFranchiseId == null) {
+            return "导入成功；franchiseName 未匹配到已有系列，已按无系列作品导入";
+        }
+        return "导入成功";
     }
 
     private boolean hasText(String value) {

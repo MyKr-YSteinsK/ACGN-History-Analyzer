@@ -5,7 +5,7 @@
 # 2. 先预览，再正式导入
 # 3. 当前 subject 导入唯一性规则：
 #    titleCn + subtitle + seasonIndex + partIndex + category 全都一样，则视为重复
-# 4. 当前支持 franchiseName 自动匹配已有系列；匹配不到会跳过
+# 4. 当前支持 franchiseName 自动匹配已有系列；匹配不到会按无系列作品导入
 
 ### 1. 预览导入
 POST {{baseUrl}}/api/subjects/import/preview
