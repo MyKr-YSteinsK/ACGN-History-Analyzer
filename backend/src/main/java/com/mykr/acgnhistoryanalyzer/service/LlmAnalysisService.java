@@ -168,6 +168,32 @@ public class LlmAnalysisService {
         ));
     }
 
+    public LlmAnalysisResponse generateHomeInsight(Integer year, Integer quarter, String category) {
+        Integer effectiveYear = year == null ? LocalDate.now().getYear() : year;
+        Integer effectiveQuarter = normalizeQuarter(quarter);
+        String normalizedCategory = normalizeBlankToNull(category);
+        if (normalizedCategory == null) {
+            normalizedCategory = "ANIME";
+        }
+
+        String prompt = llmPromptService.buildHomeInsightPrompt(
+                effectiveYear,
+                effectiveQuarter,
+                normalizedCategory
+        );
+        Map<String, Object> context = llmContextBuilder.buildHomeInsightContext(
+                effectiveYear,
+                effectiveQuarter,
+                normalizedCategory
+        );
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "HOME_INSIGHT",
+                prompt,
+                context
+        ));
+    }
+
     private String normalizeBlankToNull(String value) {
         if (value == null || value.isBlank()) {
             return null;

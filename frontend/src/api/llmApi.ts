@@ -12,6 +12,7 @@ export type LlmAnalysisType =
     | 'TASTE_PROFILE'
     | 'PREFERENCE_CONTRADICTION'
     | 'COMPREHENSIVE_REPORT'
+    | 'HOME_INSIGHT'
 
 export type LlmAnalysisScope = {
     year: number | null
@@ -108,6 +109,12 @@ export type ComprehensiveReportAnalysisParams = {
     category?: AcgnCategory
 }
 
+export type HomeInsightAnalysisParams = {
+    year: number
+    quarter: ReleaseQuarter
+    category: AcgnCategory
+}
+
 export function getLlmStatus() {
     return apiGet<LlmStatusResponse>('/llm/status')
 }
@@ -150,4 +157,8 @@ export function getPreferenceContradictionAnalysis(params: PreferenceContradicti
 
 export function getComprehensiveReportAnalysis(params: ComprehensiveReportAnalysisParams) {
     return apiGet<LlmAnalysisResponse>('/llm/analysis/comprehensive-report', params)
+}
+
+export function getHomeInsightAnalysis(params: HomeInsightAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/home-insight', params)
 }

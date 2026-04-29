@@ -110,4 +110,13 @@ public class LlmAnalysisController {
     ) {
         return ApiResponse.success(llmAnalysisService.generateComprehensiveReport(year, category));
     }
+
+    @GetMapping("/analysis/home-insight")
+    public ApiResponse<LlmAnalysisResponse> generateHomeInsight(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer quarter,
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(llmAnalysisService.generateHomeInsight(year, quarter, category));
+    }
 }

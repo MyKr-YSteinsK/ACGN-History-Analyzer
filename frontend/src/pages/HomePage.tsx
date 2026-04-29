@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+    getHomeInsightAnalysis,
+    type LlmAnalysisResponse,
+} from '../api/llmApi'
+import {
     getRecords,
     type UserSubjectRecordResponse,
 } from '../api/recordApi'
@@ -154,6 +158,9 @@ function HomePage() {
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
     const [loading, setLoading] = useState(false)
     const [detailLoading, setDetailLoading] = useState(false)
+    const [insightLoading, setInsightLoading] = useState(false)
+    const [homeInsight, setHomeInsight] = useState<LlmAnalysisResponse | null>(null)
+    const [insightError, setInsightError] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const latestSelectionApplied = useRef(false)
 
@@ -193,6 +200,29 @@ function HomePage() {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void loadRecords()
     }, [loadRecords])
+
+    useEffect(() => {
+        async function loadHomeInsight() {
+            setInsightLoading(true)
+            setInsightError(null)
+
+            try {
+                const response = await getHomeInsightAnalysis({
+                    year: selectedYear,
+                    quarter: selectedQuarter,
+                    category: selectedCategory,
+                })
+                setHomeInsight(response)
+            } catch (insightLoadError) {
+                setHomeInsight(null)
+                setInsightError(getErrorMessage(insightLoadError))
+            } finally {
+                setInsightLoading(false)
+            }
+        }
+
+        void loadHomeInsight()
+    }, [selectedCategory, selectedQuarter, selectedYear])
 
     const yearRecords = useMemo(() => {
         return records.filter((record) => record.recordYear === selectedYear)
@@ -419,7 +449,7 @@ function HomePage() {
                     </GlassCard>
                 </div>
 
-                <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
+                <div className="grid gap-5 xl:grid-cols-[1fr_1fr_0.92fr]">
                     <GlassCard className="overflow-hidden">
                         <div
                             className={[
@@ -473,6 +503,15 @@ function HomePage() {
                             </div>
                         </div>
                     </GlassCard>
+
+                    <HomeInsightPanel
+                        report={homeInsight}
+                        loading={insightLoading}
+                        error={insightError}
+                        category={selectedCategory}
+                        year={selectedYear}
+                        quarter={selectedQuarter}
+                    />
                 </div>
             </div>
 
@@ -494,6 +533,101 @@ function HomePage() {
 type MetricPillProps = {
     label: string
     value: number | string
+}
+
+type HomeInsightPanelProps = {
+    report: LlmAnalysisResponse | null
+    loading: boolean
+    error: string | null
+    category: AcgnCategory
+    year: number
+    quarter: ReleaseQuarter
+}
+
+function HomeInsightPanel({
+                              report,
+                              loading,
+                              error,
+                              category,
+                              year,
+                              quarter,
+                          }: HomeInsightPanelProps) {
+    const theme = categoryTheme[category]
+    const visibleSections = report?.sections.slice(0, 2) ?? []
+
+    return (
+        <GlassCard className="overflow-hidden">
+            <div
+                className={[
+                    'flex h-full min-h-[310px] flex-col bg-gradient-to-br p-5 transition-all duration-300',
+                    theme.softGradient,
+                ].join(' ')}
+            >
+                <SectionHeader
+                    eyebrow="ai insight"
+                    title="首页图表解读"
+                    description={`${year} · ${getReleaseQuarterLabel(quarter)} · ${theme.cnName}`}
+                />
+
+                {loading ? (
+                    <div className="mt-4 space-y-3">
+                        <div className="h-20 animate-pulse rounded-[22px] bg-white/55" />
+                        <div className="h-16 animate-pulse rounded-[22px] bg-white/45" />
+                        <div className="h-16 animate-pulse rounded-[22px] bg-white/45" />
+                    </div>
+                ) : error ? (
+                    <div className="mt-4 rounded-[24px] border border-rose-100 bg-white/62 p-4 text-sm leading-6 text-rose-600">
+                        {error}
+                    </div>
+                ) : report ? (
+                    <div className="mt-4 flex flex-1 flex-col gap-3">
+                        <div className="rounded-[24px] border border-white/75 bg-white/62 p-4 shadow-sm backdrop-blur">
+                            <p className="text-sm leading-6 text-slate-500">
+                                {report.summary}
+                            </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5">
+                            {report.keywords.slice(0, 5).map((keyword) => (
+                                <span
+                                    key={keyword}
+                                    className="rounded-full border border-white/75 bg-white/65 px-2.5 py-1 text-[11px] font-semibold text-slate-500"
+                                >
+                                    #{keyword}
+                                </span>
+                            ))}
+                        </div>
+
+                        <div className="grid flex-1 gap-2.5">
+                            {visibleSections.map((section) => (
+                                <article
+                                    key={section.title}
+                                    className="rounded-[22px] border border-white/70 bg-white/52 p-3.5"
+                                >
+                                    <h4 className="text-sm font-black text-slate-800">
+                                        {section.title}
+                                    </h4>
+                                    <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-500">
+                                        {section.content}
+                                    </p>
+                                </article>
+                            ))}
+                        </div>
+
+                        {report.evidence[0] ? (
+                            <p className="rounded-2xl border border-white/70 bg-white/48 px-3 py-2 text-[11px] leading-5 text-slate-400">
+                                {report.evidence[0]}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : (
+                    <div className="mt-4 rounded-[24px] border border-dashed border-slate-200 bg-white/45 p-4 text-sm leading-6 text-slate-400">
+                        当前暂无首页解读。
+                    </div>
+                )}
+            </div>
+        </GlassCard>
+    )
 }
 
 function MetricPill({ label, value }: MetricPillProps) {

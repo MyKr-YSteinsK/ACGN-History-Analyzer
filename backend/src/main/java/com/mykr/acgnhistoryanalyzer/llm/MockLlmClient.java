@@ -84,6 +84,10 @@ public class MockLlmClient implements LlmClient {
             return year + " 年 " + displayCategory + " 一键智能分析报告";
         }
 
+        if ("HOME_INSIGHT".equals(analysisType)) {
+            return year + " 年 " + quarterLabel(quarter) + " " + displayCategory + " 首页图表解读";
+        }
+
         if ("QUARTERLY".equals(analysisType)) {
             return year + " 年 " + quarterLabel(quarter) + "档期 " + displayCategory + " 智能总结";
         }
@@ -143,6 +147,12 @@ public class MockLlmClient implements LlmClient {
                     + "本次年度样本 " + totalRecords + " 条，并会同时参考长期正式记录。";
         }
 
+        if ("HOME_INSIGHT".equals(analysisType)) {
+            return scope + " 是首页统计图表的轻量解读：当前筛选下有 "
+                    + totalRecords + " 条正式记录，均分 " + averageScore
+                    + " / 50，高分样本 " + highScoreCount + " 条。";
+        }
+
         return scope + " 共整理到 " + totalRecords
                 + " 条正式记录，个人均分约 " + averageScore
                 + " / 50，其中 45 分以上高分记录 " + highScoreCount
@@ -162,6 +172,7 @@ public class MockLlmClient implements LlmClient {
             case "TASTE_PROFILE" -> "口味画像";
             case "PREFERENCE_CONTRADICTION" -> "偏好矛盾";
             case "COMPREHENSIVE_REPORT" -> "一键报告";
+            case "HOME_INSIGHT" -> "首页解读";
             default -> "年度总结";
         });
 
@@ -350,6 +361,30 @@ public class MockLlmClient implements LlmClient {
                     new LlmAnalysisSectionResponse(
                             "后续行动",
                             buildComprehensiveActionContent(context)
+                    )
+            );
+        }
+
+        if ("HOME_INSIGHT".equals(readStringValue(context, "analysisType", ""))) {
+            return List.of(
+                    new LlmAnalysisSectionResponse(
+                            "当前图表",
+                            buildHomeInsightOverviewContent(
+                                    context,
+                                    totalRecords,
+                                    averageScore,
+                                    highScoreCount,
+                                    lowScoreCount,
+                                    yearOverYearDiff
+                            )
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "类型与月份",
+                            buildHomeInsightDistributionContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "展示提示",
+                            buildHomeInsightActionContent(context)
                     )
             );
         }
@@ -647,6 +682,49 @@ public class MockLlmClient implements LlmClient {
                 + "。后续展示时可以先讲画像，再讲矛盾，最后落到推荐候选。";
     }
 
+    private String buildHomeInsightOverviewContent(
+            Map<String, Object> context,
+            Integer totalRecords,
+            String averageScore,
+            Integer highScoreCount,
+            Integer lowScoreCount,
+            Integer yearOverYearDiff
+    ) {
+        Integer year = readInteger(context, "year");
+        Integer quarter = readInteger(context, "quarter");
+        String category = readStringValue(context, "category", "全部类型");
+
+        if (totalRecords == null || totalRecords == 0) {
+            return year + " 年 " + quarterLabel(quarter) + " " + category
+                    + " 暂时没有正式记录。首页图表会保留筛选状态，适合继续切换年份、月份或类型寻找已有数据。";
+        }
+
+        return year + " 年 " + quarterLabel(quarter) + " " + category
+                + " 共有 " + totalRecords + " 条正式记录，均分 " + averageScore
+                + " / 50，高分 " + highScoreCount + " 条，低分 " + lowScoreCount
+                + " 条。相对上一年同档期变化 " + formatDiff(yearOverYearDiff)
+                + " 条。";
+    }
+
+    private String buildHomeInsightDistributionContent(Map<String, Object> context) {
+        String topRecords = formatRecordList(readMapList(context, "topRecords"));
+        String topTags = buildTopTagShortText(context);
+
+        return "年度类型分布：" + formatMap(readLongMap(context, "categoryDistribution"))
+                + "。当前类型的年度月份分布：" + formatMap(readLongMap(context, "quarterDistribution"))
+                + "。当前筛选下评分靠前样本：" + topRecords
+                + "。标签线索：" + topTags + "。";
+    }
+
+    private String buildHomeInsightActionContent(Map<String, Object> context) {
+        Map<String, Long> collectionCandidates = readLongMap(context, "collectionCandidates");
+
+        return "首页展示时可以先用类型总览说明年度重心，再用月份分布解释当前档期是否集中。"
+                + "如果本档期数据较少，可以切到一键报告或口味画像。未记录候选中，想看 "
+                + collectionCandidates.getOrDefault("WANT", 0L) + " 条，搁置 "
+                + collectionCandidates.getOrDefault("PAUSED", 0L) + " 条，可作为下一步补完入口。";
+    }
+
     private String buildRecommendationSummaryContent(Map<String, Object> context) {
         List<LlmRecommendationResponse> recommendations = buildRecommendations(context);
         if (recommendations.isEmpty()) {
@@ -704,6 +782,10 @@ public class MockLlmClient implements LlmClient {
 
         if ("COMPREHENSIVE_REPORT".equals(analysisType)) {
             return year + " 年 " + displayCategory + " 综合报告范围";
+        }
+
+        if ("HOME_INSIGHT".equals(analysisType)) {
+            return year + " 年 " + quarterLabel(quarter) + " " + displayCategory + " 首页图表范围";
         }
 
         if ("QUARTERLY".equals(analysisType)) {
@@ -891,6 +973,18 @@ public class MockLlmClient implements LlmClient {
         return tags.stream()
                 .map(item -> item.get("name") + "（" + item.get("count")
                         + " 次，均分 " + item.get("averageScore") + "）")
+                .collect(java.util.stream.Collectors.joining("、"));
+    }
+
+    private String buildTopTagShortText(Map<String, Object> context) {
+        List<Map<String, Object>> topTags = readMapList(context, "topTags");
+        if (topTags.isEmpty()) {
+            return "暂无稳定标签";
+        }
+
+        return topTags.stream()
+                .limit(4)
+                .map(item -> item.get("name") + "×" + item.get("count"))
                 .collect(java.util.stream.Collectors.joining("、"));
     }
 
