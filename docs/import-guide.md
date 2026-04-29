@@ -20,6 +20,19 @@ POST /api/records/import/preview
 POST /api/records/import
 ```
 
+## 季度口径
+
+本项目按 ACGN 新番常用说法记录季度，不按“春夏秋冬”自然顺序写：
+
+```text
+1 = 冬 · 1月新番
+2 = 春 · 4月新番
+3 = 夏 · 7月新番
+4 = 秋 · 10月新番
+```
+
+所以页面展示顺序是：冬、春、夏、秋。
+
 ## 作品库 JSON
 
 顶层必须是对象，字段必须叫 `subjects`。
@@ -66,7 +79,7 @@ POST /api/records/import
 | `coverUrl` | 否 | URL 或 `/api/assets/covers/...` | 远程 URL 会在正式导入时尝试缓存到本地 |
 | `summary` | 否 | 字符串或 null，最长 2000 | 简介 |
 | `releaseYear` | 是 | 1900-2100 | 发行年份 |
-| `releaseQuarter` | 是 | 1/2/3/4 | 1 春，2 夏，3 秋，4 冬 |
+| `releaseQuarter` | 是 | 1/2/3/4 | 1 冬/1月新番，2 春/4月新番，3 夏/7月新番，4 秋/10月新番 |
 | `category` | 是 | `ANIME`/`COMIC`/`GAME`/`NOVEL` | ACGN 类型 |
 | `studioName` | 否 | 字符串或 null，最长 255 | 制作方、出版社、开发商等 |
 | `platformLink` | 否 | 字符串或 null，最长 500 | Bangumi 等外部链接 |
@@ -170,7 +183,7 @@ JSON 写：
 | `subjectCategory` | 是 | `ANIME`/`COMIC`/`GAME`/`NOVEL` | 用于定位作品 |
 | `scoreValue` | 否 | 0-50 或 null | 个人评分 |
 | `recordYear` | 是 | 1900-2100 | 记录年份，不一定等于发行年份 |
-| `recordQuarter` | 是 | 1/2/3/4 | 记录季度 |
+| `recordQuarter` | 是 | 1/2/3/4 | 记录季度：1 冬/1月新番，2 春/4月新番，3 夏/7月新番，4 秋/10月新番 |
 | `note` | 否 | 字符串或 null，最长 500 | 评价/备注 |
 
 记录导入使用作品唯一键匹配作品：
@@ -223,7 +236,7 @@ subjectTitleCn + subjectSubtitle + subjectSeasonIndex + subjectPartIndex + subje
 2. records.json
 
 作品 category 只能是 ANIME / COMIC / GAME / NOVEL。
-季度规则：1 春，2 夏，3 秋，4 冬。
+季度规则采用新番月份口径：1 冬/1月新番，2 春/4月新番，3 夏/7月新番，4 秋/10月新番。
 作品唯一键是 titleCn + subtitle + seasonIndex + partIndex + category。
 不要生成 tags 字符串，只生成 tagNames 数组。
 tagNames 使用中文标签，推荐 3-7 个，最多 12 个。
@@ -233,4 +246,3 @@ sourceId 填 Bangumi subject id。
 status 固定为 NORMAL。
 记录 JSON 必须用 subjectTitleCn、subjectSubtitle、subjectSeasonIndex、subjectPartIndex、subjectCategory 匹配作品。
 ```
-

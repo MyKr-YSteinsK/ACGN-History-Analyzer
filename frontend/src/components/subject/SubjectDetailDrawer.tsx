@@ -188,8 +188,8 @@ function SubjectDetailDrawer({
                                     quarter.text,
                                     quarter.border,
                                 ].join(' ')}
-                            >
-                {quarter.cnName}
+                        >
+                {quarter.shortName}
               </span>
                         ) : null}
 

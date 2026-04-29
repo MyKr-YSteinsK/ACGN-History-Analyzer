@@ -81,7 +81,9 @@ function getReleaseText(collection: UserSubjectCollectionResponse) {
         ? getReleaseQuarterLabel(collection.subjectReleaseQuarter)
         : ''
 
-    return `${collection.subjectReleaseYear}${quarterLabel}`
+    return quarterLabel
+        ? `${collection.subjectReleaseYear} ${quarterLabel}`
+        : String(collection.subjectReleaseYear)
 }
 
 function CollectionsPage() {
@@ -747,7 +749,7 @@ function CollectionCard({
                                 releaseQuarter.border,
                             ].join(' ')}
                         >
-                            {releaseQuarter.cnName}
+                            {releaseQuarter.shortName}
                         </span>
                     ) : null}
                 </div>

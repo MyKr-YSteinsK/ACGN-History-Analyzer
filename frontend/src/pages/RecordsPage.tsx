@@ -96,7 +96,9 @@ function getReleaseText(record: UserSubjectRecordResponse) {
         ? getReleaseQuarterLabel(record.subjectReleaseQuarter)
         : ''
 
-    return `发行 ${record.subjectReleaseYear}${quarterLabel}`
+    return quarterLabel
+        ? `发行 ${record.subjectReleaseYear} ${quarterLabel}`
+        : `发行 ${record.subjectReleaseYear}`
 }
 
 function RecordsPage() {
@@ -314,7 +316,10 @@ function RecordsPage() {
                                                         : 'border-white/80 bg-white/62 text-slate-400 hover:-translate-y-0.5 hover:bg-white',
                                                 ].join(' ')}
                                             >
-                                                {theme.cnName}
+                                                <span className="block leading-tight">{theme.cnName}</span>
+                                                <span className="mt-0.5 block text-[10px] leading-none opacity-80">
+                                                    {theme.monthLabel}
+                                                </span>
                                             </button>
                                         )
                                     })}
@@ -348,7 +353,7 @@ function RecordsPage() {
                                     {selectedCategoryTheme.cnName}记录
                                 </h3>
                                 <p className="mt-1 text-sm text-slate-400">
-                                    {selectedYear} · {selectedQuarterTheme.cnName} · {filteredRecords.length} 条
+                                    {selectedYear} · {selectedQuarterTheme.displayName} · {filteredRecords.length} 条
                                 </p>
                             </div>
 
@@ -701,7 +706,7 @@ function RecordCard({ record, category, onOpenDetail }: RecordCardProps) {
                             recordQuarter.border,
                         ].join(' ')}
                     >
-                        {recordQuarter.cnName}
+                        {recordQuarter.shortName}
                     </span>
 
                     {releaseText ? (

@@ -146,7 +146,7 @@ function SubjectCard({ subject, onOpenDetail }: SubjectCardProps) {
                                 quarter.border,
                             ].join(' ')}
                         >
-              {quarter.cnName}
+              {quarter.shortName}
             </span>
                     ) : null}
 

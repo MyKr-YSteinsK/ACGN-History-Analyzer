@@ -27,10 +27,10 @@ const quarterOptions: Array<{
     value: ReleaseQuarter
     label: string
 }> = [
-    { value: 1, label: '春' },
-    { value: 2, label: '夏' },
-    { value: 3, label: '秋' },
-    { value: 4, label: '冬' },
+    { value: 1, label: '冬 · 1月' },
+    { value: 2, label: '春 · 4月' },
+    { value: 3, label: '夏 · 7月' },
+    { value: 4, label: '秋 · 10月' },
 ]
 
 const visibleYearCount = 3
@@ -236,7 +236,7 @@ function AddRecordModalContent({
                             />
                             <ReadonlyField
                                 label="发行季度"
-                                value={quarter ? quarter.cnName : '未知'}
+                                value={quarter ? quarter.displayName : '未知'}
                                 valueClassName={quarter ? `${quarter.bg} ${quarter.text} ${quarter.border}` : ''}
                             />
                             <ReadonlyField
@@ -333,7 +333,7 @@ function AddRecordModalContent({
                                                         : 'border-white/80 bg-white/60 text-slate-400 hover:-translate-y-0.5 hover:scale-105 hover:bg-white',
                                                 ].join(' ')}
                                             >
-                                                {option.label}
+                                                <span className="block leading-tight">{option.label}</span>
                                             </button>
                                         )
                                     })}

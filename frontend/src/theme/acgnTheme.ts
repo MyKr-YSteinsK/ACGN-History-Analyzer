@@ -65,6 +65,9 @@ export const quarterTheme: Record<
     {
         key: ReleaseQuarter
         cnName: string
+        monthLabel: string
+        shortName: string
+        displayName: string
         text: string
         bg: string
         border: string
@@ -73,35 +76,47 @@ export const quarterTheme: Record<
 > = {
     1: {
         key: 1,
+        cnName: '冬',
+        monthLabel: '1月新番',
+        shortName: '冬 · 1月',
+        displayName: '冬 · 1月新番',
+        text: 'text-blue-700',
+        bg: 'bg-blue-100/70',
+        border: 'border-blue-200/75',
+        panelGradient: 'from-blue-100/65 via-white/55 to-slate-100/65',
+    },
+    2: {
+        key: 2,
         cnName: '春',
+        monthLabel: '4月新番',
+        shortName: '春 · 4月',
+        displayName: '春 · 4月新番',
         text: 'text-green-600',
         bg: 'bg-green-100/80',
         border: 'border-green-200/80',
         panelGradient: 'from-green-100/70 via-white/55 to-emerald-50/60',
     },
-    2: {
-        key: 2,
+    3: {
+        key: 3,
         cnName: '夏',
+        monthLabel: '7月新番',
+        shortName: '夏 · 7月',
+        displayName: '夏 · 7月新番',
         text: 'text-cyan-600',
         bg: 'bg-cyan-100/80',
         border: 'border-cyan-200/80',
         panelGradient: 'from-cyan-100/70 via-white/55 to-sky-50/60',
     },
-    3: {
-        key: 3,
+    4: {
+        key: 4,
         cnName: '秋',
+        monthLabel: '10月新番',
+        shortName: '秋 · 10月',
+        displayName: '秋 · 10月新番',
         text: 'text-orange-600',
         bg: 'bg-orange-100/80',
         border: 'border-orange-200/80',
         panelGradient: 'from-orange-100/75 via-white/55 to-amber-50/65',
-    },
-    4: {
-        key: 4,
-        cnName: '冬',
-        text: 'text-blue-700',
-        bg: 'bg-blue-100/70',
-        border: 'border-blue-200/75',
-        panelGradient: 'from-blue-100/65 via-white/55 to-slate-100/65',
     },
 }
 

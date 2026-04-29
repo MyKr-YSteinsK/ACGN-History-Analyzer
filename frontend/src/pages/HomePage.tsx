@@ -81,7 +81,9 @@ function getReleaseText(record: UserSubjectRecordResponse) {
         ? getReleaseQuarterLabel(record.subjectReleaseQuarter)
         : ''
 
-    return `${record.subjectReleaseYear}${quarterLabel}`
+    return quarterLabel
+        ? `${record.subjectReleaseYear} ${quarterLabel}`
+        : String(record.subjectReleaseYear)
 }
 
 function getLatestRecordPosition(records: UserSubjectRecordResponse[]) {
@@ -316,7 +318,7 @@ function HomePage() {
                                     ACGN 个人历史统计
                                 </h2>
                                 <p className="mt-2 text-sm text-slate-500">
-                                    最新记录定位：{selectedYear} · {selectedQuarterTheme.cnName} · {selectedCategoryTheme.cnName}
+                                    最新记录定位：{selectedYear} · {selectedQuarterTheme.displayName} · {selectedCategoryTheme.cnName}
                                 </p>
                             </div>
 
@@ -382,8 +384,8 @@ function HomePage() {
                         >
                             <SectionHeader
                                 eyebrow="season distribution"
-                                title={`${selectedCategoryTheme.cnName}四季分布`}
-                                description="点击有数据的季节切换当前季度。"
+                                title={`${selectedCategoryTheme.cnName}新番季度分布`}
+                                description="按 1/4/7/10 月新番口径统计，点击有数据的季度切换。"
                             />
 
                             <SeasonBarChart
@@ -404,7 +406,7 @@ function HomePage() {
                         >
                             <SectionHeader
                                 eyebrow="top score preview"
-                                title={`${selectedQuarterTheme.cnName}季评分前三`}
+                                title={`${selectedQuarterTheme.displayName}评分前三`}
                                 description={`${selectedYear} · ${selectedCategoryTheme.cnName} · 按个人评分排序`}
                             />
 
@@ -428,7 +430,7 @@ function HomePage() {
                         >
                             <SectionHeader
                                 eyebrow="type composition"
-                                title={`${selectedQuarterTheme.cnName}季类型构成`}
+                                title={`${selectedQuarterTheme.displayName}类型构成`}
                                 description="点击类型会同步切换全局类型。"
                             />
 
@@ -456,7 +458,7 @@ function HomePage() {
                             <SectionHeader
                                 eyebrow="year change"
                                 title="相对往年同期变化"
-                                description={`${selectedQuarterTheme.cnName}季 · 当前类型 ${formatChange(selectedChangeRow?.diff ?? 0)}`}
+                                description={`${selectedQuarterTheme.displayName} · 当前类型 ${formatChange(selectedChangeRow?.diff ?? 0)}`}
                             />
 
                             <div className="mt-4 grid gap-2.5">
@@ -679,7 +681,10 @@ function SeasonBarChart({
                                 selected ? `${theme.bg} ${theme.text}` : 'text-slate-400',
                             ].join(' ')}
                         >
-                            {theme.cnName}
+                            <span>{theme.cnName}</span>
+                            <span className="mt-0.5 block text-[10px] font-semibold leading-none opacity-80">
+                                {theme.monthLabel}
+                            </span>
                         </span>
 
                         <span className="text-xs font-semibold text-slate-400">

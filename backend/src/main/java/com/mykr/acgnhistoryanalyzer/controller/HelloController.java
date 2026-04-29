@@ -50,10 +50,10 @@ public class HelloController {
         @GetMapping("/quarters")
         public ApiResponse<List<EnumOptionResponse>> quarters() {
             return ApiResponse.success(List.of(
-                    new EnumOptionResponse("1", "春"),
-                    new EnumOptionResponse("2", "夏"),
-                    new EnumOptionResponse("3", "秋"),
-                    new EnumOptionResponse("4", "冬")
+                    new EnumOptionResponse("1", "冬 · 1月新番"),
+                    new EnumOptionResponse("2", "春 · 4月新番"),
+                    new EnumOptionResponse("3", "夏 · 7月新番"),
+                    new EnumOptionResponse("4", "秋 · 10月新番")
             ));
         }
 

@@ -109,7 +109,9 @@ function getReleaseText(record: UserSubjectRecordResponse) {
         ? getReleaseQuarterLabel(record.subjectReleaseQuarter)
         : ''
 
-    return `${record.subjectReleaseYear}${quarterLabel}`
+    return quarterLabel
+        ? `${record.subjectReleaseYear} ${quarterLabel}`
+        : String(record.subjectReleaseYear)
 }
 
 function TopPage() {
@@ -511,7 +513,7 @@ function TopRecordCard({ record, category, onOpenDetail }: TopRecordCardProps) {
                                 quarter.border,
                             ].join(' ')}
                         >
-                            {quarter.cnName}
+                            {quarter.shortName}
                         </span>
                     ) : null}
                 </div>

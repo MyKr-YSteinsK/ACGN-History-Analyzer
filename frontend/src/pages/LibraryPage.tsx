@@ -46,23 +46,23 @@ const quarterOptions: Array<{
     { value: 'ALL', label: '全部季度' },
     {
         value: 1,
-        label: '春',
-        className: 'border-green-200 bg-green-100/85 text-green-700 shadow-sm',
+        label: '冬 · 1月新番',
+        className: 'border-blue-200 bg-blue-100/80 text-blue-700 shadow-sm',
     },
     {
         value: 2,
-        label: '夏',
-        className: 'border-cyan-200 bg-cyan-100/85 text-cyan-700 shadow-sm',
+        label: '春 · 4月新番',
+        className: 'border-green-200 bg-green-100/85 text-green-700 shadow-sm',
     },
     {
         value: 3,
-        label: '秋',
-        className: 'border-orange-200 bg-orange-100/85 text-orange-700 shadow-sm',
+        label: '夏 · 7月新番',
+        className: 'border-cyan-200 bg-cyan-100/85 text-cyan-700 shadow-sm',
     },
     {
         value: 4,
-        label: '冬',
-        className: 'border-blue-200 bg-blue-100/80 text-blue-700 shadow-sm',
+        label: '秋 · 10月新番',
+        className: 'border-orange-200 bg-orange-100/85 text-orange-700 shadow-sm',
     },
 ]
 

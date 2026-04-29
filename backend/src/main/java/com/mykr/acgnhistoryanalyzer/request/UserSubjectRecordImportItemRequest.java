@@ -27,8 +27,8 @@ public class UserSubjectRecordImportItemRequest {
     private Integer recordYear;
 
     @NotNull(message = "记录季度不能为空")
-    @Min(value = 1, message = "记录季度只能是1到4")
-    @Max(value = 4, message = "记录季度只能是1到4")
+    @Min(value = 1, message = "记录季度只能是1到4：1冬/1月，2春/4月，3夏/7月，4秋/10月")
+    @Max(value = 4, message = "记录季度只能是1到4：1冬/1月，2春/4月，3夏/7月，4秋/10月")
     private Integer recordQuarter;
 
     @Size(max = 500, message = "备注不能超过500个字符")

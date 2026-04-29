@@ -49,6 +49,7 @@ public class ImportTemplateService {
                 "preview 和正式 import 使用同一套判定规则。",
                 "作品标签使用 tagNames 数组，建议 3~7 个，最多 12 个；这些标签会进入结构化标签系统。",
                 "如果使用 CSV，tagNames 建议写成：战斗|奇幻|漫画改。",
+                "季度按新番月份口径填写：1=冬/1月新番，2=春/4月新番，3=夏/7月新番，4=秋/10月新番。",
                 "coverUrl 可以填写 Bangumi 等远程图片地址；正式导入时后端会尽量下载到本地 uploads/covers，并把作品封面地址改成本地访问路径。"
         );
 
@@ -63,7 +64,7 @@ public class ImportTemplateService {
                 new ImportFieldDocResponse("coverUrl", false, "封面地址。", "https://lain.bgm.tv/pic/cover/l/example.jpg", "推荐填 Bangumi 图片 URL，后端会尝试缓存到本地。"),
                 new ImportFieldDocResponse("summary", false, "作品简介。", "样例：巨人最终季前半部分", "仅展示用途。"),
                 new ImportFieldDocResponse("releaseYear", true, "作品发行年份。", "2020", "用于展示和检索。"),
-                new ImportFieldDocResponse("releaseQuarter", true, "作品发行季度，只能是 1~4。", "4", "用于展示和检索。"),
+                new ImportFieldDocResponse("releaseQuarter", true, "作品发行季度，只能是 1~4；1=冬/1月新番，2=春/4月新番，3=夏/7月新番，4=秋/10月新番。", "4", "用于展示和检索。"),
                 new ImportFieldDocResponse("category", true, "作品类型，参与作品唯一性判断。", "ANIME", "当前值为 ANIME / COMIC / NOVEL / GAME。"),
                 new ImportFieldDocResponse("studioName", false, "制作公司、出版社或相关机构名。", "MAPPA", "当前字段名沿用 studioName。"),
                 new ImportFieldDocResponse("platformLink", false, "外部平台链接。", "https://bgm.tv/subject/xxx", "可为空。"),
@@ -109,6 +110,7 @@ public class ImportTemplateService {
                 "当前 record 只表示正式完成记录，不再承载想看/搁置；想看/搁置由 collection 模块管理。",
                 "当前系统规则是一作品一正式记录；如果某个 subject 已经有正式记录，则新的 record 导入会跳过。",
                 "preview 和正式 import 使用同一套 subject 匹配逻辑。",
+                "记录季度按新番月份口径填写：1=冬/1月新番，2=春/4月新番，3=夏/7月新番，4=秋/10月新番。",
                 "如果匹配到多个 subject，则会跳过，并提示先清理重复作品。"
         );
 
@@ -120,7 +122,7 @@ public class ImportTemplateService {
                 new ImportFieldDocResponse("subjectCategory", true, "目标作品类型，用于定位 subject。", "ANIME", "参与作品定位。"),
                 new ImportFieldDocResponse("scoreValue", false, "个人评分，范围 0~50。", "48", "可以为空。"),
                 new ImportFieldDocResponse("recordYear", true, "记录年份。", "2024", "必填。"),
-                new ImportFieldDocResponse("recordQuarter", true, "记录季度，只能是1~4。", "1", "必填。"),
+                new ImportFieldDocResponse("recordQuarter", true, "记录季度，只能是 1~4；1=冬/1月新番，2=春/4月新番，3=夏/7月新番，4=秋/10月新番。", "1", "必填。"),
                 new ImportFieldDocResponse("note", false, "备注。", "样例：最终季前半部分补完", "可以为空。")
         );
 

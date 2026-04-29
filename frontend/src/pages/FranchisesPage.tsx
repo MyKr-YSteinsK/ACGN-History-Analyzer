@@ -80,7 +80,13 @@ function formatRelease(subject: SubjectCardView) {
         return '未知时间'
     }
 
-    return `${subject.releaseYear}${getReleaseQuarterLabel(subject.releaseQuarter)}`
+    const quarterLabel = subject.releaseQuarter
+        ? getReleaseQuarterLabel(subject.releaseQuarter)
+        : ''
+
+    return quarterLabel
+        ? `${subject.releaseYear} ${quarterLabel}`
+        : String(subject.releaseYear)
 }
 
 function formatSeasonPart(subject: SubjectCardView) {
@@ -760,7 +766,7 @@ function TimelineSubjectCard({ subject, onOpen }: TimelineSubjectCardProps) {
                                 quarter.border,
                             ].join(' ')}
                         >
-                            {quarter.cnName}
+                            {quarter.shortName}
                         </span>
                     ) : null}
                 </div>
