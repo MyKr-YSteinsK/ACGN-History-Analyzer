@@ -9,6 +9,7 @@ public record LlmAnalysisResponse(
         String summary,
         List<String> keywords,
         List<LlmAnalysisSectionResponse> sections,
+        List<LlmRecommendationResponse> recommendations,
         List<String> evidence,
         List<String> warnings,
         LlmAnalysisScopeResponse scope,

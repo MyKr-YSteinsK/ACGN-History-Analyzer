@@ -3,7 +3,9 @@ package com.mykr.acgnhistoryanalyzer.llm;
 import com.mykr.acgnhistoryanalyzer.response.LlmAnalysisResponse;
 import com.mykr.acgnhistoryanalyzer.response.LlmAnalysisScopeResponse;
 import com.mykr.acgnhistoryanalyzer.response.LlmAnalysisSectionResponse;
+import com.mykr.acgnhistoryanalyzer.response.LlmRecommendationResponse;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +38,7 @@ public class MockLlmClient implements LlmClient {
                 buildSummary(analysisType, year, quarter, displayCategory, totalRecords, averageScore, highScoreCount),
                 buildKeywords(context, analysisType),
                 buildSections(context, totalRecords, averageScore, highScoreCount, lowScoreCount, yearOverYearDiff),
+                buildRecommendations(context),
                 buildEvidence(context, request),
                 List.of(
                         "当前为 Mock 模式：报告基于真实统计上下文生成，但不是外部大模型的自然语言输出。",
@@ -59,6 +62,14 @@ public class MockLlmClient implements LlmClient {
 
         if ("TAG_PREFERENCE".equals(analysisType)) {
             return displayCategory + " 标签偏好分析";
+        }
+
+        if ("RECOMMENDATION".equals(analysisType)) {
+            return displayCategory + " 智能推荐池";
+        }
+
+        if ("COLLECTION_BACKLOG".equals(analysisType)) {
+            return displayCategory + " 收藏夹补坑建议";
         }
 
         if ("QUARTERLY".equals(analysisType)) {
@@ -99,6 +110,14 @@ public class MockLlmClient implements LlmClient {
                     + " 条正式记录，系统会根据标签出现次数、标签均分和高分命中数量，区分“经常看”和“真正容易打高分”的方向。";
         }
 
+        if ("RECOMMENDATION".equals(analysisType)) {
+            return scope + " 会从作品库未记录作品和收藏夹中挑选候选，并优先考虑想看、搁置以及命中历史高分标签的作品。";
+        }
+
+        if ("COLLECTION_BACKLOG".equals(analysisType)) {
+            return scope + " 只聚焦想看和搁置清单，目标不是随机推荐新作品，而是帮你判断哪些收藏更适合优先补完。";
+        }
+
         return scope + " 共整理到 " + totalRecords
                 + " 条正式记录，个人均分约 " + averageScore
                 + " / 50，其中 45 分以上高分记录 " + highScoreCount
@@ -113,6 +132,8 @@ public class MockLlmClient implements LlmClient {
             case "TYPE_PREFERENCE" -> "类型偏好";
             case "SCORE_STRUCTURE" -> "评分结构";
             case "TAG_PREFERENCE" -> "标签偏好";
+            case "RECOMMENDATION" -> "智能推荐";
+            case "COLLECTION_BACKLOG" -> "补坑建议";
             default -> "年度总结";
         });
 
@@ -179,6 +200,48 @@ public class MockLlmClient implements LlmClient {
                     new LlmAnalysisSectionResponse(
                             "使用建议",
                             "标签偏好适合后续推荐系统使用：高频高分标签可以作为强偏好，低频高分标签可以作为探索方向，高频低分标签则应被视为风险提示。"
+                    )
+            );
+        }
+
+        if ("RECOMMENDATION".equals(readStringValue(context, "analysisType", ""))) {
+            return List.of(
+                    new LlmAnalysisSectionResponse(
+                            "推荐池规则",
+                            "候选来自作品库未记录作品、想看清单和搁置清单；已经有正式记录的作品会被排除。排序会优先考虑 WANT > PAUSED > 普通作品库，再叠加高分标签匹配和平台评分参考。"
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "高优先级候选",
+                            buildRecommendationSummaryContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "匹配依据",
+                            "推荐理由会显示来源、命中的历史高分标签、平台评分参考和可能风险。平台评分只作为辅助信息，不会替代你的个人评分偏好。"
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "使用建议",
+                            "高优先级适合近期补，MEDIUM 适合放入候选，LOW 更适合作为探索或等待更多数据后再判断。"
+                    )
+            );
+        }
+
+        if ("COLLECTION_BACKLOG".equals(readStringValue(context, "analysisType", ""))) {
+            return List.of(
+                    new LlmAnalysisSectionResponse(
+                            "补坑范围",
+                            "这个模块只看收藏夹中的想看和搁置作品，并继续排除已经正式记录的作品。它适合用来整理“我到底先补哪个”。"
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "优先补完",
+                            buildRecommendationSummaryContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "搁置恢复判断",
+                            "搁置作品会保留风险提示：如果缺少高分标签命中，或当初可能因为节奏不合被搁置，就不建议强行立刻补完。"
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "使用建议",
+                            "想看清单里命中高分标签的作品优先级最高；搁置作品则更适合在状态合适时恢复，而不是被推荐分数硬推着看。"
                     )
             );
         }
@@ -335,6 +398,20 @@ public class MockLlmClient implements LlmClient {
                 + "。低频低分：" + formatTagGroup(groups.get("lowFrequencyLowScore")) + "。";
     }
 
+    private String buildRecommendationSummaryContent(Map<String, Object> context) {
+        List<LlmRecommendationResponse> recommendations = buildRecommendations(context);
+        if (recommendations.isEmpty()) {
+            return "当前没有可推荐候选。可能是作品库未记录作品较少，或收藏夹作品都已经完成正式记录。";
+        }
+
+        return recommendations.stream()
+                .limit(5)
+                .map(item -> item.title() + "（" + sourceLabel(item.source())
+                        + "，" + priorityLabel(item.priority()) + "，匹配分 "
+                        + item.matchScore() + "）")
+                .collect(java.util.stream.Collectors.joining("；"));
+    }
+
     private List<String> buildEvidence(Map<String, Object> context, LlmGenerateRequest request) {
         List<String> evidence = new java.util.ArrayList<>(readStringList(context, "evidence"));
         evidence.add("当前模型提供者：" + properties.getProvider());
@@ -358,6 +435,14 @@ public class MockLlmClient implements LlmClient {
 
         if ("TAG_PREFERENCE".equals(analysisType)) {
             return displayCategory + " 标签偏好范围";
+        }
+
+        if ("RECOMMENDATION".equals(analysisType)) {
+            return displayCategory + " 推荐池范围";
+        }
+
+        if ("COLLECTION_BACKLOG".equals(analysisType)) {
+            return displayCategory + " 收藏夹补坑范围";
         }
 
         if ("QUARTERLY".equals(analysisType)) {
@@ -462,6 +547,26 @@ public class MockLlmClient implements LlmClient {
         return result;
     }
 
+    private List<LlmRecommendationResponse> buildRecommendations(Map<String, Object> context) {
+        return readMapList(context, "recommendations").stream()
+                .map(item -> new LlmRecommendationResponse(
+                        readLongValue(item, "subjectId"),
+                        readItemString(item, "title"),
+                        readItemString(item, "coverUrl"),
+                        readItemString(item, "category"),
+                        readItemStringList(item, "tags"),
+                        readItemString(item, "franchiseName"),
+                        readItemString(item, "source"),
+                        readItemString(item, "reason"),
+                        readItemString(item, "risk"),
+                        readItemString(item, "evidence"),
+                        readItemString(item, "priority"),
+                        readItemInteger(item, "matchScore"),
+                        readBigDecimalValue(item, "platformScore")
+                ))
+                .toList();
+    }
+
     private Map<String, Long> readLongMap(Map<String, Object> context, String key) {
         Object value = context.get(key);
         if (!(value instanceof Map<?, ?> map)) {
@@ -514,5 +619,64 @@ public class MockLlmClient implements LlmClient {
                 .map(item -> item.get("name") + "（" + item.get("count")
                         + " 次，均分 " + item.get("averageScore") + "）")
                 .collect(java.util.stream.Collectors.joining("、"));
+    }
+
+    private String sourceLabel(String source) {
+        return switch (source) {
+            case "WANT" -> "想看";
+            case "PAUSED" -> "搁置";
+            default -> "作品库";
+        };
+    }
+
+    private String priorityLabel(String priority) {
+        return switch (priority) {
+            case "HIGH" -> "高优先级";
+            case "MEDIUM" -> "中优先级";
+            default -> "低优先级";
+        };
+    }
+
+    private Long readLongValue(Map<String, Object> item, String key) {
+        Object value = item.get(key);
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return null;
+    }
+
+    private Integer readItemInteger(Map<String, Object> item, String key) {
+        Object value = item.get(key);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return null;
+    }
+
+    private String readItemString(Map<String, Object> item, String key) {
+        Object value = item.get(key);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private List<String> readItemStringList(Map<String, Object> item, String key) {
+        Object value = item.get(key);
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+
+        return list.stream()
+                .map(String::valueOf)
+                .toList();
+    }
+
+    private BigDecimal readBigDecimalValue(Map<String, Object> item, String key) {
+        Object value = item.get(key);
+        if (value instanceof BigDecimal bigDecimal) {
+            return bigDecimal;
+        }
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue());
+        }
+        return null;
     }
 }

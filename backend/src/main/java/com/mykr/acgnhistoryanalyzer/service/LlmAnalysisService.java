@@ -104,6 +104,30 @@ public class LlmAnalysisService {
         ));
     }
 
+    public LlmAnalysisResponse generateRecommendations(String category) {
+        String normalizedCategory = normalizeBlankToNull(category);
+        String prompt = llmPromptService.buildRecommendationPrompt(normalizedCategory);
+        Map<String, Object> context = llmContextBuilder.buildRecommendationContext(normalizedCategory);
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "RECOMMENDATION",
+                prompt,
+                context
+        ));
+    }
+
+    public LlmAnalysisResponse generateCollectionBacklog(String category) {
+        String normalizedCategory = normalizeBlankToNull(category);
+        String prompt = llmPromptService.buildCollectionBacklogPrompt(normalizedCategory);
+        Map<String, Object> context = llmContextBuilder.buildCollectionBacklogContext(normalizedCategory);
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "COLLECTION_BACKLOG",
+                prompt,
+                context
+        ));
+    }
+
     private String normalizeBlankToNull(String value) {
         if (value == null || value.isBlank()) {
             return null;

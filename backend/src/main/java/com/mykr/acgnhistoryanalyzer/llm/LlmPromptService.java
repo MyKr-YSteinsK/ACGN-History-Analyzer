@@ -48,6 +48,22 @@ public class LlmPromptService {
         return buildBasePrompt(scope);
     }
 
+    public String buildRecommendationPrompt(String category) {
+        String scope = category == null || category.isBlank()
+                ? "作品库与收藏夹智能推荐"
+                : category + " 作品库与收藏夹智能推荐";
+
+        return buildBasePrompt(scope);
+    }
+
+    public String buildCollectionBacklogPrompt(String category) {
+        String scope = category == null || category.isBlank()
+                ? "收藏夹补坑建议"
+                : category + " 收藏夹补坑建议";
+
+        return buildBasePrompt(scope);
+    }
+
     private String buildBasePrompt(String scope) {
         return """
                 你是一个个人 ACGN 历史数据分析助手。

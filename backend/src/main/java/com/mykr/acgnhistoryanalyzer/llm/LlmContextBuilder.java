@@ -1,7 +1,11 @@
 package com.mykr.acgnhistoryanalyzer.llm;
 
 import com.mykr.acgnhistoryanalyzer.common.enums.CollectionType;
+import com.mykr.acgnhistoryanalyzer.entity.Franchise;
+import com.mykr.acgnhistoryanalyzer.entity.Subject;
+import com.mykr.acgnhistoryanalyzer.entity.Tag;
 import com.mykr.acgnhistoryanalyzer.entity.UserSubjectCollection;
+import com.mykr.acgnhistoryanalyzer.repository.FranchiseRepository;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectCollectionRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
@@ -38,15 +42,18 @@ public class LlmContextBuilder {
     private final UserSubjectRecordRepository userSubjectRecordRepository;
     private final UserSubjectCollectionRepository userSubjectCollectionRepository;
     private final SubjectRepository subjectRepository;
+    private final FranchiseRepository franchiseRepository;
 
     public LlmContextBuilder(UserSubjectRecordService userSubjectRecordService,
                              UserSubjectRecordRepository userSubjectRecordRepository,
                              UserSubjectCollectionRepository userSubjectCollectionRepository,
-                             SubjectRepository subjectRepository) {
+                             SubjectRepository subjectRepository,
+                             FranchiseRepository franchiseRepository) {
         this.userSubjectRecordService = userSubjectRecordService;
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectCollectionRepository = userSubjectCollectionRepository;
         this.subjectRepository = subjectRepository;
+        this.franchiseRepository = franchiseRepository;
     }
 
     public Map<String, Object> buildYearlyContext(Integer year, String category) {
@@ -201,6 +208,62 @@ public class LlmContextBuilder {
         context.put("tagPreferenceGroups", buildTagPreferenceGroups(records));
         context.put("collectionCandidates", buildCollectionCandidateStats(category));
         context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
+    public Map<String, Object> buildRecommendationContext(String category) {
+        List<UserSubjectRecordResponse> allRecords =
+                userSubjectRecordService.getRecords(null, null, null, null);
+        List<UserSubjectRecordResponse> scopedRecords = filterByCategory(allRecords, category);
+        List<Map<String, Object>> recommendations = buildRecommendationItems(category, false);
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "RECOMMENDATION");
+        context.put("category", category);
+        context.put("comparisonLabel", "历史高分偏好");
+        context.put("totalRecords", scopedRecords.size());
+        context.put("previousYearTotalRecords", allRecords.size());
+        context.put("yearOverYearDiff", recommendations.size());
+        context.put("averageScore", averageScore(scopedRecords));
+        context.put("highScoreCount", countScoreAtLeast(scopedRecords, 45));
+        context.put("lowScoreCount", countScoreBelow(scopedRecords, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(scopedRecords));
+        context.put("quarterDistribution", buildQuarterDistribution(scopedRecords));
+        context.put("topRecords", buildRecordHighlights(scopedRecords, true));
+        context.put("lowScoreRecords", buildRecordHighlights(scopedRecords, false));
+        context.put("topTags", buildTagStats(scopedRecords));
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("recommendations", recommendations);
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
+    public Map<String, Object> buildCollectionBacklogContext(String category) {
+        List<UserSubjectRecordResponse> allRecords =
+                userSubjectRecordService.getRecords(null, null, null, null);
+        List<UserSubjectRecordResponse> scopedRecords = filterByCategory(allRecords, category);
+        List<Map<String, Object>> recommendations = buildRecommendationItems(category, true);
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "COLLECTION_BACKLOG");
+        context.put("category", category);
+        context.put("comparisonLabel", "收藏夹待补作品");
+        context.put("totalRecords", scopedRecords.size());
+        context.put("previousYearTotalRecords", allRecords.size());
+        context.put("yearOverYearDiff", recommendations.size());
+        context.put("averageScore", averageScore(scopedRecords));
+        context.put("highScoreCount", countScoreAtLeast(scopedRecords, 45));
+        context.put("lowScoreCount", countScoreBelow(scopedRecords, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(scopedRecords));
+        context.put("quarterDistribution", buildQuarterDistribution(scopedRecords));
+        context.put("topRecords", buildRecordHighlights(scopedRecords, true));
+        context.put("lowScoreRecords", buildRecordHighlights(scopedRecords, false));
+        context.put("topTags", buildTagStats(scopedRecords));
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("recommendations", recommendations);
         context.put("evidence", buildEvidence(context));
         return context;
     }
@@ -467,6 +530,175 @@ public class LlmContextBuilder {
         return stats;
     }
 
+    private List<Map<String, Object>> buildRecommendationItems(String category, boolean collectionOnly) {
+        List<UserSubjectRecordResponse> allRecords =
+                userSubjectRecordService.getRecords(null, null, null, null);
+        List<UserSubjectRecordResponse> scopedRecords = filterByCategory(allRecords, category);
+        Map<String, Long> highScoreTagWeights = buildHighScoreTagWeights(scopedRecords);
+        Set<Long> recordedSubjectIds = allRecords.stream()
+                .map(UserSubjectRecordResponse::getSubjectId)
+                .collect(Collectors.toSet());
+        Map<Long, UserSubjectCollection> collectionMap = userSubjectCollectionRepository.findAll()
+                .stream()
+                .collect(Collectors.toMap(
+                        UserSubjectCollection::getSubjectId,
+                        collection -> collection,
+                        (first, second) -> first
+                ));
+
+        return subjectRepository.findAll()
+                .stream()
+                .filter(subject -> "NORMAL".equalsIgnoreCase(subject.getStatus()))
+                .filter(subject -> category == null || category.isBlank()
+                        || category.equalsIgnoreCase(subject.getCategory()))
+                .filter(subject -> !recordedSubjectIds.contains(subject.getId()))
+                .filter(subject -> !collectionOnly || collectionMap.containsKey(subject.getId()))
+                .map(subject -> buildRecommendationItem(subject, collectionMap.get(subject.getId()), highScoreTagWeights))
+                .sorted(Comparator
+                        .comparing((Map<String, Object> item) -> (Integer) item.get("matchScore")).reversed()
+                        .thenComparing(item -> String.valueOf(item.get("title"))))
+                .limit(12)
+                .toList();
+    }
+
+    private Map<String, Long> buildHighScoreTagWeights(List<UserSubjectRecordResponse> records) {
+        return records.stream()
+                .filter(record -> record.getScoreValue() != null && record.getScoreValue() >= 42)
+                .filter(record -> record.getTagList() != null)
+                .flatMap(record -> record.getTagList().stream())
+                .collect(Collectors.groupingBy(
+                        TagResponse::getName,
+                        Collectors.counting()
+                ));
+    }
+
+    private Map<String, Object> buildRecommendationItem(
+            Subject subject,
+            UserSubjectCollection collection,
+            Map<String, Long> highScoreTagWeights
+    ) {
+        List<String> tags = subject.getStructuredTags()
+                .stream()
+                .map(Tag::getName)
+                .toList();
+        List<String> matchedTags = tags.stream()
+                .filter(highScoreTagWeights::containsKey)
+                .limit(5)
+                .toList();
+        String source = resolveRecommendationSource(collection);
+        int sourceScore = switch (source) {
+            case "WANT" -> 80;
+            case "PAUSED" -> 58;
+            default -> 30;
+        };
+        int tagScore = matchedTags.stream()
+                .mapToInt(tag -> highScoreTagWeights.getOrDefault(tag, 0L).intValue())
+                .sum() * 8;
+        int platformScore = subject.getPlatformScore() == null
+                ? 0
+                : subject.getPlatformScore().multiply(BigDecimal.valueOf(3)).intValue();
+        int matchScore = sourceScore + tagScore + platformScore;
+
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("subjectId", subject.getId());
+        item.put("title", subject.getDisplayTitle());
+        item.put("coverUrl", subject.getCoverUrl());
+        item.put("category", subject.getCategory());
+        item.put("tags", tags.stream().limit(6).toList());
+        item.put("franchiseName", resolveFranchiseName(subject.getFranchiseId()));
+        item.put("source", source);
+        item.put("reason", buildRecommendationReason(source, matchedTags, subject));
+        item.put("risk", buildRecommendationRisk(source, matchedTags, subject));
+        item.put("evidence", buildRecommendationEvidence(matchedTags, subject));
+        item.put("priority", resolvePriority(matchScore, source));
+        item.put("matchScore", matchScore);
+        item.put("platformScore", subject.getPlatformScore());
+        return item;
+    }
+
+    private String resolveRecommendationSource(UserSubjectCollection collection) {
+        if (collection == null) {
+            return "LIBRARY";
+        }
+
+        return collection.getCollectionType() == CollectionType.WANT ? "WANT" : "PAUSED";
+    }
+
+    private String buildRecommendationReason(String source, List<String> matchedTags, Subject subject) {
+        String sourceText = switch (source) {
+            case "WANT" -> "来自想看清单，优先级天然高于普通作品库候选";
+            case "PAUSED" -> "来自搁置清单，适合判断是否值得恢复";
+            default -> "来自作品库未记录候选";
+        };
+
+        if (!matchedTags.isEmpty()) {
+            return sourceText + "，并且匹配你历史高分标签：" + String.join("、", matchedTags);
+        }
+
+        if (subject.getPlatformScore() != null) {
+            return sourceText + "，平台评分 " + subject.getPlatformScore() + " 可作为辅助参考";
+        }
+
+        return sourceText + "，当前主要依靠收藏状态和作品基础信息推荐";
+    }
+
+    private String buildRecommendationRisk(String source, List<String> matchedTags, Subject subject) {
+        if ("PAUSED".equals(source)) {
+            return "搁置作品可能和当初的观看节奏或兴趣状态有关，建议降低即时补完压力";
+        }
+
+        if (matchedTags.isEmpty()) {
+            return "缺少历史高分标签匹配，推荐依据偏弱，适合作为探索候选";
+        }
+
+        if (subject.getPlatformScore() == null) {
+            return "缺少平台评分，只能更多依赖个人标签偏好";
+        }
+
+        return "风险较低，但仍需结合当前心情和系列前置作品判断";
+    }
+
+    private String buildRecommendationEvidence(List<String> matchedTags, Subject subject) {
+        String tagEvidence = matchedTags.isEmpty()
+                ? "暂无高分标签命中"
+                : "命中高分标签 " + String.join("、", matchedTags);
+        String scoreEvidence = subject.getPlatformScore() == null
+                ? "平台评分未知"
+                : "平台评分 " + subject.getPlatformScore();
+
+        return tagEvidence + "；" + scoreEvidence;
+    }
+
+    private String resolvePriority(int matchScore, String source) {
+        if (matchScore >= 95 || "WANT".equals(source)) {
+            return "HIGH";
+        }
+
+        if (matchScore >= 65 || "PAUSED".equals(source)) {
+            return "MEDIUM";
+        }
+
+        return "LOW";
+    }
+
+    private String resolveFranchiseName(Long franchiseId) {
+        if (franchiseId == null) {
+            return null;
+        }
+
+        return franchiseRepository.findById(franchiseId)
+                .map(this::displayFranchiseName)
+                .orElse(null);
+    }
+
+    private String displayFranchiseName(Franchise franchise) {
+        if (franchise.getNameCn() != null && !franchise.getNameCn().isBlank()) {
+            return franchise.getNameCn();
+        }
+
+        return franchise.getName();
+    }
+
     private boolean matchesCollectionCategory(UserSubjectCollection collection, String category) {
         if (category == null || category.isBlank()) {
             return true;
@@ -504,6 +736,10 @@ public class LlmContextBuilder {
             evidence.add(scope + " 评分结构样本 " + context.get("totalRecords") + " 条");
         } else if ("TAG_PREFERENCE".equals(analysisType)) {
             evidence.add(scope + " 标签偏好样本 " + context.get("totalRecords") + " 条");
+        } else if ("RECOMMENDATION".equals(analysisType)) {
+            evidence.add(scope + " 推荐候选 " + ((List<?>) context.get("recommendations")).size() + " 条");
+        } else if ("COLLECTION_BACKLOG".equals(analysisType)) {
+            evidence.add(scope + " 收藏夹补坑候选 " + ((List<?>) context.get("recommendations")).size() + " 条");
         } else if ("QUARTERLY".equals(analysisType)) {
             evidence.add(year + " 年 " + QUARTER_LABELS.getOrDefault(quarter, "未知月份")
                     + "档期 " + scope + " 正式记录 " + context.get("totalRecords") + " 条");

@@ -8,6 +8,7 @@ export type LlmAnalysisType =
     | 'SCORE_STRUCTURE'
     | 'TAG_PREFERENCE'
     | 'RECOMMENDATION'
+    | 'COLLECTION_BACKLOG'
 
 export type LlmAnalysisScope = {
     year: number | null
@@ -20,12 +21,33 @@ export type LlmAnalysisSection = {
     content: string
 }
 
+export type LlmRecommendationSource = 'WANT' | 'PAUSED' | 'LIBRARY'
+
+export type LlmRecommendationPriority = 'HIGH' | 'MEDIUM' | 'LOW'
+
+export type LlmRecommendationResponse = {
+    subjectId: number
+    title: string
+    coverUrl: string | null
+    category: AcgnCategory
+    tags: string[]
+    franchiseName: string | null
+    source: LlmRecommendationSource
+    reason: string
+    risk: string
+    evidence: string
+    priority: LlmRecommendationPriority
+    matchScore: number
+    platformScore: number | null
+}
+
 export type LlmAnalysisResponse = {
     analysisType: LlmAnalysisType
     title: string
     summary: string
     keywords: string[]
     sections: LlmAnalysisSection[]
+    recommendations: LlmRecommendationResponse[]
     evidence: string[]
     warnings: string[]
     scope: LlmAnalysisScope
@@ -62,6 +84,14 @@ export type TagPreferenceAnalysisParams = {
     category?: AcgnCategory
 }
 
+export type RecommendationAnalysisParams = {
+    category?: AcgnCategory
+}
+
+export type CollectionBacklogAnalysisParams = {
+    category?: AcgnCategory
+}
+
 export function getLlmStatus() {
     return apiGet<LlmStatusResponse>('/llm/status')
 }
@@ -84,4 +114,12 @@ export function getScoreStructureAnalysis(params: ScoreStructureAnalysisParams) 
 
 export function getTagPreferenceAnalysis(params: TagPreferenceAnalysisParams) {
     return apiGet<LlmAnalysisResponse>('/llm/analysis/tag-preference', params)
+}
+
+export function getRecommendationAnalysis(params: RecommendationAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/recommendations', params)
+}
+
+export function getCollectionBacklogAnalysis(params: CollectionBacklogAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/collection-backlog', params)
 }

@@ -74,4 +74,18 @@ public class LlmAnalysisController {
     ) {
         return ApiResponse.success(llmAnalysisService.generateTagPreference(category));
     }
+
+    @GetMapping("/analysis/recommendations")
+    public ApiResponse<LlmAnalysisResponse> generateRecommendations(
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(llmAnalysisService.generateRecommendations(category));
+    }
+
+    @GetMapping("/analysis/collection-backlog")
+    public ApiResponse<LlmAnalysisResponse> generateCollectionBacklog(
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(llmAnalysisService.generateCollectionBacklog(category));
+    }
 }
