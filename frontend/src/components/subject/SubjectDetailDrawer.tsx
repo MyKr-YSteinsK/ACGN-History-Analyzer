@@ -19,7 +19,10 @@ type SubjectDetailDrawerProps = {
     onAddToWant: (subject: SubjectCardView) => void
     onAddToPaused: (subject: SubjectCardView) => void
     onSetToNone: (subject: SubjectCardView) => void
+    onDeleteRecord?: (subject: SubjectCardView) => void
+    onDeleteSubject?: (subject: SubjectCardView) => void
     statusAction?: 'WANT' | 'PAUSED' | 'NONE' | null
+    deleteAction?: 'RECORD' | 'SUBJECT' | null
     detailLoading?: boolean
     showActions?: boolean
     showStatusActions?: boolean
@@ -47,7 +50,10 @@ function SubjectDetailDrawer({
                                  onAddToWant,
                                  onAddToPaused,
                                  onSetToNone,
+                                 onDeleteRecord,
+                                 onDeleteSubject,
                                  statusAction = null,
+                                 deleteAction = null,
                                  detailLoading = false,
                                  showActions = true,
                                  showStatusActions = true,
@@ -81,11 +87,12 @@ function SubjectDetailDrawer({
         : null
     const recordPanelGradient = recordQuarter?.panelGradient ?? neutralPanelGradient
     const wantDisabled =
-        subject.libraryStatus === 'WANT' || statusAction !== null
+        subject.libraryStatus === 'WANT' || statusAction !== null || deleteAction !== null
     const pausedDisabled =
-        subject.libraryStatus === 'PAUSED' || statusAction !== null
+        subject.libraryStatus === 'PAUSED' || statusAction !== null || deleteAction !== null
     const noneDisabled =
-        subject.libraryStatus === 'NONE' || statusAction !== null
+        subject.libraryStatus === 'NONE' || statusAction !== null || deleteAction !== null
+    const actionDisabled = statusAction !== null || deleteAction !== null
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -272,6 +279,38 @@ function SubjectDetailDrawer({
                                                 : '设为未记录'}
                                     </button>
                                 </>
+                            ) : null}
+
+                            {onDeleteRecord && subject.recordId ? (
+                                <button
+                                    type="button"
+                                    disabled={actionDisabled}
+                                    onClick={() => onDeleteRecord(subject)}
+                                    className={[
+                                        'rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
+                                        actionDisabled
+                                            ? 'cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-400'
+                                            : 'border-rose-100 bg-rose-50/85 text-rose-700 hover:-translate-y-0.5 hover:bg-rose-100',
+                                    ].join(' ')}
+                                >
+                                    {deleteAction === 'RECORD' ? '删除中' : '删除记录'}
+                                </button>
+                            ) : null}
+
+                            {onDeleteSubject ? (
+                                <button
+                                    type="button"
+                                    disabled={actionDisabled}
+                                    onClick={() => onDeleteSubject(subject)}
+                                    className={[
+                                        'rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
+                                        actionDisabled
+                                            ? 'cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-400'
+                                            : 'border-red-100 bg-red-50/85 text-red-700 hover:-translate-y-0.5 hover:bg-red-100',
+                                    ].join(' ')}
+                                >
+                                    {deleteAction === 'SUBJECT' ? '删除中' : '删除作品'}
+                                </button>
                             ) : null}
                         </div>
                     ) : null}

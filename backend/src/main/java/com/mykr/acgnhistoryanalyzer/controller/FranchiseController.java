@@ -88,14 +88,30 @@ public class FranchiseController {
             );
         }
 
-        if (franchiseService.isFranchiseReferenced(id)) {
+        franchiseService.deleteFranchise(id);
+        return ApiResponse.success("删除成功");
+    }
+
+    @DeleteMapping("/{franchiseId}/subjects/{subjectId}")
+    public ApiResponse<?> removeSubjectFromFranchise(
+            @PathVariable Long franchiseId,
+            @PathVariable Long subjectId
+    ) {
+        if (!franchiseService.franchiseExists(franchiseId)) {
             return ApiResponse.fail(
-                    BusinessErrors.FRANCHISE_DELETE_FORBIDDEN.getCode(),
-                    BusinessErrors.FRANCHISE_DELETE_FORBIDDEN.getMessage()
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getCode(),
+                    BusinessErrors.FRANCHISE_NOT_FOUND.getMessage()
             );
         }
 
-        franchiseService.deleteFranchise(id);
-        return ApiResponse.success("删除成功");
+        boolean removed = franchiseService.removeSubjectFromFranchise(franchiseId, subjectId);
+        if (!removed) {
+            return ApiResponse.fail(
+                    BusinessErrors.SUBJECT_NOT_FOUND.getCode(),
+                    BusinessErrors.SUBJECT_NOT_FOUND.getMessage()
+            );
+        }
+
+        return ApiResponse.success("移出成功");
     }
 }

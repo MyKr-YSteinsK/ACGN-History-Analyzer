@@ -46,3 +46,7 @@ export function updateFranchise(id: number, payload: FranchiseCreateRequest) {
 export function deleteFranchise(id: number) {
     return apiDelete<string>(`/franchises/${id}`)
 }
+
+export function removeSubjectFromFranchise(franchiseId: number, subjectId: number) {
+    return apiDelete<string>(`/franchises/${franchiseId}/subjects/${subjectId}`)
+}

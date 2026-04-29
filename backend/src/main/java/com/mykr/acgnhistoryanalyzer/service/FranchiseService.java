@@ -14,6 +14,7 @@ import com.mykr.acgnhistoryanalyzer.response.FranchiseResponse;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -105,8 +106,25 @@ public class FranchiseService {
         return !subjectRepository.findByFranchiseId(id).isEmpty();
     }
 
+    @Transactional
     public void deleteFranchise(Long id) {
+        List<Subject> subjects = subjectRepository.findByFranchiseId(id);
+        subjects.forEach(subject -> subject.setFranchiseId(null));
+        subjectRepository.saveAll(subjects);
         franchiseRepository.deleteById(id);
+    }
+
+    @Transactional
+    public boolean removeSubjectFromFranchise(Long franchiseId, Long subjectId) {
+        Subject subject = subjectRepository.findById(subjectId).orElse(null);
+
+        if (subject == null || !franchiseId.equals(subject.getFranchiseId())) {
+            return false;
+        }
+
+        subject.setFranchiseId(null);
+        subjectRepository.save(subject);
+        return true;
     }
 
     public boolean franchiseNameExistsForCreate(FranchiseCreateRequest request) {

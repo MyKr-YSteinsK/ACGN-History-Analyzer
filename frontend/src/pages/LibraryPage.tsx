@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { addToPaused, addToWant, deleteCollection } from '../api/collectionApi'
 import { createRecord, deleteRecord, updateRecord } from '../api/recordApi'
 import { getApiErrorMessage } from '../api/request'
-import { getSubjectById, getSubjectPage } from '../api/subjectApi'
+import { deleteSubject, getSubjectById, getSubjectPage } from '../api/subjectApi'
 import { getTags, type TagResponse } from '../api/tagApi'
 import CategorySelector from '../components/common/CategorySelector'
 import ConfirmDialog from '../components/common/ConfirmDialog'
@@ -148,6 +148,9 @@ function LibraryPage() {
     const [statusAction, setStatusAction] = useState<StatusTarget | null>(null)
     const [pendingStatusChange, setPendingStatusChange] =
         useState<PendingStatusChange | null>(null)
+    const [pendingSubjectDelete, setPendingSubjectDelete] =
+        useState<SubjectCardView | null>(null)
+    const [subjectDeleting, setSubjectDeleting] = useState(false)
 
     const selectedQuarterGradient =
         selectedQuarter === 'ALL'
@@ -464,6 +467,48 @@ function LibraryPage() {
         setPendingStatusChange(null)
     }
 
+    function requestSubjectDelete(subject: SubjectCardView) {
+        setPendingSubjectDelete(subject)
+    }
+
+    function closeSubjectDeleteDialog() {
+        if (subjectDeleting) {
+            return
+        }
+
+        setPendingSubjectDelete(null)
+    }
+
+    async function confirmSubjectDelete() {
+        if (!pendingSubjectDelete) {
+            return
+        }
+
+        const subjectToDelete = pendingSubjectDelete
+        setSubjectDeleting(true)
+        setFeedbackMessage(null)
+
+        try {
+            await deleteSubject(subjectToDelete.id)
+            setSubjects((current) =>
+                current.filter((subject) => subject.id !== subjectToDelete.id),
+            )
+            setSelectedSubject((current) =>
+                current?.id === subjectToDelete.id ? null : current,
+            )
+            setAddRecordSubject((current) =>
+                current?.id === subjectToDelete.id ? null : current,
+            )
+            setPendingSubjectDelete(null)
+            setFeedbackMessage(`已删除作品《${subjectToDelete.displayTitle}》`)
+            await loadSubjects()
+        } catch (error) {
+            setFeedbackMessage(getApiErrorMessage(error))
+        } finally {
+            setSubjectDeleting(false)
+        }
+    }
+
     const confirmCopy = useMemo(() => {
         if (!pendingStatusChange) {
             return null
@@ -696,7 +741,9 @@ function LibraryPage() {
                 onAddToWant={handleAddToWant}
                 onAddToPaused={handleAddToPaused}
                 onSetToNone={handleSetToNone}
+                onDeleteSubject={requestSubjectDelete}
                 statusAction={statusAction}
+                deleteAction={subjectDeleting ? 'SUBJECT' : null}
                 detailLoading={detailLoading}
             />
 
@@ -720,6 +767,21 @@ function LibraryPage() {
                     onConfirm={() => void confirmStatusChange()}
                 />
             ) : null}
+
+            <ConfirmDialog
+                open={pendingSubjectDelete !== null}
+                title="删除作品？"
+                description={
+                    pendingSubjectDelete
+                        ? `这会从作品库删除《${pendingSubjectDelete.displayTitle}》。如果它已有正式记录或收藏，后端会拒绝删除，请先删除对应记录或收藏。`
+                        : ''
+                }
+                confirmText="删除作品"
+                loading={subjectDeleting}
+                tone="danger"
+                onCancel={closeSubjectDeleteDialog}
+                onConfirm={() => void confirmSubjectDelete()}
+            />
         </>
     )
 }

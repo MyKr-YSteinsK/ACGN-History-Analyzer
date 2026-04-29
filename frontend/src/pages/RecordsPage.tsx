@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+    deleteRecord,
     getRecords,
     updateRecord,
     type RecordPageSort,
     type UserSubjectRecordResponse,
 } from '../api/recordApi'
+import ConfirmDialog from '../components/common/ConfirmDialog'
 import { getSubjectById } from '../api/subjectApi'
 import CoverImage from '../components/common/CoverImage'
 import GlassCard from '../components/common/GlassCard'
@@ -128,6 +130,9 @@ function RecordsPage() {
     const [addRecordSubject, setAddRecordSubject] = useState<SubjectCardView | null>(null)
     const [detailLoading, setDetailLoading] = useState(false)
     const [recordSubmitting, setRecordSubmitting] = useState(false)
+    const [pendingRecordDelete, setPendingRecordDelete] =
+        useState<SubjectCardView | null>(null)
+    const [recordDeleting, setRecordDeleting] = useState(false)
 
     const loadRecords = useCallback(async () => {
         setLoading(true)
@@ -268,6 +273,53 @@ function RecordsPage() {
             setFeedbackMessage(getErrorMessage(error))
         } finally {
             setRecordSubmitting(false)
+        }
+    }
+
+    function requestRecordDelete(subject: SubjectCardView) {
+        if (!subject.recordId) {
+            setFeedbackMessage('未找到可删除的正式记录，请重新打开详情后再试。')
+            return
+        }
+
+        setPendingRecordDelete(subject)
+    }
+
+    function closeRecordDeleteDialog() {
+        if (recordDeleting) {
+            return
+        }
+
+        setPendingRecordDelete(null)
+    }
+
+    async function confirmRecordDelete() {
+        if (!pendingRecordDelete?.recordId) {
+            return
+        }
+
+        const subjectToDelete = pendingRecordDelete
+        const recordId = pendingRecordDelete.recordId
+        setRecordDeleting(true)
+        setFeedbackMessage(null)
+
+        try {
+            await deleteRecord(recordId)
+            setRecords((current) =>
+                current.filter((record) => record.id !== recordId),
+            )
+            setSelectedSubject((current) =>
+                current?.id === subjectToDelete.id ? null : current,
+            )
+            setAddRecordSubject((current) =>
+                current?.id === subjectToDelete.id ? null : current,
+            )
+            setPendingRecordDelete(null)
+            setFeedbackMessage(`已删除《${subjectToDelete.displayTitle}》的正式记录`)
+        } catch (error) {
+            setFeedbackMessage(getErrorMessage(error))
+        } finally {
+            setRecordDeleting(false)
         }
     }
 
@@ -444,6 +496,8 @@ function RecordsPage() {
                 onAddToWant={() => undefined}
                 onAddToPaused={() => undefined}
                 onSetToNone={() => undefined}
+                onDeleteRecord={requestRecordDelete}
+                deleteAction={recordDeleting ? 'RECORD' : null}
                 detailLoading={detailLoading}
                 showActions
                 showStatusActions={false}
@@ -455,6 +509,21 @@ function RecordsPage() {
                 onClose={() => setAddRecordSubject(null)}
                 onSubmit={handleSubmitRecord}
                 submitting={recordSubmitting}
+            />
+
+            <ConfirmDialog
+                open={pendingRecordDelete !== null}
+                title="删除正式记录？"
+                description={
+                    pendingRecordDelete
+                        ? `这会删除《${pendingRecordDelete.displayTitle}》的个人评分和备注，作品本体仍会保留在作品库。`
+                        : ''
+                }
+                confirmText="删除记录"
+                loading={recordDeleting}
+                tone="danger"
+                onCancel={closeRecordDeleteDialog}
+                onConfirm={() => void confirmRecordDelete()}
             />
         </>
     )
