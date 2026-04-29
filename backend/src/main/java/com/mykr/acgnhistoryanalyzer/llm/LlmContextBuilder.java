@@ -268,6 +268,72 @@ public class LlmContextBuilder {
         return context;
     }
 
+    public Map<String, Object> buildTasteProfileContext(String category) {
+        List<UserSubjectRecordResponse> records = filterByCategory(
+                userSubjectRecordService.getRecords(null, null, null, null),
+                category
+        );
+        Map<String, List<Map<String, Object>>> tagPreferenceGroups = buildTagPreferenceGroups(records);
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "TASTE_PROFILE");
+        context.put("category", category);
+        context.put("comparisonLabel", "长期个人口味画像");
+        context.put("totalRecords", records.size());
+        context.put("previousYearTotalRecords", records.size());
+        context.put("yearOverYearDiff", records.size());
+        context.put("averageScore", averageScore(records));
+        context.put("highScoreCount", countScoreAtLeast(records, 45));
+        context.put("lowScoreCount", countScoreBelow(records, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(records));
+        context.put("quarterDistribution", buildQuarterDistribution(records));
+        context.put("scoreBands", buildScoreBands(records));
+        context.put("categoryScoreStats", buildCategoryScoreStats(records));
+        context.put("yearScoreTrend", buildYearScoreTrend(records));
+        context.put("topRecords", buildRecordHighlights(records, true));
+        context.put("lowScoreRecords", buildRecordHighlights(records, false));
+        context.put("topTags", buildTagStats(records));
+        context.put("tagPreferenceGroups", tagPreferenceGroups);
+        context.put("profileSignals", buildTasteProfileSignals(records, tagPreferenceGroups));
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
+    public Map<String, Object> buildPreferenceContradictionContext(String category) {
+        List<UserSubjectRecordResponse> records = filterByCategory(
+                userSubjectRecordService.getRecords(null, null, null, null),
+                category
+        );
+        Map<String, List<Map<String, Object>>> tagPreferenceGroups = buildTagPreferenceGroups(records);
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "PREFERENCE_CONTRADICTION");
+        context.put("category", category);
+        context.put("comparisonLabel", "偏好矛盾样本");
+        context.put("totalRecords", records.size());
+        context.put("previousYearTotalRecords", records.size());
+        context.put("yearOverYearDiff", records.size());
+        context.put("averageScore", averageScore(records));
+        context.put("highScoreCount", countScoreAtLeast(records, 45));
+        context.put("lowScoreCount", countScoreBelow(records, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(records));
+        context.put("quarterDistribution", buildQuarterDistribution(records));
+        context.put("scoreBands", buildScoreBands(records));
+        context.put("categoryScoreStats", buildCategoryScoreStats(records));
+        context.put("yearScoreTrend", buildYearScoreTrend(records));
+        context.put("topRecords", buildRecordHighlights(records, true));
+        context.put("lowScoreRecords", buildRecordHighlights(records, false));
+        context.put("topTags", buildTagStats(records));
+        context.put("tagPreferenceGroups", tagPreferenceGroups);
+        context.put("profileSignals", buildTasteProfileSignals(records, tagPreferenceGroups));
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
     private List<UserSubjectRecordResponse> filterByCategory(
             List<UserSubjectRecordResponse> records,
             String category
@@ -488,6 +554,34 @@ public class LlmContextBuilder {
         groups.put("lowFrequencyHighScore", filterTagBuckets(bucketMap, highFrequencyThreshold, false, true));
         groups.put("lowFrequencyLowScore", filterTagBuckets(bucketMap, highFrequencyThreshold, false, false));
         return groups;
+    }
+
+    private Map<String, Object> buildTasteProfileSignals(
+            List<UserSubjectRecordResponse> records,
+            Map<String, List<Map<String, Object>>> tagPreferenceGroups
+    ) {
+        Map<String, Long> categoryDistribution = buildCategoryDistribution(records);
+        String dominantCategory = categoryDistribution.entrySet()
+                .stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(null);
+        String favoriteCategory = buildCategoryScoreStats(records).stream()
+                .filter(item -> ((Integer) item.get("count")) > 0)
+                .max(Comparator.comparing(item -> (BigDecimal) item.get("averageScore")))
+                .map(item -> String.valueOf(item.get("category")))
+                .orElse(null);
+
+        Map<String, Object> signals = new LinkedHashMap<>();
+        signals.put("dominantCategory", dominantCategory);
+        signals.put("favoriteCategory", favoriteCategory);
+        signals.put("stableTags", tagPreferenceGroups.getOrDefault("highFrequencyHighScore", List.of()));
+        signals.put("explorationTags", tagPreferenceGroups.getOrDefault("lowFrequencyHighScore", List.of()));
+        signals.put("riskTags", tagPreferenceGroups.getOrDefault("highFrequencyLowScore", List.of()));
+        signals.put("uncertainTags", tagPreferenceGroups.getOrDefault("lowFrequencyLowScore", List.of()));
+        signals.put("highScoreRecords", buildRecordHighlights(records, true));
+        signals.put("lowScoreRecords", buildRecordHighlights(records, false));
+        return signals;
     }
 
     private List<Map<String, Object>> filterTagBuckets(
@@ -740,6 +834,10 @@ public class LlmContextBuilder {
             evidence.add(scope + " 推荐候选 " + ((List<?>) context.get("recommendations")).size() + " 条");
         } else if ("COLLECTION_BACKLOG".equals(analysisType)) {
             evidence.add(scope + " 收藏夹补坑候选 " + ((List<?>) context.get("recommendations")).size() + " 条");
+        } else if ("TASTE_PROFILE".equals(analysisType)) {
+            evidence.add(scope + " 口味画像样本 " + context.get("totalRecords") + " 条");
+        } else if ("PREFERENCE_CONTRADICTION".equals(analysisType)) {
+            evidence.add(scope + " 偏好矛盾样本 " + context.get("totalRecords") + " 条");
         } else if ("QUARTERLY".equals(analysisType)) {
             evidence.add(year + " 年 " + QUARTER_LABELS.getOrDefault(quarter, "未知月份")
                     + "档期 " + scope + " 正式记录 " + context.get("totalRecords") + " 条");

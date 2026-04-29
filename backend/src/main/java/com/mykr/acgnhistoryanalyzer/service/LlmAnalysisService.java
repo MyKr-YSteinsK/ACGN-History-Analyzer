@@ -128,6 +128,30 @@ public class LlmAnalysisService {
         ));
     }
 
+    public LlmAnalysisResponse generateTasteProfile(String category) {
+        String normalizedCategory = normalizeBlankToNull(category);
+        String prompt = llmPromptService.buildTasteProfilePrompt(normalizedCategory);
+        Map<String, Object> context = llmContextBuilder.buildTasteProfileContext(normalizedCategory);
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "TASTE_PROFILE",
+                prompt,
+                context
+        ));
+    }
+
+    public LlmAnalysisResponse generatePreferenceContradictions(String category) {
+        String normalizedCategory = normalizeBlankToNull(category);
+        String prompt = llmPromptService.buildPreferenceContradictionPrompt(normalizedCategory);
+        Map<String, Object> context = llmContextBuilder.buildPreferenceContradictionContext(normalizedCategory);
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "PREFERENCE_CONTRADICTION",
+                prompt,
+                context
+        ));
+    }
+
     private String normalizeBlankToNull(String value) {
         if (value == null || value.isBlank()) {
             return null;

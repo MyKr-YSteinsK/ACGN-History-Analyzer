@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
     getCollectionBacklogAnalysis,
     getLlmStatus,
+    getPreferenceContradictionAnalysis,
     getQuarterlyAnalysis,
     getRecommendationAnalysis,
     getScoreStructureAnalysis,
     getTagPreferenceAnalysis,
+    getTasteProfileAnalysis,
     getTypePreferenceAnalysis,
     getYearlyAnalysis,
     type LlmAnalysisResponse,
@@ -32,6 +34,8 @@ type AnalysisMode =
     | 'TAG_PREFERENCE'
     | 'RECOMMENDATION'
     | 'COLLECTION_BACKLOG'
+    | 'TASTE_PROFILE'
+    | 'PREFERENCE_CONTRADICTION'
 
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
 const quarterOptions: ReleaseQuarter[] = [1, 2, 3, 4]
@@ -76,6 +80,16 @@ const analysisModes: Array<{
         label: '补坑建议',
         description: '优先整理想看和搁置作品',
     },
+    {
+        value: 'TASTE_PROFILE',
+        label: '口味画像',
+        description: '把长期记录整理成个人 ACGN 偏好画像',
+    },
+    {
+        value: 'PREFERENCE_CONTRADICTION',
+        label: '偏好矛盾',
+        description: '发现看得多但不稳、低频但高命中的方向',
+    },
 ]
 
 function AnalysisPage() {
@@ -118,6 +132,14 @@ function AnalysisPage() {
 
         if (analysisMode === 'COLLECTION_BACKLOG') {
             return `${categoryName} · 收藏夹补坑`
+        }
+
+        if (analysisMode === 'TASTE_PROFILE') {
+            return `${categoryName} · 口味画像`
+        }
+
+        if (analysisMode === 'PREFERENCE_CONTRADICTION') {
+            return `${categoryName} · 偏好矛盾`
         }
 
         if (analysisMode === 'QUARTERLY') {
@@ -182,6 +204,14 @@ function AnalysisPage() {
                               ? await getCollectionBacklogAnalysis({
                                     category,
                                 })
+                              : analysisMode === 'TASTE_PROFILE'
+                                ? await getTasteProfileAnalysis({
+                                      category,
+                                  })
+                                : analysisMode === 'PREFERENCE_CONTRADICTION'
+                                  ? await getPreferenceContradictionAnalysis({
+                                        category,
+                                    })
                               : await getYearlyAnalysis({
                                     year: selectedYear,
                                     category,
@@ -242,7 +272,7 @@ function AnalysisPage() {
                         </div>
                     </div>
 
-                    <div className="mt-6 grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+                    <div className="mt-6 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
                         {analysisModes.map((mode) => {
                             const selected = analysisMode === mode.value
 

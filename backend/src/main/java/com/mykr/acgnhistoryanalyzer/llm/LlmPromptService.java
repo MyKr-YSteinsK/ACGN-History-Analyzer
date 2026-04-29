@@ -64,6 +64,22 @@ public class LlmPromptService {
         return buildBasePrompt(scope);
     }
 
+    public String buildTasteProfilePrompt(String category) {
+        String scope = category == null || category.isBlank()
+                ? "个人 ACGN 口味画像"
+                : category + " 个人口味画像";
+
+        return buildBasePrompt(scope);
+    }
+
+    public String buildPreferenceContradictionPrompt(String category) {
+        String scope = category == null || category.isBlank()
+                ? "个人 ACGN 偏好矛盾分析"
+                : category + " 偏好矛盾分析";
+
+        return buildBasePrompt(scope);
+    }
+
     private String buildBasePrompt(String scope) {
         return """
                 你是一个个人 ACGN 历史数据分析助手。

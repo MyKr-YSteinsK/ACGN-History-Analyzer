@@ -88,4 +88,18 @@ public class LlmAnalysisController {
     ) {
         return ApiResponse.success(llmAnalysisService.generateCollectionBacklog(category));
     }
+
+    @GetMapping("/analysis/taste-profile")
+    public ApiResponse<LlmAnalysisResponse> generateTasteProfile(
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(llmAnalysisService.generateTasteProfile(category));
+    }
+
+    @GetMapping("/analysis/preference-contradictions")
+    public ApiResponse<LlmAnalysisResponse> generatePreferenceContradictions(
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(llmAnalysisService.generatePreferenceContradictions(category));
+    }
 }

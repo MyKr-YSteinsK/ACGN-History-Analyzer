@@ -72,6 +72,14 @@ public class MockLlmClient implements LlmClient {
             return displayCategory + " 收藏夹补坑建议";
         }
 
+        if ("TASTE_PROFILE".equals(analysisType)) {
+            return displayCategory + " 个人口味画像";
+        }
+
+        if ("PREFERENCE_CONTRADICTION".equals(analysisType)) {
+            return displayCategory + " 偏好矛盾分析";
+        }
+
         if ("QUARTERLY".equals(analysisType)) {
             return year + " 年 " + quarterLabel(quarter) + "档期 " + displayCategory + " 智能总结";
         }
@@ -118,6 +126,14 @@ public class MockLlmClient implements LlmClient {
             return scope + " 只聚焦想看和搁置清单，目标不是随机推荐新作品，而是帮你判断哪些收藏更适合优先补完。";
         }
 
+        if ("TASTE_PROFILE".equals(analysisType)) {
+            return scope + " 会把类型分布、评分结构、标签命中和高低分样本合在一起，生成一份克制版个人口味画像。";
+        }
+
+        if ("PREFERENCE_CONTRADICTION".equals(analysisType)) {
+            return scope + " 会重点寻找“看得多但不一定喜欢”和“看得少但命中很高”的方向，用来解释偏好边界。";
+        }
+
         return scope + " 共整理到 " + totalRecords
                 + " 条正式记录，个人均分约 " + averageScore
                 + " / 50，其中 45 分以上高分记录 " + highScoreCount
@@ -134,6 +150,8 @@ public class MockLlmClient implements LlmClient {
             case "TAG_PREFERENCE" -> "标签偏好";
             case "RECOMMENDATION" -> "智能推荐";
             case "COLLECTION_BACKLOG" -> "补坑建议";
+            case "TASTE_PROFILE" -> "口味画像";
+            case "PREFERENCE_CONTRADICTION" -> "偏好矛盾";
             default -> "年度总结";
         });
 
@@ -242,6 +260,54 @@ public class MockLlmClient implements LlmClient {
                     new LlmAnalysisSectionResponse(
                             "使用建议",
                             "想看清单里命中高分标签的作品优先级最高；搁置作品则更适合在状态合适时恢复，而不是被推荐分数硬推着看。"
+                    )
+            );
+        }
+
+        if ("TASTE_PROFILE".equals(readStringValue(context, "analysisType", ""))) {
+            return List.of(
+                    new LlmAnalysisSectionResponse(
+                            "画像概览",
+                            buildTasteProfileOverviewContent(
+                                    context,
+                                    totalRecords,
+                                    averageScore,
+                                    highScoreCount,
+                                    lowScoreCount
+                            )
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "稳定偏好",
+                            buildStablePreferenceContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "探索倾向",
+                            buildExplorationPreferenceContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "边界与风险",
+                            buildPreferenceBoundaryContent(context)
+                    )
+            );
+        }
+
+        if ("PREFERENCE_CONTRADICTION".equals(readStringValue(context, "analysisType", ""))) {
+            return List.of(
+                    new LlmAnalysisSectionResponse(
+                            "矛盾概览",
+                            buildContradictionOverviewContent(context, totalRecords, averageScore)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "看得多但不稳",
+                            buildDenseLowScoreContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "低频高命中",
+                            buildSparseHighScoreContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "解释建议",
+                            "这类分析适合辅助推荐和自我理解，不适合直接当成绝对结论。样本少的标签要保守看待，样本多但均分偏低的标签则更适合作为风险提醒。"
                     )
             );
         }
@@ -398,6 +464,83 @@ public class MockLlmClient implements LlmClient {
                 + "。低频低分：" + formatTagGroup(groups.get("lowFrequencyLowScore")) + "。";
     }
 
+    private String buildTasteProfileOverviewContent(
+            Map<String, Object> context,
+            Integer totalRecords,
+            String averageScore,
+            Integer highScoreCount,
+            Integer lowScoreCount
+    ) {
+        Map<String, Long> categoryDistribution = readLongMap(context, "categoryDistribution");
+        String dominantCategory = topDistributionItem(categoryDistribution);
+
+        if (totalRecords == null || totalRecords == 0) {
+            return "当前还没有足够正式记录生成口味画像。系统会保留入口，等记录和标签增加后再形成更稳定的判断。";
+        }
+
+        return "当前样本共 " + totalRecords + " 条，个人均分 " + averageScore
+                + " / 50，高分样本 " + highScoreCount + " 条，低分样本 " + lowScoreCount
+                + " 条。数量最集中的媒介是 " + dominantCategory
+                + "。这份画像优先解释你的长期稳定偏好，而不是给某一部作品下结论。";
+    }
+
+    private String buildStablePreferenceContent(Map<String, Object> context) {
+        Map<String, List<Map<String, Object>>> groups = readTagPreferenceGroups(context);
+        String stableTags = formatTagGroup(groups.get("highFrequencyHighScore"));
+        String topRecords = formatRecordList(readMapList(context, "topRecords"));
+
+        return "稳定偏好主要看“出现次数较多且均分较高”的标签。目前可用标签为：" + stableTags
+                + "。高分样本包括：" + topRecords
+                + "。这类方向后续适合作为推荐系统的强偏好依据。";
+    }
+
+    private String buildExplorationPreferenceContent(Map<String, Object> context) {
+        Map<String, List<Map<String, Object>>> groups = readTagPreferenceGroups(context);
+        String explorationTags = formatTagGroup(groups.get("lowFrequencyHighScore"));
+
+        return "探索倾向主要看“出现次数不多但均分较高”的标签。目前可用标签为：" + explorationTags
+                + "。它们不一定代表长期主口味，但很适合作为后续推荐里的惊喜方向。";
+    }
+
+    private String buildPreferenceBoundaryContent(Map<String, Object> context) {
+        Map<String, List<Map<String, Object>>> groups = readTagPreferenceGroups(context);
+        String riskTags = formatTagGroup(groups.get("highFrequencyLowScore"));
+        String lowRecords = formatRecordList(readMapList(context, "lowScoreRecords"));
+
+        return "偏好边界主要看“出现频率不低但均分偏低”的标签。目前风险标签为：" + riskTags
+                + "。低分样本包括：" + lowRecords
+                + "。这些方向不是绝对不能看，而是推荐时需要更多理由支撑。";
+    }
+
+    private String buildContradictionOverviewContent(
+            Map<String, Object> context,
+            Integer totalRecords,
+            String averageScore
+    ) {
+        if (totalRecords == null || totalRecords == 0) {
+            return "当前没有足够样本生成偏好矛盾分析。这个模块需要同时依赖标签数量、个人评分和高低分样本。";
+        }
+
+        return "当前从 " + totalRecords + " 条正式记录中寻找偏好矛盾，整体均分为 "
+                + averageScore + " / 50。重点不是判断某个标签好坏，而是区分“经常接触”和“真正容易高分命中”。";
+    }
+
+    private String buildDenseLowScoreContent(Map<String, Object> context) {
+        Map<String, List<Map<String, Object>>> groups = readTagPreferenceGroups(context);
+        String denseLowTags = formatTagGroup(groups.get("highFrequencyLowScore"));
+
+        return "看得多但不稳定的方向为：" + denseLowTags
+                + "。如果这里出现明确标签，说明它们可能是高频尝试题材，但未必是稳定高分来源。";
+    }
+
+    private String buildSparseHighScoreContent(Map<String, Object> context) {
+        Map<String, List<Map<String, Object>>> groups = readTagPreferenceGroups(context);
+        String sparseHighTags = formatTagGroup(groups.get("lowFrequencyHighScore"));
+
+        return "低频但高命中的方向为：" + sparseHighTags
+                + "。这些标签适合在推荐中少量提高权重，但因为样本较少，仍需要保留不确定性。";
+    }
+
     private String buildRecommendationSummaryContent(Map<String, Object> context) {
         List<LlmRecommendationResponse> recommendations = buildRecommendations(context);
         if (recommendations.isEmpty()) {
@@ -443,6 +586,14 @@ public class MockLlmClient implements LlmClient {
 
         if ("COLLECTION_BACKLOG".equals(analysisType)) {
             return displayCategory + " 收藏夹补坑范围";
+        }
+
+        if ("TASTE_PROFILE".equals(analysisType)) {
+            return displayCategory + " 口味画像范围";
+        }
+
+        if ("PREFERENCE_CONTRADICTION".equals(analysisType)) {
+            return displayCategory + " 偏好矛盾范围";
         }
 
         if ("QUARTERLY".equals(analysisType)) {
@@ -591,6 +742,18 @@ public class MockLlmClient implements LlmClient {
         return map.entrySet().stream()
                 .map(entry -> entry.getKey() + " " + entry.getValue() + " 条")
                 .collect(java.util.stream.Collectors.joining("、"));
+    }
+
+    private String topDistributionItem(Map<String, Long> map) {
+        if (map.isEmpty()) {
+            return "暂无数据";
+        }
+
+        return map.entrySet()
+                .stream()
+                .max(Map.Entry.comparingByValue())
+                .map(entry -> entry.getKey() + "（" + entry.getValue() + " 条）")
+                .orElse("暂无数据");
     }
 
     private String formatDiff(Integer diff) {

@@ -9,6 +9,8 @@ export type LlmAnalysisType =
     | 'TAG_PREFERENCE'
     | 'RECOMMENDATION'
     | 'COLLECTION_BACKLOG'
+    | 'TASTE_PROFILE'
+    | 'PREFERENCE_CONTRADICTION'
 
 export type LlmAnalysisScope = {
     year: number | null
@@ -92,6 +94,14 @@ export type CollectionBacklogAnalysisParams = {
     category?: AcgnCategory
 }
 
+export type TasteProfileAnalysisParams = {
+    category?: AcgnCategory
+}
+
+export type PreferenceContradictionAnalysisParams = {
+    category?: AcgnCategory
+}
+
 export function getLlmStatus() {
     return apiGet<LlmStatusResponse>('/llm/status')
 }
@@ -122,4 +132,12 @@ export function getRecommendationAnalysis(params: RecommendationAnalysisParams) 
 
 export function getCollectionBacklogAnalysis(params: CollectionBacklogAnalysisParams) {
     return apiGet<LlmAnalysisResponse>('/llm/analysis/collection-backlog', params)
+}
+
+export function getTasteProfileAnalysis(params: TasteProfileAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/taste-profile', params)
+}
+
+export function getPreferenceContradictionAnalysis(params: PreferenceContradictionAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/preference-contradictions', params)
 }
