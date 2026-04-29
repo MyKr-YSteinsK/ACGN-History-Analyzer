@@ -334,6 +334,53 @@ public class LlmContextBuilder {
         return context;
     }
 
+    public Map<String, Object> buildComprehensiveReportContext(Integer year, String category) {
+        List<UserSubjectRecordResponse> allRecords = filterByCategory(
+                userSubjectRecordService.getRecords(null, null, null, null),
+                category
+        );
+        List<UserSubjectRecordResponse> yearRecords = filterByCategory(
+                userSubjectRecordService.getRecords(year, null, null, null),
+                category
+        );
+        List<UserSubjectRecordResponse> previousYearRecords = filterByCategory(
+                userSubjectRecordService.getRecords(year - 1, null, null, null),
+                category
+        );
+        List<UserSubjectRecordResponse> reportRecords = yearRecords.isEmpty() ? allRecords : yearRecords;
+        Map<String, List<Map<String, Object>>> tagPreferenceGroups = buildTagPreferenceGroups(allRecords);
+        List<Map<String, Object>> recommendations = buildRecommendationItems(category, false);
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "COMPREHENSIVE_REPORT");
+        context.put("year", year);
+        context.put("category", category);
+        context.put("comparisonLabel", "上一年和长期画像");
+        context.put("totalRecords", yearRecords.size());
+        context.put("longTermTotalRecords", allRecords.size());
+        context.put("previousYearTotalRecords", previousYearRecords.size());
+        context.put("yearOverYearDiff", yearRecords.size() - previousYearRecords.size());
+        context.put("averageScore", averageScore(reportRecords));
+        context.put("longTermAverageScore", averageScore(allRecords));
+        context.put("highScoreCount", countScoreAtLeast(reportRecords, 45));
+        context.put("lowScoreCount", countScoreBelow(reportRecords, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(reportRecords));
+        context.put("quarterDistribution", buildQuarterDistribution(reportRecords));
+        context.put("scoreBands", buildScoreBands(allRecords));
+        context.put("categoryScoreStats", buildCategoryScoreStats(allRecords));
+        context.put("yearScoreTrend", buildYearScoreTrend(allRecords));
+        context.put("topRecords", buildRecordHighlights(reportRecords, true));
+        context.put("lowScoreRecords", buildRecordHighlights(reportRecords, false));
+        context.put("topTags", buildTagStats(allRecords));
+        context.put("tagPreferenceGroups", tagPreferenceGroups);
+        context.put("profileSignals", buildTasteProfileSignals(allRecords, tagPreferenceGroups));
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("recommendations", recommendations);
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
     private List<UserSubjectRecordResponse> filterByCategory(
             List<UserSubjectRecordResponse> records,
             String category
@@ -838,6 +885,10 @@ public class LlmContextBuilder {
             evidence.add(scope + " 口味画像样本 " + context.get("totalRecords") + " 条");
         } else if ("PREFERENCE_CONTRADICTION".equals(analysisType)) {
             evidence.add(scope + " 偏好矛盾样本 " + context.get("totalRecords") + " 条");
+        } else if ("COMPREHENSIVE_REPORT".equals(analysisType)) {
+            evidence.add(year + " 年 " + scope + " 年度正式记录 " + context.get("totalRecords") + " 条");
+            evidence.add(scope + " 长期画像样本 " + context.get("longTermTotalRecords") + " 条");
+            evidence.add(scope + " 综合推荐候选 " + ((List<?>) context.get("recommendations")).size() + " 条");
         } else if ("QUARTERLY".equals(analysisType)) {
             evidence.add(year + " 年 " + QUARTER_LABELS.getOrDefault(quarter, "未知月份")
                     + "档期 " + scope + " 正式记录 " + context.get("totalRecords") + " 条");

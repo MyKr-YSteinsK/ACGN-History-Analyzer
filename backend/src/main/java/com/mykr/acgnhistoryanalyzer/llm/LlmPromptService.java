@@ -80,6 +80,14 @@ public class LlmPromptService {
         return buildBasePrompt(scope);
     }
 
+    public String buildComprehensiveReportPrompt(Integer year, String category) {
+        String scope = category == null || category.isBlank()
+                ? year + " 年个人 ACGN 一键智能分析报告"
+                : year + " 年 " + category + " 一键智能分析报告";
+
+        return buildBasePrompt(scope);
+    }
+
     private String buildBasePrompt(String scope) {
         return """
                 你是一个个人 ACGN 历史数据分析助手。

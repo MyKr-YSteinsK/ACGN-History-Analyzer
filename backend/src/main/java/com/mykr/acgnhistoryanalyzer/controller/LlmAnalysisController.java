@@ -102,4 +102,12 @@ public class LlmAnalysisController {
     ) {
         return ApiResponse.success(llmAnalysisService.generatePreferenceContradictions(category));
     }
+
+    @GetMapping("/analysis/comprehensive-report")
+    public ApiResponse<LlmAnalysisResponse> generateComprehensiveReport(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(llmAnalysisService.generateComprehensiveReport(year, category));
+    }
 }

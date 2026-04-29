@@ -11,6 +11,7 @@ export type LlmAnalysisType =
     | 'COLLECTION_BACKLOG'
     | 'TASTE_PROFILE'
     | 'PREFERENCE_CONTRADICTION'
+    | 'COMPREHENSIVE_REPORT'
 
 export type LlmAnalysisScope = {
     year: number | null
@@ -102,6 +103,11 @@ export type PreferenceContradictionAnalysisParams = {
     category?: AcgnCategory
 }
 
+export type ComprehensiveReportAnalysisParams = {
+    year?: number
+    category?: AcgnCategory
+}
+
 export function getLlmStatus() {
     return apiGet<LlmStatusResponse>('/llm/status')
 }
@@ -140,4 +146,8 @@ export function getTasteProfileAnalysis(params: TasteProfileAnalysisParams) {
 
 export function getPreferenceContradictionAnalysis(params: PreferenceContradictionAnalysisParams) {
     return apiGet<LlmAnalysisResponse>('/llm/analysis/preference-contradictions', params)
+}
+
+export function getComprehensiveReportAnalysis(params: ComprehensiveReportAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/comprehensive-report', params)
 }

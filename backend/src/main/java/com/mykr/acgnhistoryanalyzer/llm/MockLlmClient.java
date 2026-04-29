@@ -80,6 +80,10 @@ public class MockLlmClient implements LlmClient {
             return displayCategory + " 偏好矛盾分析";
         }
 
+        if ("COMPREHENSIVE_REPORT".equals(analysisType)) {
+            return year + " 年 " + displayCategory + " 一键智能分析报告";
+        }
+
         if ("QUARTERLY".equals(analysisType)) {
             return year + " 年 " + quarterLabel(quarter) + "档期 " + displayCategory + " 智能总结";
         }
@@ -134,6 +138,11 @@ public class MockLlmClient implements LlmClient {
             return scope + " 会重点寻找“看得多但不一定喜欢”和“看得少但命中很高”的方向，用来解释偏好边界。";
         }
 
+        if ("COMPREHENSIVE_REPORT".equals(analysisType)) {
+            return scope + " 会整合年度统计、长期评分结构、标签偏好、口味画像、偏好矛盾和推荐候选。"
+                    + "本次年度样本 " + totalRecords + " 条，并会同时参考长期正式记录。";
+        }
+
         return scope + " 共整理到 " + totalRecords
                 + " 条正式记录，个人均分约 " + averageScore
                 + " / 50，其中 45 分以上高分记录 " + highScoreCount
@@ -152,6 +161,7 @@ public class MockLlmClient implements LlmClient {
             case "COLLECTION_BACKLOG" -> "补坑建议";
             case "TASTE_PROFILE" -> "口味画像";
             case "PREFERENCE_CONTRADICTION" -> "偏好矛盾";
+            case "COMPREHENSIVE_REPORT" -> "一键报告";
             default -> "年度总结";
         });
 
@@ -308,6 +318,38 @@ public class MockLlmClient implements LlmClient {
                     new LlmAnalysisSectionResponse(
                             "解释建议",
                             "这类分析适合辅助推荐和自我理解，不适合直接当成绝对结论。样本少的标签要保守看待，样本多但均分偏低的标签则更适合作为风险提醒。"
+                    )
+            );
+        }
+
+        if ("COMPREHENSIVE_REPORT".equals(readStringValue(context, "analysisType", ""))) {
+            return List.of(
+                    new LlmAnalysisSectionResponse(
+                            "年度总览",
+                            buildComprehensiveOverviewContent(
+                                    context,
+                                    totalRecords,
+                                    averageScore,
+                                    highScoreCount,
+                                    lowScoreCount,
+                                    yearOverYearDiff
+                            )
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "评分与类型结构",
+                            buildComprehensiveStructureContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "标签与口味画像",
+                            buildComprehensiveTasteContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "偏好矛盾",
+                            buildComprehensiveContradictionContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "后续行动",
+                            buildComprehensiveActionContent(context)
                     )
             );
         }
@@ -541,6 +583,70 @@ public class MockLlmClient implements LlmClient {
                 + "。这些标签适合在推荐中少量提高权重，但因为样本较少，仍需要保留不确定性。";
     }
 
+    private String buildComprehensiveOverviewContent(
+            Map<String, Object> context,
+            Integer totalRecords,
+            String averageScore,
+            Integer highScoreCount,
+            Integer lowScoreCount,
+            Integer yearOverYearDiff
+    ) {
+        String longTermTotal = readStringValue(context, "longTermTotalRecords", "0");
+        String longTermAverage = readStringValue(context, "longTermAverageScore", "0.0");
+
+        if (totalRecords == null || totalRecords == 0) {
+            return "当前年份没有正式记录，报告会退回参考长期画像样本。长期样本共 "
+                    + longTermTotal + " 条，长期均分 " + longTermAverage
+                    + " / 50。建议先补充年度记录，再让综合报告承担答辩展示入口。";
+        }
+
+        return "本年度正式记录 " + totalRecords + " 条，个人均分 " + averageScore
+                + " / 50，高分样本 " + highScoreCount + " 条，低分样本 " + lowScoreCount
+                + " 条。相对上一年变化 " + formatDiff(yearOverYearDiff)
+                + " 条。长期画像样本共 " + longTermTotal + " 条，长期均分 "
+                + longTermAverage + " / 50。";
+    }
+
+    private String buildComprehensiveStructureContent(Map<String, Object> context) {
+        return "年度类型分布：" + formatMap(readLongMap(context, "categoryDistribution"))
+                + "。年度月份档期分布：" + formatMap(readLongMap(context, "quarterDistribution"))
+                + "。长期评分分段：" + formatMap(readLongMap(context, "scoreBands"))
+                + "。这部分用于回答“这一年看了什么”和“长期评分标准是否集中”。";
+    }
+
+    private String buildComprehensiveTasteContent(Map<String, Object> context) {
+        Map<String, List<Map<String, Object>>> groups = readTagPreferenceGroups(context);
+        String stableTags = formatTagGroup(groups.get("highFrequencyHighScore"));
+        String explorationTags = formatTagGroup(groups.get("lowFrequencyHighScore"));
+        String topRecords = formatRecordList(readMapList(context, "topRecords"));
+
+        return "稳定高分标签：" + stableTags
+                + "。低频高命中标签：" + explorationTags
+                + "。年度高分样本：" + topRecords
+                + "。综合来看，稳定标签适合做推荐主依据，低频高命中标签适合做探索补充。";
+    }
+
+    private String buildComprehensiveContradictionContent(Map<String, Object> context) {
+        Map<String, List<Map<String, Object>>> groups = readTagPreferenceGroups(context);
+        String denseLowTags = formatTagGroup(groups.get("highFrequencyLowScore"));
+        String lowRecords = formatRecordList(readMapList(context, "lowScoreRecords"));
+
+        return "高频但均分偏低的风险方向：" + denseLowTags
+                + "。年度低分样本：" + lowRecords
+                + "。这部分可以解释“看得多不等于喜欢”，也能为推荐系统提供降权依据。";
+    }
+
+    private String buildComprehensiveActionContent(Map<String, Object> context) {
+        Map<String, Long> collectionCandidates = readLongMap(context, "collectionCandidates");
+        String recommendations = buildRecommendationSummaryContent(context);
+
+        return "未记录候选中，想看 " + collectionCandidates.getOrDefault("WANT", 0L)
+                + " 条，搁置 " + collectionCandidates.getOrDefault("PAUSED", 0L)
+                + " 条，普通作品库候选 " + context.getOrDefault("libraryCandidateCount", 0)
+                + " 条。当前优先推荐：" + recommendations
+                + "。后续展示时可以先讲画像，再讲矛盾，最后落到推荐候选。";
+    }
+
     private String buildRecommendationSummaryContent(Map<String, Object> context) {
         List<LlmRecommendationResponse> recommendations = buildRecommendations(context);
         if (recommendations.isEmpty()) {
@@ -594,6 +700,10 @@ public class MockLlmClient implements LlmClient {
 
         if ("PREFERENCE_CONTRADICTION".equals(analysisType)) {
             return displayCategory + " 偏好矛盾范围";
+        }
+
+        if ("COMPREHENSIVE_REPORT".equals(analysisType)) {
+            return year + " 年 " + displayCategory + " 综合报告范围";
         }
 
         if ("QUARTERLY".equals(analysisType)) {

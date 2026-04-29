@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
     getCollectionBacklogAnalysis,
+    getComprehensiveReportAnalysis,
     getLlmStatus,
     getPreferenceContradictionAnalysis,
     getQuarterlyAnalysis,
@@ -36,6 +37,7 @@ type AnalysisMode =
     | 'COLLECTION_BACKLOG'
     | 'TASTE_PROFILE'
     | 'PREFERENCE_CONTRADICTION'
+    | 'COMPREHENSIVE_REPORT'
 
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
 const quarterOptions: ReleaseQuarter[] = [1, 2, 3, 4]
@@ -90,6 +92,11 @@ const analysisModes: Array<{
         label: '偏好矛盾',
         description: '发现看得多但不稳、低频但高命中的方向',
     },
+    {
+        value: 'COMPREHENSIVE_REPORT',
+        label: '一键报告',
+        description: '整合年度统计、画像、矛盾和推荐候选',
+    },
 ]
 
 function AnalysisPage() {
@@ -142,6 +149,10 @@ function AnalysisPage() {
             return `${categoryName} · 偏好矛盾`
         }
 
+        if (analysisMode === 'COMPREHENSIVE_REPORT') {
+            return `${selectedYear} 年 · ${categoryName} · 一键报告`
+        }
+
         if (analysisMode === 'QUARTERLY') {
             return `${selectedYear} 年 · ${getReleaseQuarterLabel(selectedQuarter)} · ${categoryName}`
         }
@@ -150,7 +161,10 @@ function AnalysisPage() {
     }, [analysisMode, selectedCategory, selectedQuarter, selectedYear])
 
     const activeMode = analysisModes.find((item) => item.value === analysisMode) ?? analysisModes[0]
-    const usesYearFilter = analysisMode === 'YEARLY' || analysisMode === 'QUARTERLY'
+    const usesYearFilter =
+        analysisMode === 'YEARLY'
+        || analysisMode === 'QUARTERLY'
+        || analysisMode === 'COMPREHENSIVE_REPORT'
     const usesQuarterFilter = analysisMode === 'QUARTERLY'
     const controlGridClassName = usesQuarterFilter
         ? 'mt-6 grid gap-4 xl:grid-cols-[260px_360px_1fr_150px]'
@@ -212,10 +226,15 @@ function AnalysisPage() {
                                   ? await getPreferenceContradictionAnalysis({
                                         category,
                                     })
-                              : await getYearlyAnalysis({
-                                    year: selectedYear,
-                                    category,
-                                })
+                                  : analysisMode === 'COMPREHENSIVE_REPORT'
+                                    ? await getComprehensiveReportAnalysis({
+                                          year: selectedYear,
+                                          category,
+                                      })
+                                    : await getYearlyAnalysis({
+                                          year: selectedYear,
+                                          category,
+                                      })
             setReport(response)
         } catch (generateError) {
             setReport(null)
@@ -272,7 +291,7 @@ function AnalysisPage() {
                         </div>
                     </div>
 
-                    <div className="mt-6 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+                    <div className="mt-6 grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
                         {analysisModes.map((mode) => {
                             const selected = analysisMode === mode.value
 
