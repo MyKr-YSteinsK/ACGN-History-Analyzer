@@ -1,4 +1,5 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import AnalysisPage from '../pages/AnalysisPage'
 import AppLayout from '../components/layout/AppLayout'
 import CollectionsPage from '../pages/CollectionsPage'
 import FranchisesPage from '../pages/FranchisesPage'
@@ -40,6 +41,10 @@ const router = createBrowserRouter([
             {
                 path: 'franchises',
                 element: <FranchisesPage />,
+            },
+            {
+                path: 'analysis',
+                element: <AnalysisPage />,
             },
         ],
     },

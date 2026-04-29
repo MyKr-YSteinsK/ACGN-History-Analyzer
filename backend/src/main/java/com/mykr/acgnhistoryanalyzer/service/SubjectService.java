@@ -618,6 +618,18 @@ public class SubjectService {
                     .and(Sort.by("partIndex").descending())
                     .and(Sort.by("displayTitle").descending())
                     .and(Sort.by("id").descending());
+            case PLATFORM_SCORE_DESC -> Sort.by(Sort.Order.desc("platformScore").nullsLast())
+                    .and(Sort.by("titleCn").ascending())
+                    .and(Sort.by("seasonIndex").ascending())
+                    .and(Sort.by("partIndex").ascending())
+                    .and(Sort.by("displayTitle").ascending())
+                    .and(Sort.by("id").ascending());
+            case PLATFORM_SCORE_ASC -> Sort.by(Sort.Order.asc("platformScore").nullsLast())
+                    .and(Sort.by("titleCn").ascending())
+                    .and(Sort.by("seasonIndex").ascending())
+                    .and(Sort.by("partIndex").ascending())
+                    .and(Sort.by("displayTitle").ascending())
+                    .and(Sort.by("id").ascending());
             case RELEASE_NEWEST -> Sort.by("releaseYear").descending()
                     .and(Sort.by("releaseQuarter").descending())
                     .and(Sort.by("displayTitle").ascending());

@@ -10,6 +10,8 @@ export type SubjectStatus = 'NORMAL' | 'HIDDEN'
 export type SubjectPageSort =
     | 'TITLE_ASC'
     | 'TITLE_DESC'
+    | 'PLATFORM_SCORE_DESC'
+    | 'PLATFORM_SCORE_ASC'
     | 'RELEASE_NEWEST'
     | 'RELEASE_OLDEST'
 

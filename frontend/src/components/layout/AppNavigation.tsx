@@ -42,6 +42,11 @@ const navItems: NavItem[] = [
         label: '系列',
         description: '跨季 / 跨媒介整理',
     },
+    {
+        path: '/analysis',
+        label: '智能分析',
+        description: 'Mock 报告与 AI 功能入口',
+    },
 ]
 
 function AppNavigation() {

@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { addToPaused, addToWant, deleteCollection } from '../api/collectionApi'
 import { createRecord, deleteRecord, updateRecord } from '../api/recordApi'
 import { getApiErrorMessage } from '../api/request'
-import { deleteSubject, getSubjectById, getSubjectPage } from '../api/subjectApi'
+import {
+    deleteSubject,
+    getSubjectById,
+    getSubjectPage,
+    type SubjectPageSort,
+} from '../api/subjectApi'
 import { getTags, type TagResponse } from '../api/tagApi'
 import CategorySelector from '../components/common/CategorySelector'
 import ConfirmDialog from '../components/common/ConfirmDialog'
@@ -37,6 +42,17 @@ import type { SubjectCardView } from '../types/subject'
 const pageSize = 12
 
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019]
+
+type SortOption = {
+    value: SubjectPageSort
+    label: string
+}
+
+const sortOptions: SortOption[] = [
+    { value: 'TITLE_ASC', label: '默认' },
+    { value: 'PLATFORM_SCORE_DESC', label: '评分降序' },
+    { value: 'PLATFORM_SCORE_ASC', label: '评分升序' },
+]
 
 const quarterOptions: Array<{
     value: ReleaseQuarter | 'ALL'
@@ -137,6 +153,7 @@ function LibraryPage() {
     const [availableTags, setAvailableTags] = useState<TagResponse[]>([])
     const [selectedYear, setSelectedYear] = useState<number | 'ALL'>('ALL')
     const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter | 'ALL'>('ALL')
+    const [sort, setSort] = useState<SubjectPageSort>('TITLE_ASC')
     const [currentPage, setCurrentPage] = useState(0)
     const [listLoading, setListLoading] = useState(false)
     const [listError, setListError] = useState<string | null>(null)
@@ -156,6 +173,7 @@ function LibraryPage() {
         selectedQuarter === 'ALL'
             ? neutralPanelGradient
             : quarterTheme[selectedQuarter].panelGradient
+    const selectedCategoryTheme = categoryTheme[selectedCategory]
 
     const resultAnimationKey = [
         selectedCategory,
@@ -164,6 +182,7 @@ function LibraryPage() {
         selectedStatus,
         selectedTagName,
         keyword,
+        sort,
         currentPage,
     ].join('-')
 
@@ -201,7 +220,7 @@ function LibraryPage() {
                 tagName: selectedTagName === 'ALL' ? undefined : selectedTagName,
                 page: currentPage,
                 size: pageSize,
-                sort: 'TITLE_ASC',
+                sort,
             })
 
             setSubjects(response.content.map(mapSubjectResponseToCardView))
@@ -228,6 +247,7 @@ function LibraryPage() {
         selectedStatus,
         selectedTagName,
         selectedYear,
+        sort,
     ])
 
     useEffect(() => {
@@ -304,6 +324,11 @@ function LibraryPage() {
     function handleQuarterChange(quarter: ReleaseQuarter | 'ALL') {
         resetPage()
         setSelectedQuarter(quarter)
+    }
+
+    function handleSortChange(nextSort: SubjectPageSort) {
+        resetPage()
+        setSort(nextSort)
     }
 
     function handleOpenDetail(subject: SubjectCardView) {
@@ -655,11 +680,30 @@ function LibraryPage() {
                                 </p>
                             </div>
 
-                            <div className="flex flex-wrap gap-2 text-xs text-slate-400">
-                                <span className="rounded-full bg-white/65 px-3 py-1.5">
-                                    后端分页
-                                </span>
-                                <span className="rounded-full bg-white/65 px-3 py-1.5">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <div className="flex flex-wrap gap-2">
+                                    {sortOptions.map((option) => {
+                                        const selected = sort === option.value
+
+                                        return (
+                                            <button
+                                                key={option.value}
+                                                type="button"
+                                                onClick={() => handleSortChange(option.value)}
+                                                className={[
+                                                    'rounded-full border px-4 py-2 text-xs font-semibold transition-all duration-200',
+                                                    selected
+                                                        ? `${selectedCategoryTheme.border} ${selectedCategoryTheme.bg} ${selectedCategoryTheme.text} shadow-sm`
+                                                        : 'border-white/75 bg-white/55 text-slate-400 hover:-translate-y-0.5 hover:bg-white hover:text-slate-600',
+                                                ].join(' ')}
+                                            >
+                                                {option.label}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+
+                                <span className="rounded-full bg-white/65 px-3 py-1.5 text-xs text-slate-400">
                                     {pageText}
                                 </span>
                             </div>

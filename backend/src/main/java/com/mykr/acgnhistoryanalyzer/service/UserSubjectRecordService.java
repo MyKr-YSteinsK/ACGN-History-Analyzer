@@ -643,7 +643,7 @@ public class UserSubjectRecordService {
 
     private RecordPageSortType normalizeRecordPageSort(String sortType) {
         if (sortType == null || sortType.isBlank()) {
-            return RecordPageSortType.RECORD_TIME_DESC;
+            return RecordPageSortType.TITLE_ASC;
         }
         return RecordPageSortType.valueOf(sortType.toUpperCase());
     }
@@ -664,8 +664,10 @@ public class UserSubjectRecordService {
                     .and(Sort.by("recordQuarter").ascending())
                     .and(Sort.by("id").ascending());
             case SCORE_DESC -> Sort.by("scoreValue").descending()
+                    .and(Sort.by("subjectTitle").ascending())
                     .and(Sort.by("id").descending());
             case SCORE_ASC -> Sort.by("scoreValue").ascending()
+                    .and(Sort.by("subjectTitle").ascending())
                     .and(Sort.by("id").ascending());
             case TITLE_ASC -> Sort.by("subjectTitle").ascending()
                     .and(Sort.by("id").ascending());

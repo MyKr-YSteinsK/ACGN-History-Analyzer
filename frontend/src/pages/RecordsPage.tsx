@@ -41,10 +41,9 @@ type SortOption = {
 }
 
 const sortOptions: SortOption[] = [
-    { value: 'RECORD_TIME_DESC', label: '添加新到旧' },
-    { value: 'RECORD_TIME_ASC', label: '添加旧到新' },
-    { value: 'SCORE_DESC', label: '评分高到低' },
-    { value: 'SCORE_ASC', label: '评分低到高' },
+    { value: 'TITLE_ASC', label: '默认' },
+    { value: 'SCORE_DESC', label: '评分降序' },
+    { value: 'SCORE_ASC', label: '评分升序' },
 ]
 
 function getCurrentQuarter(): ReleaseQuarter {
@@ -83,11 +82,11 @@ function compareRecordsBySort(
     }
 
     if (sort === 'SCORE_DESC') {
-        return (second.scoreValue ?? -1) - (first.scoreValue ?? -1) || second.id - first.id
+        return (second.scoreValue ?? -1) - (first.scoreValue ?? -1)
     }
 
     if (sort === 'SCORE_ASC') {
-        return (first.scoreValue ?? 51) - (second.scoreValue ?? 51) || first.id - second.id
+        return (first.scoreValue ?? 51) - (second.scoreValue ?? 51)
     }
 
     return second.id - first.id
@@ -105,7 +104,11 @@ function compareRecordsForDisplay(
     second: UserSubjectRecordResponse,
     sort: RecordPageSort,
 ) {
-    return compareRecordTitle(first, second) || compareRecordsBySort(first, second, sort)
+    if (sort === 'TITLE_ASC') {
+        return compareRecordTitle(first, second) || first.id - second.id
+    }
+
+    return compareRecordsBySort(first, second, sort) || compareRecordTitle(first, second)
 }
 
 function getReleaseMonthText(record: UserSubjectRecordResponse) {
@@ -131,7 +134,7 @@ function RecordsPage() {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
     const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(getCurrentQuarter())
     const [keyword, setKeyword] = useState('')
-    const [sort, setSort] = useState<RecordPageSort>('RECORD_TIME_DESC')
+    const [sort, setSort] = useState<RecordPageSort>('TITLE_ASC')
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
     const [addRecordSubject, setAddRecordSubject] = useState<SubjectCardView | null>(null)
     const [detailLoading, setDetailLoading] = useState(false)

@@ -25,7 +25,7 @@ import { mapSubjectDetailToCardView } from '../mappers/subjectMapper'
 import {
     categoryTheme,
     libraryStatusTheme,
-    yearChipClassName,
+    quarterTheme,
 } from '../theme/acgnTheme'
 import {
     categoryOrder,
@@ -89,6 +89,32 @@ function getReleaseText(collection: UserSubjectCollectionResponse) {
     return quarterLabel
         ? `${collection.subjectReleaseYear}${quarterLabel}`
         : String(collection.subjectReleaseYear)
+}
+
+function getReleaseChipClassName(collection: UserSubjectCollectionResponse) {
+    if (!collection.subjectReleaseQuarter) {
+        return 'border-amber-200/75 bg-amber-50/90 text-amber-700'
+    }
+
+    const theme = quarterTheme[collection.subjectReleaseQuarter]
+    return `${theme.bg} ${theme.text} ${theme.border}`
+}
+
+function formatCollectionDate(value?: string | null) {
+    if (!value) {
+        return '收藏记录'
+    }
+
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+        return '收藏记录'
+    }
+
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+
+    return `${year}.${month}.${day}`
 }
 
 function CollectionsPage() {
@@ -622,8 +648,10 @@ function CollectionCard({
                         }: CollectionCardProps) {
     const category = categoryTheme[collection.subjectCategory ?? fallbackCategory]
     const releaseText = getReleaseText(collection)
+    const releaseChipClassName = getReleaseChipClassName(collection)
     const typeTheme = libraryStatusTheme[collection.collectionType]
     const moveTargetText = collection.collectionType === 'WANT' ? '搁置' : '想看'
+    const collectionDate = formatCollectionDate(collection.createdAt)
 
     return (
         <article
@@ -682,9 +710,6 @@ function CollectionCard({
 
             {menuOpen ? (
                 <div className="absolute right-3 top-14 z-10 w-40 overflow-hidden rounded-[18px] border border-white/75 bg-white/92 p-1.5 shadow-[0_16px_45px_rgba(80,90,120,0.18)] backdrop-blur-xl">
-                    <MenuButton onClick={() => onAddRecord(collection)}>
-                        添加已看
-                    </MenuButton>
                     <MenuButton onClick={() => onMove(collection)}>
                         移至{moveTargetText}
                     </MenuButton>
@@ -695,9 +720,14 @@ function CollectionCard({
             ) : null}
 
             <div className="m-2.5 flex flex-1 flex-col rounded-[20px] border border-white/65 bg-white/58 p-3.5 shadow-sm backdrop-blur">
-                <h3 className="line-clamp-1 text-[14px] font-bold text-slate-800">
-                    {collection.subjectTitle}
-                </h3>
+                <div className="min-w-0">
+                    <h3 className="line-clamp-1 text-[14px] font-bold text-slate-800">
+                        {collection.subjectTitle}
+                    </h3>
+                    <p className="mt-0.5 text-[11px] font-medium text-slate-400">
+                        加入于 {collectionDate}
+                    </p>
+                </div>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
                     <span
@@ -714,7 +744,7 @@ function CollectionCard({
                         <span
                             className={[
                                 'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
-                                yearChipClassName,
+                                releaseChipClassName,
                             ].join(' ')}
                         >
                             {releaseText}
@@ -723,21 +753,28 @@ function CollectionCard({
 
                 </div>
 
-                <p className="mt-3 min-h-[40px] line-clamp-2 text-xs leading-5 text-slate-400">
-                    {collection.note ?? '暂无收藏备注'}
-                </p>
+                <div className="mt-3 min-h-[48px] rounded-[16px] border border-white/65 bg-white/45 px-3 py-2">
+                    <p className="line-clamp-2 text-xs leading-5 text-slate-400">
+                        {collection.note ?? '暂无收藏备注'}
+                    </p>
+                </div>
 
-                <div className="mt-auto flex items-center justify-between border-t border-white/70 pt-3">
-                    <span className="line-clamp-1 text-[11px] text-slate-400">
-                        {collection.createdAt ? '按加入时间排序' : '收藏记录'}
-                    </span>
-
+                <div className="mt-auto grid grid-cols-2 gap-2 border-t border-white/70 pt-3">
                     <button
                         type="button"
                         onClick={() => onOpenDetail(collection)}
                         className="rounded-full border border-slate-200/70 bg-white/75 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-900 hover:text-white"
                     >
-                        详情
+                        查看详情
+                    </button>
+
+                    <button
+                        type="button"
+                        disabled={actionLoading}
+                        onClick={() => onAddRecord(collection)}
+                        className="rounded-full border border-rose-100 bg-rose-50/85 px-3 py-1.5 text-[11px] font-semibold text-rose-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-rose-100 disabled:cursor-not-allowed disabled:text-rose-300"
+                    >
+                        添加已看
                     </button>
                 </div>
             </div>
