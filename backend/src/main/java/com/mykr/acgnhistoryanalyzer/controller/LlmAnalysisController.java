@@ -111,6 +111,15 @@ public class LlmAnalysisController {
         return ApiResponse.success(llmAnalysisService.generateComprehensiveReport(year, category));
     }
 
+    @GetMapping("/qa")
+    public ApiResponse<?> answerQuestion(@RequestParam String question) {
+        if (question == null || question.isBlank()) {
+            return ApiResponse.fail(4001, "问题不能为空");
+        }
+
+        return ApiResponse.success(llmAnalysisService.answerQuestion(question));
+    }
+
     @GetMapping("/analysis/home-insight")
     public ApiResponse<LlmAnalysisResponse> generateHomeInsight(
             @RequestParam(required = false) Integer year,

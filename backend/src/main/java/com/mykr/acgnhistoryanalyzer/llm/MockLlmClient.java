@@ -88,6 +88,10 @@ public class MockLlmClient implements LlmClient {
             return year + " 年 " + quarterLabel(quarter) + " " + displayCategory + " 首页图表解读";
         }
 
+        if ("QUESTION_ANSWER".equals(analysisType)) {
+            return "自然语言问答";
+        }
+
         if ("QUARTERLY".equals(analysisType)) {
             return year + " 年 " + quarterLabel(quarter) + "档期 " + displayCategory + " 智能总结";
         }
@@ -153,6 +157,12 @@ public class MockLlmClient implements LlmClient {
                     + " / 50，高分样本 " + highScoreCount + " 条。";
         }
 
+        if ("QUESTION_ANSWER".equals(analysisType)) {
+            return scope + " 已根据问题识别出对应范围，命中 "
+                    + totalRecords + " 条正式记录，均分 " + averageScore
+                    + " / 50，高分样本 " + highScoreCount + " 条。";
+        }
+
         return scope + " 共整理到 " + totalRecords
                 + " 条正式记录，个人均分约 " + averageScore
                 + " / 50，其中 45 分以上高分记录 " + highScoreCount
@@ -173,6 +183,7 @@ public class MockLlmClient implements LlmClient {
             case "PREFERENCE_CONTRADICTION" -> "偏好矛盾";
             case "COMPREHENSIVE_REPORT" -> "一键报告";
             case "HOME_INSIGHT" -> "首页解读";
+            case "QUESTION_ANSWER" -> "自然问答";
             default -> "年度总结";
         });
 
@@ -385,6 +396,33 @@ public class MockLlmClient implements LlmClient {
                     new LlmAnalysisSectionResponse(
                             "展示提示",
                             buildHomeInsightActionContent(context)
+                    )
+            );
+        }
+
+        if ("QUESTION_ANSWER".equals(readStringValue(context, "analysisType", ""))) {
+            return List.of(
+                    new LlmAnalysisSectionResponse(
+                            "直接回答",
+                            buildQuestionAnswerContent(
+                                    context,
+                                    totalRecords,
+                                    averageScore,
+                                    highScoreCount,
+                                    lowScoreCount
+                            )
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "相关样本",
+                            buildQuestionSampleContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "可追溯依据",
+                            buildQuestionEvidenceContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "边界说明",
+                            "当前是 Mock 问答：系统只做关键词、年份、月份、类型和标签的规则识别，不会调用真实大模型，也不会修改你的任何作品、记录或收藏数据。"
                     )
             );
         }
@@ -725,6 +763,85 @@ public class MockLlmClient implements LlmClient {
                 + collectionCandidates.getOrDefault("PAUSED", 0L) + " 条，可作为下一步补完入口。";
     }
 
+    private String buildQuestionAnswerContent(
+            Map<String, Object> context,
+            Integer totalRecords,
+            String averageScore,
+            Integer highScoreCount,
+            Integer lowScoreCount
+    ) {
+        String intent = readStringValue(context, "questionIntent", "OVERVIEW");
+        String question = readStringValue(context, "question", "");
+        int total = totalRecords == null ? 0 : totalRecords;
+        int highCount = highScoreCount == null ? 0 : highScoreCount;
+        int lowCount = lowScoreCount == null ? 0 : lowScoreCount;
+
+        if (total == 0 && !"RECOMMENDATION".equals(intent) && !"COLLECTION".equals(intent)) {
+            return "这个问题暂时没有命中正式记录。已识别的问题是「" + question
+                    + "」，你可以放宽年份、月份或类型条件后再试。";
+        }
+
+        return switch (intent) {
+            case "HIGH_SCORE" -> "这个问题被识别为高分查询。当前范围共有 " + total
+                    + " 条记录，其中 45 分以上 " + highCount
+                    + " 条。靠前样本是：" + formatRecordList(readMapList(context, "topRecords")) + "。";
+            case "LOW_SCORE" -> "这个问题被识别为低分或避雷查询。当前范围共有 " + total
+                    + " 条记录，其中 30 分以下 " + lowCount
+                    + " 条。需要注意的样本是：" + formatRecordList(readMapList(context, "lowScoreRecords")) + "。";
+            case "TAG_PREFERENCE" -> buildQuestionTagAnswerContent(context, total, averageScore);
+            case "RECOMMENDATION", "COLLECTION" -> "这个问题被识别为补完或收藏清单整理。当前可参考候选是："
+                    + buildRecommendationSummaryContent(context)
+                    + "。建议先看命中历史高分标签、且来源为想看的作品。";
+            default -> "这个问题被识别为总体概览。当前范围共有 " + total
+                    + " 条正式记录，均分 " + averageScore
+                    + " / 50。类型分布为：" + formatMap(readLongMap(context, "categoryDistribution"))
+                    + "。月份分布为：" + formatMap(readLongMap(context, "quarterDistribution")) + "。";
+        };
+    }
+
+    private String buildQuestionTagAnswerContent(
+            Map<String, Object> context,
+            int totalRecords,
+            String averageScore
+    ) {
+        String matchedTag = readStringValue(context, "matchedTag", "");
+        Map<String, List<Map<String, Object>>> groups = readTagPreferenceGroups(context);
+        String stableTags = formatTagGroup(groups.get("highFrequencyHighScore"));
+        String explorationTags = formatTagGroup(groups.get("lowFrequencyHighScore"));
+
+        if (!matchedTag.isBlank()) {
+            return "问题中提到了「" + matchedTag + "」标签。当前范围共有 " + totalRecords
+                    + " 条记录，均分 " + averageScore
+                    + " / 50。稳定高分标签为：" + stableTags
+                    + "。低频但高命中的探索标签为：" + explorationTags + "。";
+        }
+
+        return "这个问题被识别为标签偏好查询。当前范围共有 " + totalRecords
+                + " 条记录，均分 " + averageScore
+                + " / 50。高频标签线索为：" + buildTopTagShortText(context)
+                + "；稳定高分标签为：" + stableTags + "。";
+    }
+
+    private String buildQuestionSampleContent(Map<String, Object> context) {
+        return "高分样本：" + formatRecordList(readMapList(context, "topRecords"))
+                + "。低分样本：" + formatRecordList(readMapList(context, "lowScoreRecords"))
+                + "。标签线索：" + buildTopTagShortText(context) + "。";
+    }
+
+    private String buildQuestionEvidenceContent(Map<String, Object> context) {
+        Integer year = readInteger(context, "year");
+        Integer quarter = readInteger(context, "quarter");
+        String category = readStringValue(context, "category", "全部类型");
+        String matchedTag = readStringValue(context, "matchedTag", "");
+        String yearText = year == null ? "不限年份" : year + " 年";
+        String quarterText = quarter == null ? "不限月份" : quarterLabel(quarter);
+        String tagText = matchedTag.isBlank() ? "未命中特定标签" : "命中标签「" + matchedTag + "」";
+
+        return "识别范围：" + yearText + "、" + quarterText + "、" + category
+                + "、" + tagText + "。评分段为：" + formatMap(readLongMap(context, "scoreBands"))
+                + "。这部分用于展示系统为什么给出上面的回答。";
+    }
+
     private String buildRecommendationSummaryContent(Map<String, Object> context) {
         List<LlmRecommendationResponse> recommendations = buildRecommendations(context);
         if (recommendations.isEmpty()) {
@@ -786,6 +903,10 @@ public class MockLlmClient implements LlmClient {
 
         if ("HOME_INSIGHT".equals(analysisType)) {
             return year + " 年 " + quarterLabel(quarter) + " " + displayCategory + " 首页图表范围";
+        }
+
+        if ("QUESTION_ANSWER".equals(analysisType)) {
+            return "自然语言问答范围";
         }
 
         if ("QUARTERLY".equals(analysisType)) {

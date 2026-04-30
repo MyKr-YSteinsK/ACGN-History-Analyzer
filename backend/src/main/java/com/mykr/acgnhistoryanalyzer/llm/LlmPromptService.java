@@ -103,6 +103,10 @@ public class LlmPromptService {
         return buildBasePrompt(scope);
     }
 
+    public String buildQuestionAnswerPrompt(String question) {
+        return buildBasePrompt("自然语言问答：" + question);
+    }
+
     private String buildBasePrompt(String scope) {
         return """
                 你是一个个人 ACGN 历史数据分析助手。

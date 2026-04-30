@@ -4,6 +4,7 @@ import {
     getComprehensiveReportAnalysis,
     getLlmStatus,
     getPreferenceContradictionAnalysis,
+    getQuestionAnswerAnalysis,
     getQuarterlyAnalysis,
     getRecommendationAnalysis,
     getScoreStructureAnalysis,
@@ -38,6 +39,7 @@ type AnalysisMode =
     | 'TASTE_PROFILE'
     | 'PREFERENCE_CONTRADICTION'
     | 'COMPREHENSIVE_REPORT'
+    | 'QUESTION_ANSWER'
 
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
 const quarterOptions: ReleaseQuarter[] = [1, 2, 3, 4]
@@ -97,6 +99,11 @@ const analysisModes: Array<{
         label: '一键报告',
         description: '整合年度统计、画像、矛盾和推荐候选',
     },
+    {
+        value: 'QUESTION_ANSWER',
+        label: '自然问答',
+        description: '用一句话查询记录、评分、标签或补完建议',
+    },
 ]
 
 function AnalysisPage() {
@@ -104,6 +111,7 @@ function AnalysisPage() {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
     const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(1)
     const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('ALL')
+    const [question, setQuestion] = useState('2025 年我有哪些高分动画？')
     const [status, setStatus] = useState<LlmStatusResponse | null>(null)
     const [report, setReport] = useState<LlmAnalysisResponse | null>(null)
     const [loading, setLoading] = useState(false)
@@ -153,6 +161,10 @@ function AnalysisPage() {
             return `${selectedYear} 年 · ${categoryName} · 一键报告`
         }
 
+        if (analysisMode === 'QUESTION_ANSWER') {
+            return '自然语言问答 · Mock 规则识别'
+        }
+
         if (analysisMode === 'QUARTERLY') {
             return `${selectedYear} 年 · ${getReleaseQuarterLabel(selectedQuarter)} · ${categoryName}`
         }
@@ -185,6 +197,12 @@ function AnalysisPage() {
     }, [])
 
     const generateReport = useCallback(async () => {
+        if (analysisMode === 'QUESTION_ANSWER' && !question.trim()) {
+            setReport(null)
+            setError('请先输入一个想问的问题')
+            return
+        }
+
         setLoading(true)
         setError(null)
 
@@ -192,7 +210,11 @@ function AnalysisPage() {
             const category =
                 selectedCategory === 'ALL' ? undefined : selectedCategory
             const response =
-                analysisMode === 'QUARTERLY'
+                analysisMode === 'QUESTION_ANSWER'
+                    ? await getQuestionAnswerAnalysis({
+                          question: question.trim(),
+                      })
+                    : analysisMode === 'QUARTERLY'
                     ? await getQuarterlyAnalysis({
                           year: selectedYear,
                           quarter: selectedQuarter,
@@ -242,10 +264,15 @@ function AnalysisPage() {
         } finally {
             setLoading(false)
         }
-    }, [analysisMode, selectedCategory, selectedQuarter, selectedYear])
+    }, [analysisMode, question, selectedCategory, selectedQuarter, selectedYear])
 
     function handleModeChange(mode: AnalysisMode) {
         setAnalysisMode(mode)
+
+        if (mode === 'QUESTION_ANSWER') {
+            setReport(null)
+            setError(null)
+        }
 
         if (mode === 'TYPE_PREFERENCE' && selectedCategory === 'ALL') {
             setSelectedCategory('ANIME')
@@ -253,9 +280,13 @@ function AnalysisPage() {
     }
 
     useEffect(() => {
+        if (analysisMode === 'QUESTION_ANSWER') {
+            return
+        }
+
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void generateReport()
-    }, [generateReport])
+    }, [analysisMode, generateReport])
 
     return (
         <div className="space-y-6 content-enter">
@@ -316,6 +347,14 @@ function AnalysisPage() {
                         })}
                     </div>
 
+                    {analysisMode === 'QUESTION_ANSWER' ? (
+                        <QuestionAnswerControl
+                            question={question}
+                            loading={loading}
+                            onQuestionChange={setQuestion}
+                            onSubmit={() => void generateReport()}
+                        />
+                    ) : (
                     <div className={controlGridClassName}>
                         {usesYearFilter ? (
                         <div>
@@ -409,6 +448,7 @@ function AnalysisPage() {
                             </button>
                         </div>
                     </div>
+                    )}
                 </div>
             </GlassCard>
 
@@ -424,6 +464,72 @@ function AnalysisPage() {
                     description="选择分析类型和范围后点击生成分析，系统会返回一份结构化 Mock 报告。"
                 />
             )}
+        </div>
+    )
+}
+
+type QuestionAnswerControlProps = {
+    question: string
+    loading: boolean
+    onQuestionChange: (value: string) => void
+    onSubmit: () => void
+}
+
+const questionExamples = [
+    '2025 年我有哪些高分动画？',
+    '我是不是更喜欢日常标签？',
+    '想看里有什么适合优先补？',
+]
+
+function QuestionAnswerControl({
+    question,
+    loading,
+    onQuestionChange,
+    onSubmit,
+}: QuestionAnswerControlProps) {
+    return (
+        <div className="mt-6 rounded-[28px] border border-white/75 bg-white/58 p-5 shadow-sm backdrop-blur">
+            <div className="grid gap-4 xl:grid-cols-[1fr_150px]">
+                <div>
+                    <p className="mb-2 text-xs font-semibold text-slate-400">问题</p>
+                    <textarea
+                        value={question}
+                        onChange={(event) => onQuestionChange(event.target.value)}
+                        rows={2}
+                        placeholder="比如：2025 年我有哪些高分动画？"
+                        className="min-h-[88px] w-full resize-none rounded-[24px] border border-white/80 bg-white/70 px-4 py-3 text-sm font-semibold leading-6 text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-300 focus:border-sky-200 focus:bg-white focus:ring-4 focus:ring-sky-100/70"
+                    />
+                </div>
+
+                <div className="flex items-end">
+                    <button
+                        type="button"
+                        onClick={onSubmit}
+                        disabled={loading || !question.trim()}
+                        className={[
+                            'h-12 w-full rounded-2xl border px-4 text-sm font-black shadow-sm transition-all duration-200',
+                            loading || !question.trim()
+                                ? 'cursor-not-allowed border-white/55 bg-white/45 text-slate-300'
+                                : 'border-sky-200 bg-sky-100/90 text-sky-700 hover:-translate-y-0.5 hover:bg-sky-50',
+                        ].join(' ')}
+                    >
+                        {loading ? '生成中' : '提问'}
+                    </button>
+                </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+                {questionExamples.map((example) => (
+                    <button
+                        key={example}
+                        type="button"
+                        onClick={() => onQuestionChange(example)}
+                        className="rounded-full border border-white/75 bg-white/68 px-3 py-1.5 text-xs font-semibold text-slate-500 transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
+                    >
+                        {example}
+                    </button>
+                ))}
+            </div>
         </div>
     )
 }

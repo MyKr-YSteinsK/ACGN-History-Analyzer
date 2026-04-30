@@ -25,11 +25,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class LlmContextBuilder {
 
     private static final List<String> CATEGORY_ORDER = List.of("ANIME", "COMIC", "GAME", "NOVEL");
+    private static final Pattern YEAR_PATTERN = Pattern.compile("(20\\d{2})");
 
     private static final Map<Integer, String> QUARTER_LABELS = Map.of(
             1, "一月",
@@ -429,6 +432,52 @@ public class LlmContextBuilder {
         return context;
     }
 
+    public Map<String, Object> buildQuestionAnswerContext(String question) {
+        String normalizedQuestion = question == null ? "" : question.trim();
+        String intent = resolveQuestionIntent(normalizedQuestion);
+        Integer year = extractQuestionYear(normalizedQuestion);
+        Integer quarter = extractQuestionQuarter(normalizedQuestion);
+        String category = extractQuestionCategory(normalizedQuestion);
+        List<UserSubjectRecordResponse> scopedRecords = filterQuestionRecords(
+                userSubjectRecordService.getRecords(null, null, null, null),
+                year,
+                quarter,
+                category
+        );
+        Map<String, List<Map<String, Object>>> tagPreferenceGroups = buildTagPreferenceGroups(scopedRecords);
+        String matchedTag = findMatchedTag(normalizedQuestion, buildTagStats(scopedRecords));
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "QUESTION_ANSWER");
+        context.put("question", normalizedQuestion);
+        context.put("questionIntent", intent);
+        context.put("matchedTag", matchedTag);
+        context.put("year", year);
+        context.put("quarter", quarter);
+        context.put("category", category);
+        context.put("comparisonLabel", "自然语言问题筛选范围");
+        context.put("totalRecords", scopedRecords.size());
+        context.put("previousYearTotalRecords", scopedRecords.size());
+        context.put("yearOverYearDiff", scopedRecords.size());
+        context.put("averageScore", averageScore(scopedRecords));
+        context.put("highScoreCount", countScoreAtLeast(scopedRecords, 45));
+        context.put("lowScoreCount", countScoreBelow(scopedRecords, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(scopedRecords));
+        context.put("quarterDistribution", buildQuarterDistribution(scopedRecords));
+        context.put("scoreBands", buildScoreBands(scopedRecords));
+        context.put("categoryScoreStats", buildCategoryScoreStats(scopedRecords));
+        context.put("yearScoreTrend", buildYearScoreTrend(scopedRecords));
+        context.put("topRecords", buildRecordHighlights(scopedRecords, true));
+        context.put("lowScoreRecords", buildRecordHighlights(scopedRecords, false));
+        context.put("topTags", buildTagStats(scopedRecords));
+        context.put("tagPreferenceGroups", tagPreferenceGroups);
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("recommendations", buildQuestionRecommendations(intent, category));
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
     private List<UserSubjectRecordResponse> filterByCategory(
             List<UserSubjectRecordResponse> records,
             String category
@@ -440,6 +489,108 @@ public class LlmContextBuilder {
         return records.stream()
                 .filter(record -> category.equalsIgnoreCase(record.getSubjectCategory()))
                 .toList();
+    }
+
+    private List<UserSubjectRecordResponse> filterQuestionRecords(
+            List<UserSubjectRecordResponse> records,
+            Integer year,
+            Integer quarter,
+            String category
+    ) {
+        return records.stream()
+                .filter(record -> year == null || year.equals(record.getRecordYear()))
+                .filter(record -> quarter == null || quarter.equals(record.getRecordQuarter()))
+                .filter(record -> category == null || category.equalsIgnoreCase(record.getSubjectCategory()))
+                .toList();
+    }
+
+    private String resolveQuestionIntent(String question) {
+        String text = question.toLowerCase();
+        if (containsAny(text, "推荐", "下一部", "补什么", "补哪", "补坑")) {
+            return "RECOMMENDATION";
+        }
+        if (containsAny(text, "想看", "搁置", "收藏")) {
+            return "COLLECTION";
+        }
+        if (containsAny(text, "低分", "不好", "踩雷", "不喜欢")) {
+            return "LOW_SCORE";
+        }
+        if (containsAny(text, "标签", "题材", "偏好", "喜欢", "是不是更喜欢")) {
+            return "TAG_PREFERENCE";
+        }
+        if (containsAny(text, "高分", "最好", "评分高", "45", "四十五")) {
+            return "HIGH_SCORE";
+        }
+        return "OVERVIEW";
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        for (String keyword : keywords) {
+            if (text.contains(keyword.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Integer extractQuestionYear(String question) {
+        Matcher matcher = YEAR_PATTERN.matcher(question);
+        if (matcher.find()) {
+            return Integer.parseInt(matcher.group(1));
+        }
+        return null;
+    }
+
+    private Integer extractQuestionQuarter(String question) {
+        String text = question.toLowerCase();
+        if (containsAny(text, "一月", "1月", "一月档", "1 月")) {
+            return 1;
+        }
+        if (containsAny(text, "四月", "4月", "四月档", "4 月")) {
+            return 2;
+        }
+        if (containsAny(text, "七月", "7月", "七月档", "7 月")) {
+            return 3;
+        }
+        if (containsAny(text, "十月", "10月", "十月档", "10 月")) {
+            return 4;
+        }
+        return null;
+    }
+
+    private String extractQuestionCategory(String question) {
+        String text = question.toLowerCase();
+        if (containsAny(text, "动画", "anime", "番剧")) {
+            return "ANIME";
+        }
+        if (containsAny(text, "漫画", "comic", "manga")) {
+            return "COMIC";
+        }
+        if (containsAny(text, "游戏", "game")) {
+            return "GAME";
+        }
+        if (containsAny(text, "小说", "novel")) {
+            return "NOVEL";
+        }
+        return null;
+    }
+
+    private String findMatchedTag(String question, List<Map<String, Object>> topTags) {
+        return topTags.stream()
+                .map(item -> String.valueOf(item.get("name")))
+                .filter(name -> question.contains(name))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private List<Map<String, Object>> buildQuestionRecommendations(String intent, String category) {
+        if ("RECOMMENDATION".equals(intent)) {
+            return buildRecommendationItems(category, false);
+        }
+        if ("COLLECTION".equals(intent)) {
+            return buildRecommendationItems(category, true);
+        }
+        return List.of();
     }
 
     private BigDecimal averageScore(List<UserSubjectRecordResponse> records) {
@@ -941,6 +1092,10 @@ public class LlmContextBuilder {
             evidence.add(year + " 年 " + QUARTER_LABELS.getOrDefault(quarter, "未知月份")
                     + " " + scope + " 首页当前筛选记录 " + context.get("totalRecords") + " 条");
             evidence.add(year + " 年 " + scope + " 年度同类型记录 " + context.get("yearTotalRecords") + " 条");
+        } else if ("QUESTION_ANSWER".equals(analysisType)) {
+            evidence.add("自然语言问题：" + context.get("question"));
+            evidence.add("识别意图：" + context.get("questionIntent"));
+            evidence.add(scope + " 问答筛选范围内正式记录 " + context.get("totalRecords") + " 条");
         } else if ("QUARTERLY".equals(analysisType)) {
             evidence.add(year + " 年 " + QUARTER_LABELS.getOrDefault(quarter, "未知月份")
                     + "档期 " + scope + " 正式记录 " + context.get("totalRecords") + " 条");

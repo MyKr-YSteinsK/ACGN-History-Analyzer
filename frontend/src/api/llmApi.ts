@@ -13,6 +13,7 @@ export type LlmAnalysisType =
     | 'PREFERENCE_CONTRADICTION'
     | 'COMPREHENSIVE_REPORT'
     | 'HOME_INSIGHT'
+    | 'QUESTION_ANSWER'
 
 export type LlmAnalysisScope = {
     year: number | null
@@ -115,6 +116,10 @@ export type HomeInsightAnalysisParams = {
     category: AcgnCategory
 }
 
+export type QuestionAnswerAnalysisParams = {
+    question: string
+}
+
 export function getLlmStatus() {
     return apiGet<LlmStatusResponse>('/llm/status')
 }
@@ -161,4 +166,8 @@ export function getComprehensiveReportAnalysis(params: ComprehensiveReportAnalys
 
 export function getHomeInsightAnalysis(params: HomeInsightAnalysisParams) {
     return apiGet<LlmAnalysisResponse>('/llm/analysis/home-insight', params)
+}
+
+export function getQuestionAnswerAnalysis(params: QuestionAnswerAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/qa', params)
 }

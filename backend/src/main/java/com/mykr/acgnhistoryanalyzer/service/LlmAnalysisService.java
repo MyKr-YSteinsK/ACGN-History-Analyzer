@@ -168,6 +168,18 @@ public class LlmAnalysisService {
         ));
     }
 
+    public LlmAnalysisResponse answerQuestion(String question) {
+        String normalizedQuestion = question == null ? "" : question.trim();
+        String prompt = llmPromptService.buildQuestionAnswerPrompt(normalizedQuestion);
+        Map<String, Object> context = llmContextBuilder.buildQuestionAnswerContext(normalizedQuestion);
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "QUESTION_ANSWER",
+                prompt,
+                context
+        ));
+    }
+
     public LlmAnalysisResponse generateHomeInsight(Integer year, Integer quarter, String category) {
         Integer effectiveYear = year == null ? LocalDate.now().getYear() : year;
         Integer effectiveQuarter = normalizeQuarter(quarter);
