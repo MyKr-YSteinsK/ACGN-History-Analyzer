@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './request'
+import { apiGet, apiPost, apiRequest } from './request'
 import type { ReleaseQuarter } from '../types/common'
 import type {
     SubjectImportPreviewResponse,
@@ -44,6 +44,24 @@ export type BangumiSeasonImportRequest = {
     japaneseOnly: boolean
 }
 
+export type BangumiImportJobStartResponse = {
+    jobId: string
+}
+
+export type BangumiImportJobStatus = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED'
+
+export type BangumiImportJobStatusResponse = {
+    jobId: string
+    status: BangumiImportJobStatus
+    stage: string
+    message: string
+    percent: number
+    result: SubjectImportResponse | null
+    errorMessage: string | null
+    createdAt: string
+    updatedAt: string
+}
+
 export function getImportOverview() {
     return apiGet<ImportOverviewResponse>('/import/overview')
 }
@@ -61,15 +79,32 @@ export function getCollectionImportTemplate() {
 }
 
 export function previewBangumiSeasonImport(payload: BangumiSeasonImportRequest) {
-    return apiPost<SubjectImportPreviewResponse, BangumiSeasonImportRequest>(
-        '/import/bangumi/season/preview',
+    return apiRequest<SubjectImportPreviewResponse>({
+        method: 'POST',
+        url: '/import/bangumi/season/preview',
+        data: payload,
+        timeout: 45000,
+    })
+}
+
+export function importBangumiSeason(payload: BangumiSeasonImportRequest) {
+    return apiRequest<SubjectImportResponse>({
+        method: 'POST',
+        url: '/import/bangumi/season/import',
+        data: payload,
+        timeout: 180000,
+    })
+}
+
+export function startBangumiSeasonImportJob(payload: BangumiSeasonImportRequest) {
+    return apiPost<BangumiImportJobStartResponse, BangumiSeasonImportRequest>(
+        '/import/bangumi/season/import-jobs',
         payload,
     )
 }
 
-export function importBangumiSeason(payload: BangumiSeasonImportRequest) {
-    return apiPost<SubjectImportResponse, BangumiSeasonImportRequest>(
-        '/import/bangumi/season/import',
-        payload,
+export function getBangumiSeasonImportJobStatus(jobId: string) {
+    return apiGet<BangumiImportJobStatusResponse>(
+        `/import/bangumi/season/import-jobs/${jobId}`,
     )
 }

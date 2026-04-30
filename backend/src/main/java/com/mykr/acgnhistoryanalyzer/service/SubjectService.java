@@ -24,6 +24,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -276,13 +277,29 @@ public class SubjectService {
     }
 
     public SubjectImportResponse importSubjects(SubjectBatchImportRequest request) {
+        return importSubjects(request, null);
+    }
+
+    public SubjectImportResponse importSubjects(SubjectBatchImportRequest request,
+                                                SubjectImportProgressListener progressListener) {
         List<SubjectImportItemResponse> items = new ArrayList<>();
+        Set<String> batchBusinessKeys = new HashSet<>();
+        Set<String> batchSourceKeys = new HashSet<>();
 
         int importedCount = 0;
         int skippedCount = 0;
 
         int rowNumber = 1;
+        int totalCount = request.getSubjects().size();
         for (SubjectCreateRequest item : request.getSubjects()) {
+            if (progressListener != null) {
+                progressListener.onItemProcessing(
+                        rowNumber,
+                        totalCount,
+                        buildSubjectImportLabel(item, rowNumber)
+                );
+            }
+
             String validationMessage = validateSubjectImportItem(item);
             if (validationMessage != null) {
                 skippedCount++;
@@ -291,6 +308,44 @@ public class SubjectService {
                         buildSubjectImportLabel(item, rowNumber),
                         "ERROR",
                         validationMessage
+                ));
+                rowNumber++;
+                continue;
+            }
+
+            String sourceUniqueKey = buildSourceUniqueKey(item);
+            if (sourceUniqueKey != null && subjectSourceUniqueExistsForCreate(item)) {
+                skippedCount++;
+                items.add(new SubjectImportItemResponse(
+                        null,
+                        item.getDisplayTitle(),
+                        "SKIPPED",
+                        "来源作品已存在，已跳过"
+                ));
+                rowNumber++;
+                continue;
+            }
+
+            if (sourceUniqueKey != null && !batchSourceKeys.add(sourceUniqueKey)) {
+                skippedCount++;
+                items.add(new SubjectImportItemResponse(
+                        null,
+                        item.getDisplayTitle(),
+                        "SKIPPED",
+                        "同一批次内来源作品重复，已跳过"
+                ));
+                rowNumber++;
+                continue;
+            }
+
+            String businessUniqueKey = buildBusinessUniqueKey(item);
+            if (!batchBusinessKeys.add(businessUniqueKey)) {
+                skippedCount++;
+                items.add(new SubjectImportItemResponse(
+                        null,
+                        item.getDisplayTitle(),
+                        "SKIPPED",
+                        "同一批次内作品唯一信息重复，已跳过"
                 ));
                 rowNumber++;
                 continue;
@@ -347,6 +402,8 @@ public class SubjectService {
 
     public SubjectImportPreviewResponse previewImportSubjects(SubjectBatchImportRequest request) {
         List<SubjectImportPreviewItemResponse> items = new ArrayList<>();
+        Set<String> batchBusinessKeys = new HashSet<>();
+        Set<String> batchSourceKeys = new HashSet<>();
 
         int canImportCount = 0;
         int skippedCount = 0;
@@ -360,6 +417,41 @@ public class SubjectService {
                         buildSubjectImportLabel(item, rowNumber),
                         "ERROR",
                         validationMessage
+                ));
+                rowNumber++;
+                continue;
+            }
+
+            String sourceUniqueKey = buildSourceUniqueKey(item);
+            if (sourceUniqueKey != null && subjectSourceUniqueExistsForCreate(item)) {
+                skippedCount++;
+                items.add(new SubjectImportPreviewItemResponse(
+                        item.getDisplayTitle(),
+                        "SKIPPED",
+                        "来源作品已存在，正式导入时会跳过"
+                ));
+                rowNumber++;
+                continue;
+            }
+
+            if (sourceUniqueKey != null && !batchSourceKeys.add(sourceUniqueKey)) {
+                skippedCount++;
+                items.add(new SubjectImportPreviewItemResponse(
+                        item.getDisplayTitle(),
+                        "SKIPPED",
+                        "同一批次内来源作品重复，正式导入时会跳过"
+                ));
+                rowNumber++;
+                continue;
+            }
+
+            String businessUniqueKey = buildBusinessUniqueKey(item);
+            if (!batchBusinessKeys.add(businessUniqueKey)) {
+                skippedCount++;
+                items.add(new SubjectImportPreviewItemResponse(
+                        item.getDisplayTitle(),
+                        "SKIPPED",
+                        "同一批次内作品唯一信息重复，正式导入时会跳过"
                 ));
                 rowNumber++;
                 continue;
@@ -423,6 +515,29 @@ public class SubjectService {
                 normalizeNumberKey(request.getSeasonIndex()),
                 normalizeNumberKey(request.getPartIndex()),
                 normalizeTextKey(request.getCategory()),
+                id
+        );
+    }
+
+    public boolean subjectSourceUniqueExistsForCreate(SubjectCreateRequest request) {
+        if (!hasText(request.getSourcePlatform()) || !hasText(request.getSourceId())) {
+            return false;
+        }
+
+        return subjectRepository.existsBySourceIdentity(
+                normalizeTextKey(request.getSourcePlatform()),
+                normalizeTextKey(request.getSourceId())
+        );
+    }
+
+    public boolean subjectSourceUniqueExistsForUpdate(Long id, SubjectCreateRequest request) {
+        if (!hasText(request.getSourcePlatform()) || !hasText(request.getSourceId())) {
+            return false;
+        }
+
+        return subjectRepository.existsBySourceIdentityAndIdNot(
+                normalizeTextKey(request.getSourcePlatform()),
+                normalizeTextKey(request.getSourceId()),
                 id
         );
     }
@@ -545,6 +660,26 @@ public class SubjectService {
             return item.getTitleCn().trim();
         }
         return "第 " + rowNumber + " 行";
+    }
+
+    private String buildBusinessUniqueKey(SubjectCreateRequest request) {
+        return String.join("|",
+                normalizeTextKey(request.getTitleCn()),
+                normalizeTextKey(request.getSubtitle()),
+                String.valueOf(normalizeNumberKey(request.getSeasonIndex())),
+                String.valueOf(normalizeNumberKey(request.getPartIndex())),
+                normalizeTextKey(request.getCategory())
+        );
+    }
+
+    private String buildSourceUniqueKey(SubjectCreateRequest request) {
+        if (!hasText(request.getSourcePlatform()) || !hasText(request.getSourceId())) {
+            return null;
+        }
+
+        return normalizeTextKey(request.getSourcePlatform())
+                + "|"
+                + normalizeTextKey(request.getSourceId());
     }
 
     private boolean hasText(String value) {

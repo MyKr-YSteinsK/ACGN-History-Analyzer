@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     getCollectionImportTemplate,
+    getBangumiSeasonImportJobStatus,
     getImportOverview,
     getRecordImportTemplate,
     getSubjectImportTemplate,
-    importBangumiSeason,
     previewBangumiSeasonImport,
+    startBangumiSeasonImportJob,
     type BangumiSeasonImportRequest,
+    type BangumiImportJobStatusResponse,
     type ImportOverviewResponse,
     type ImportTemplateResponse,
 } from '../api/importApi'
@@ -208,6 +210,12 @@ function getErrorMessage(error: unknown) {
     }
 
     return '请求失败，请稍后重试'
+}
+
+function wait(milliseconds: number) {
+    return new Promise((resolve) => {
+        window.setTimeout(resolve, milliseconds)
+    })
 }
 
 function getTargetRootKey(target: ImportTarget) {
@@ -518,6 +526,8 @@ function ImportPage() {
     const [bangumiQuarter, setBangumiQuarter] = useState<ReleaseQuarter>(1)
     const [bangumiIncludeWeb, setBangumiIncludeWeb] = useState(false)
     const [bangumiJapaneseOnly, setBangumiJapaneseOnly] = useState(true)
+    const [bangumiJobStatus, setBangumiJobStatus] =
+        useState<BangumiImportJobStatusResponse | null>(null)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
 
     const selectedTemplate = pickTemplate(
@@ -599,6 +609,31 @@ function ImportPage() {
         setPreview(null)
         setImportResult(null)
         setFeedbackMessage(null)
+        setBangumiJobStatus(null)
+    }
+
+    async function waitForBangumiImportJob(jobId: string) {
+        for (let attempt = 0; attempt < 300; attempt += 1) {
+            await wait(1000)
+            const status = await getBangumiSeasonImportJobStatus(jobId)
+            setBangumiJobStatus(status)
+
+            if (status.status === 'SUCCESS') {
+                if (status.result) {
+                    setImportResult({ target: 'SUBJECT', data: status.result })
+                    setFeedbackMessage(`已从 Bangumi 导入 ${status.result.importedCount} 条作品`)
+                } else {
+                    setFeedbackMessage('Bangumi 导入完成')
+                }
+                return
+            }
+
+            if (status.status === 'FAILED') {
+                throw new Error(status.errorMessage || 'Bangumi 导入失败')
+            }
+        }
+
+        throw new Error('Bangumi 导入任务等待超时，请稍后刷新作品库确认结果')
     }
 
     function handleTargetChange(target: ImportTarget) {
@@ -718,10 +753,20 @@ function ImportPage() {
 
         try {
             if (isBangumiMode) {
-                const response = await importBangumiSeason(bangumiPayload)
+                const startedJob = await startBangumiSeasonImportJob(bangumiPayload)
                 setSelectedTarget('SUBJECT')
-                setImportResult({ target: 'SUBJECT', data: response })
-                setFeedbackMessage(`已从 Bangumi 导入 ${response.importedCount} 条作品`)
+                setBangumiJobStatus({
+                    jobId: startedJob.jobId,
+                    status: 'RUNNING',
+                    stage: 'STARTING',
+                    message: '导入任务已启动，正在准备请求 Bangumi',
+                    percent: 1,
+                    result: null,
+                    errorMessage: null,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                })
+                await waitForBangumiImportJob(startedJob.jobId)
                 return
             }
 
@@ -959,6 +1004,7 @@ function ImportPage() {
                                 quarter={bangumiQuarter}
                                 includeWeb={bangumiIncludeWeb}
                                 japaneseOnly={bangumiJapaneseOnly}
+                                jobStatus={bangumiJobStatus}
                                 onYearChange={(year) => {
                                     setBangumiYear(year)
                                     resetResultState()
@@ -1170,6 +1216,7 @@ type BangumiSeasonPanelProps = {
     quarter: ReleaseQuarter
     includeWeb: boolean
     japaneseOnly: boolean
+    jobStatus: BangumiImportJobStatusResponse | null
     onYearChange: (year: number) => void
     onQuarterChange: (quarter: ReleaseQuarter) => void
     onIncludeWebChange: (includeWeb: boolean) => void
@@ -1181,12 +1228,21 @@ function BangumiSeasonPanel({
     quarter,
     includeWeb,
     japaneseOnly,
+    jobStatus,
     onYearChange,
     onQuarterChange,
     onIncludeWebChange,
     onJapaneseOnlyChange,
 }: BangumiSeasonPanelProps) {
     const selectedQuarter = bangumiQuarterOptions.find((option) => option.value === quarter)
+    const progressPercent = jobStatus?.percent ?? 0
+    const progressMessage = jobStatus?.errorMessage || jobStatus?.message || '等待导入任务开始'
+    const progressTone =
+        jobStatus?.status === 'FAILED'
+            ? 'from-rose-400 to-orange-300'
+            : jobStatus?.status === 'SUCCESS'
+              ? 'from-emerald-400 to-sky-300'
+              : 'from-sky-400 to-violet-300'
 
     return (
         <div className="mt-4 overflow-hidden rounded-[28px] border border-sky-100/80 bg-gradient-to-br from-sky-50/72 via-white/62 to-violet-50/60 p-5 shadow-sm">
@@ -1292,6 +1348,34 @@ function BangumiSeasonPanel({
                     </span>
                 </label>
             </div>
+
+            {jobStatus ? (
+                <div className="mt-5 rounded-[24px] border border-white/75 bg-white/68 p-4 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p className="text-sm font-black text-slate-700">
+                                Bangumi 导入进度
+                            </p>
+                            <p className="mt-1 text-xs leading-5 text-slate-400">
+                                {progressMessage}
+                            </p>
+                        </div>
+                        <span className="rounded-full border border-sky-100 bg-sky-50/85 px-3 py-1 text-xs font-black text-sky-600">
+                            {jobStatus.stage} · {progressPercent}%
+                        </span>
+                    </div>
+
+                    <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100/80">
+                        <div
+                            className={[
+                                'h-full rounded-full bg-gradient-to-r transition-all duration-500',
+                                progressTone,
+                            ].join(' ')}
+                            style={{ width: `${Math.max(3, progressPercent)}%` }}
+                        />
+                    </div>
+                </div>
+            ) : null}
         </div>
     )
 }

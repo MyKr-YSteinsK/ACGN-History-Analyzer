@@ -38,6 +38,12 @@ public class SubjectController {
                     BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getMessage()
             );
         }
+        if (subjectService.subjectSourceUniqueExistsForCreate(request)) {
+            return ApiResponse.fail(
+                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
+                    "来源作品已存在，请勿重复添加"
+            );
+        }
         SubjectResponse savedSubject = subjectService.createSubject(request);
         return ApiResponse.success(savedSubject);
     }
@@ -128,6 +134,12 @@ public class SubjectController {
             return ApiResponse.fail(
                     BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
                     BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getMessage()
+            );
+        }
+        if (subjectService.subjectSourceUniqueExistsForUpdate(id, request)) {
+            return ApiResponse.fail(
+                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
+                    "来源作品已存在，请勿重复添加"
             );
         }
 

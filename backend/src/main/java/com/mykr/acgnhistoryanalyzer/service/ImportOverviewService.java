@@ -65,6 +65,18 @@ public class ImportOverviewService {
                         "按年份与月份档期从 Bangumi 拉取动画作品，复用 subject 导入规则正式写入作品库。"
                 ),
                 new ImportEndpointDocResponse(
+                        "Bangumi 导入任务启动",
+                        "POST",
+                        "/api/import/bangumi/season/import-jobs",
+                        "启动异步 Bangumi 导入任务，返回 jobId，前端用它查询导入进度。"
+                ),
+                new ImportEndpointDocResponse(
+                        "Bangumi 导入任务进度",
+                        "GET",
+                        "/api/import/bangumi/season/import-jobs/{jobId}",
+                        "查询 Bangumi 导入任务的阶段、百分比、当前消息和最终写入结果。"
+                ),
+                new ImportEndpointDocResponse(
                         "record 导入模板",
                         "GET",
                         "/api/import/templates/record",

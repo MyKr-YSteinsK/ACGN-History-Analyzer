@@ -56,16 +56,63 @@ public class BangumiSeasonImportService {
     }
 
     public SubjectImportResponse importSeason(BangumiSeasonImportRequest request) {
-        SubjectBatchImportRequest batchRequest = buildSubjectBatchImportRequest(request);
-        return subjectService.importSubjects(batchRequest);
+        return importSeason(request, null);
     }
 
     private SubjectBatchImportRequest buildSubjectBatchImportRequest(BangumiSeasonImportRequest request) {
-        List<JsonNode> bangumiSubjects = fetchSeasonSubjects(request);
+        return buildSubjectBatchImportRequest(request, null);
+    }
+
+    public synchronized SubjectImportResponse importSeason(BangumiSeasonImportRequest request,
+                                                           BangumiImportProgressReporter progressReporter) {
+        SubjectBatchImportRequest batchRequest = buildSubjectBatchImportRequest(request, progressReporter);
+        int totalCount = batchRequest.getSubjects().size();
+        if (progressReporter != null) {
+            progressReporter.update(55, "IMPORTING", "准备写入作品并缓存封面，共 " + totalCount + " 条");
+        }
+
+        SubjectImportResponse response = subjectService.importSubjects(
+                batchRequest,
+                (currentIndex, itemTotalCount, displayTitle) -> {
+                    if (progressReporter == null) {
+                        return;
+                    }
+                    int percent = itemTotalCount <= 0
+                            ? 95
+                            : 55 + (int) Math.floor((currentIndex - 1) * 40.0 / itemTotalCount);
+                    progressReporter.update(
+                            Math.min(95, Math.max(55, percent)),
+                            "IMPORTING",
+                            "正在写入并缓存封面 " + currentIndex + "/" + itemTotalCount + "：" + displayTitle
+                    );
+                }
+        );
+
+        if (progressReporter != null) {
+            progressReporter.update(100, "DONE", "导入完成");
+        }
+        return response;
+    }
+
+    private SubjectBatchImportRequest buildSubjectBatchImportRequest(BangumiSeasonImportRequest request,
+                                                                     BangumiImportProgressReporter progressReporter) {
+        if (progressReporter != null) {
+            progressReporter.update(5, "FETCHING", "正在连接 Bangumi，准备获取作品列表");
+        }
+
+        List<JsonNode> bangumiSubjects = fetchSeasonSubjects(request, progressReporter);
+        if (progressReporter != null) {
+            progressReporter.update(38, "MAPPING", "正在整理 Bangumi 字段与作品标签");
+        }
+
         List<SubjectCreateRequest> subjects = bangumiSubjects.stream()
                 .filter(subject -> shouldKeepSubject(subject, request))
                 .map(subject -> toSubjectCreateRequest(subject, request))
                 .toList();
+
+        if (progressReporter != null) {
+            progressReporter.update(48, "CHECKING", "已整理 " + subjects.size() + " 条候选作品，准备进入导入校验");
+        }
 
         SubjectBatchImportRequest batchRequest = new SubjectBatchImportRequest();
         batchRequest.setSubjects(subjects);
@@ -73,6 +120,11 @@ public class BangumiSeasonImportService {
     }
 
     private List<JsonNode> fetchSeasonSubjects(BangumiSeasonImportRequest request) {
+        return fetchSeasonSubjects(request, null);
+    }
+
+    private List<JsonNode> fetchSeasonSubjects(BangumiSeasonImportRequest request,
+                                               BangumiImportProgressReporter progressReporter) {
         int month = toBangumiMonth(request.getQuarter());
         Set<Integer> categories = new LinkedHashSet<>();
         categories.add(ANIME_CATEGORY_TV);
@@ -81,8 +133,17 @@ public class BangumiSeasonImportService {
         }
 
         Map<String, JsonNode> subjectById = new LinkedHashMap<>();
+        int categoryIndex = 0;
         for (Integer category : categories) {
-            fetchCategorySubjects(request.getYear(), month, category)
+            categoryIndex++;
+            if (progressReporter != null) {
+                progressReporter.update(
+                        categoryIndex == 1 ? 10 : 24,
+                        "FETCHING",
+                        "正在获取 Bangumi " + categoryName(category) + " 动画列表"
+                );
+            }
+            fetchCategorySubjects(request.getYear(), month, category, progressReporter)
                     .forEach(subject -> {
                         String id = subject.path("id").asText("");
                         if (!id.isBlank()) {
@@ -94,11 +155,23 @@ public class BangumiSeasonImportService {
     }
 
     private List<JsonNode> fetchCategorySubjects(Integer year, int month, int category) {
+        return fetchCategorySubjects(year, month, category, null);
+    }
+
+    private List<JsonNode> fetchCategorySubjects(Integer year, int month, int category,
+                                                 BangumiImportProgressReporter progressReporter) {
         List<JsonNode> subjects = new ArrayList<>();
         int offset = 0;
         int pageCount = 0;
 
         while (pageCount < MAX_PAGE_COUNT) {
+            if (progressReporter != null) {
+                progressReporter.update(
+                        Math.min(35, 12 + pageCount * 4),
+                        "FETCHING",
+                        "正在获取 " + categoryName(category) + " 第 " + (pageCount + 1) + " 页"
+                );
+            }
             JsonNode page = fetchBangumiSubjectsPage(year, month, category, offset);
             JsonNode data = page.path("data");
             if (!data.isArray() || data.isEmpty()) {
@@ -118,6 +191,13 @@ public class BangumiSeasonImportService {
         }
 
         return subjects;
+    }
+
+    private String categoryName(int category) {
+        if (category == ANIME_CATEGORY_WEB) {
+            return "WEB";
+        }
+        return "TV";
     }
 
     private JsonNode fetchBangumiSubjectsPage(Integer year, int month, int category, int offset) {
