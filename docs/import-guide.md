@@ -20,6 +20,9 @@
 POST /api/subjects/import/preview
 POST /api/subjects/import
 
+POST /api/import/bangumi/season/preview
+POST /api/import/bangumi/season/import
+
 POST /api/collections/import/preview
 POST /api/collections/import
 
@@ -41,6 +44,17 @@ POST /api/records/import
 页面展示顺序是：一月、四月、七月、十月。
 
 ## 作品库 JSON
+
+### Bangumi 新番自动导入
+
+导入页的“Bangumi 新番”模式可以直接选择年份和月份档期。后端会调用 Bangumi 官方 `/v0/subjects` 浏览接口，按 `type=2`、`cat=1`、`year`、`month` 拉取 TV 动画，再转换成普通 `subjects` 导入请求。
+
+可选项：
+
+- 优先日本动画：使用 Bangumi 的“日本”标签做轻量过滤。
+- 包含 WEB 动画：额外拉取 Bangumi `cat=5` 的 WEB 动画。
+
+正式写入时仍然复用作品导入逻辑，所以重复判断、结构化标签、封面缓存都会按原规则执行。
 
 顶层必须是对象，字段必须叫 `subjects`。
 

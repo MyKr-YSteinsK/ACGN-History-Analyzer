@@ -1,4 +1,9 @@
-import { apiGet } from './request'
+import { apiGet, apiPost } from './request'
+import type { ReleaseQuarter } from '../types/common'
+import type {
+    SubjectImportPreviewResponse,
+    SubjectImportResponse,
+} from './subjectApi'
 
 export type ImportEndpointDocResponse = {
     name: string
@@ -32,6 +37,13 @@ export type ImportTemplateResponse = {
     fields: ImportFieldDocResponse[]
 }
 
+export type BangumiSeasonImportRequest = {
+    year: number
+    quarter: ReleaseQuarter
+    includeWeb: boolean
+    japaneseOnly: boolean
+}
+
 export function getImportOverview() {
     return apiGet<ImportOverviewResponse>('/import/overview')
 }
@@ -46,4 +58,18 @@ export function getRecordImportTemplate() {
 
 export function getCollectionImportTemplate() {
     return apiGet<ImportTemplateResponse>('/import/templates/collection')
+}
+
+export function previewBangumiSeasonImport(payload: BangumiSeasonImportRequest) {
+    return apiPost<SubjectImportPreviewResponse, BangumiSeasonImportRequest>(
+        '/import/bangumi/season/preview',
+        payload,
+    )
+}
+
+export function importBangumiSeason(payload: BangumiSeasonImportRequest) {
+    return apiPost<SubjectImportResponse, BangumiSeasonImportRequest>(
+        '/import/bangumi/season/import',
+        payload,
+    )
 }

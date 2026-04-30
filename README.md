@@ -231,6 +231,7 @@ TOP 页按 ACGN 类型切换，不提供“全部”混排。
 - 正式记录导入
 - JSON 粘贴
 - CSV 粘贴 / 文件读取
+- Bangumi 新番自动导入
 - 模板字段说明
 - 预览校验
 - 确认写入
@@ -328,7 +329,7 @@ docs/import-guide.md
 TOP 榜单       -> /api/top/*、/api/records/stats/*
 收藏夹         -> /api/collections/*
 系列管理       -> /api/franchises/*
-导入中心       -> /api/import/*、/api/subjects/import、/api/records/import、/api/collections/import
+导入中心       -> /api/import/*、/api/import/bangumi/*、/api/subjects/import、/api/records/import、/api/collections/import
 智能分析       -> /api/llm/*
 选项数据       -> /api/options/*
 ```
@@ -466,6 +467,8 @@ GET    /api/import/overview
 GET    /api/import/templates/subject
 GET    /api/import/templates/record
 GET    /api/import/templates/collection
+POST   /api/import/bangumi/season/preview
+POST   /api/import/bangumi/season/import
 GET    /api/llm/status
 GET    /api/llm/analysis/*
 GET    /api/llm/qa
@@ -793,7 +796,6 @@ docs/thesis-demo-route.md
 - 报告导出为 Markdown / PDF
 - 更细的推荐算法权重
 - 系列自动补全
-- Bangumi 自动导入新番
 - 首页和列表缓存
 - 更丰富的图表组件
 

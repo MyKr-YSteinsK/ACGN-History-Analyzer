@@ -4,6 +4,9 @@ import {
     getImportOverview,
     getRecordImportTemplate,
     getSubjectImportTemplate,
+    importBangumiSeason,
+    previewBangumiSeasonImport,
+    type BangumiSeasonImportRequest,
     type ImportOverviewResponse,
     type ImportTemplateResponse,
 } from '../api/importApi'
@@ -37,6 +40,7 @@ import {
 import { FeedbackBanner } from '../components/common/FeedbackState'
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
+import type { ReleaseQuarter } from '../types/common'
 
 type ImportTarget = 'SUBJECT' | 'COLLECTION' | 'RECORD'
 
@@ -109,9 +113,9 @@ const importModes: Array<{
     },
     {
         value: 'BANGUMI',
-        title: 'Bangumi 链接',
-        description: '平台链接解析入口',
-        enabled: false,
+        title: 'Bangumi 新番',
+        description: '按年份档期自动拉取动画',
+        enabled: true,
     },
     {
         value: 'BACKUP',
@@ -185,6 +189,17 @@ const importFlowSteps = [
         title: '确认写入',
         description: '合法数据写入数据库',
     },
+]
+
+const bangumiQuarterOptions: Array<{
+    value: ReleaseQuarter
+    label: string
+    month: number
+}> = [
+    { value: 1, label: '一月', month: 1 },
+    { value: 2, label: '四月', month: 4 },
+    { value: 3, label: '七月', month: 7 },
+    { value: 4, label: '十月', month: 10 },
 ]
 
 function getErrorMessage(error: unknown) {
@@ -499,6 +514,10 @@ function ImportPage() {
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [loadingDocs, setLoadingDocs] = useState(false)
     const [submitting, setSubmitting] = useState(false)
+    const [bangumiYear, setBangumiYear] = useState(() => new Date().getFullYear())
+    const [bangumiQuarter, setBangumiQuarter] = useState<ReleaseQuarter>(1)
+    const [bangumiIncludeWeb, setBangumiIncludeWeb] = useState(false)
+    const [bangumiJapaneseOnly, setBangumiJapaneseOnly] = useState(true)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
 
     const selectedTemplate = pickTemplate(
@@ -515,6 +534,19 @@ function ImportPage() {
         preview && preview.target === selectedTarget ? preview.data : null
     const activeResult =
         importResult && importResult.target === selectedTarget ? importResult.data : null
+    const isBangumiMode = selectedMode === 'BANGUMI'
+    const bangumiSelectedQuarter = bangumiQuarterOptions.find(
+        (option) => option.value === bangumiQuarter,
+    )
+    const bangumiPayload = useMemo<BangumiSeasonImportRequest>(
+        () => ({
+            year: bangumiYear,
+            quarter: bangumiQuarter,
+            includeWeb: bangumiIncludeWeb,
+            japaneseOnly: bangumiJapaneseOnly,
+        }),
+        [bangumiIncludeWeb, bangumiJapaneseOnly, bangumiQuarter, bangumiYear],
+    )
 
     const draftLineCount = useMemo(() => {
         return draftText.trim() ? draftText.trim().split(/\r?\n/).length : 0
@@ -523,7 +555,7 @@ function ImportPage() {
         ? 4
         : activePreview
           ? 3
-          : draftText.trim()
+          : isBangumiMode || draftText.trim()
             ? 2
             : 1
 
@@ -570,6 +602,10 @@ function ImportPage() {
     }
 
     function handleTargetChange(target: ImportTarget) {
+        if (isBangumiMode && target !== 'SUBJECT') {
+            setSelectedMode('JSON')
+        }
+
         setSelectedTarget(target)
         resetResultState()
 
@@ -589,6 +625,12 @@ function ImportPage() {
         setSelectedMode(mode)
         resetResultState()
 
+        if (mode === 'BANGUMI') {
+            setSelectedTarget('SUBJECT')
+            setDraftText('')
+            return
+        }
+
         if (mode === 'JSON' && selectedTemplate) {
             setDraftText(stringifyTemplate(selectedTemplate))
             return
@@ -600,7 +642,7 @@ function ImportPage() {
     }
 
     function handleLoadTemplate() {
-        if (!selectedTemplate) {
+        if (isBangumiMode || !selectedTemplate) {
             return
         }
 
@@ -613,7 +655,7 @@ function ImportPage() {
     }
 
     async function handleCopyTemplate() {
-        if (!selectedTemplate) {
+        if (isBangumiMode || !selectedTemplate) {
             return
         }
 
@@ -637,6 +679,16 @@ function ImportPage() {
         setFeedbackMessage(null)
 
         try {
+            if (isBangumiMode) {
+                const response = await previewBangumiSeasonImport(bangumiPayload)
+                setSelectedTarget('SUBJECT')
+                setPreview({ target: 'SUBJECT', data: response })
+                setFeedbackMessage(
+                    `已获取 ${bangumiYear} ${bangumiSelectedQuarter?.label ?? ''} Bangumi 新番预览`,
+                )
+                return
+            }
+
             const payload = parseDraftPayload(draftText, selectedMode, selectedTarget)
 
             if (selectedTarget === 'SUBJECT') {
@@ -665,6 +717,14 @@ function ImportPage() {
         setFeedbackMessage(null)
 
         try {
+            if (isBangumiMode) {
+                const response = await importBangumiSeason(bangumiPayload)
+                setSelectedTarget('SUBJECT')
+                setImportResult({ target: 'SUBJECT', data: response })
+                setFeedbackMessage(`已从 Bangumi 导入 ${response.importedCount} 条作品`)
+                return
+            }
+
             const payload = parseDraftPayload(draftText, selectedMode, selectedTarget)
 
             if (selectedTarget === 'SUBJECT') {
@@ -715,7 +775,7 @@ function ImportPage() {
             <PageHero
                 eyebrow="IMPORT"
                 title="导入中心"
-                description="先预览校验，再确认写入。当前支持作品库、收藏夹和个人记录的 JSON / CSV 导入。"
+                description="先预览校验，再确认写入。当前支持 JSON / CSV 批量导入，也可以按年份档期从 Bangumi 自动导入新番作品。"
             />
 
             <ImportFlowStepper currentStep={currentFlowStep} />
@@ -760,12 +820,14 @@ function ImportPage() {
                                     title="收藏夹"
                                     description="导入想看 / 搁置，正式记录会覆盖收藏状态"
                                     active={selectedTarget === 'COLLECTION'}
+                                    disabled={isBangumiMode}
                                     onClick={() => handleTargetChange('COLLECTION')}
                                 />
                                 <TargetCard
                                     title="个人记录"
                                     description="导入正式看过 / 读过 / 玩过的记录"
                                     active={selectedTarget === 'RECORD'}
+                                    disabled={isBangumiMode}
                                     onClick={() => handleTargetChange('RECORD')}
                                 />
                             </div>
@@ -839,21 +901,25 @@ function ImportPage() {
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                                    payload editor
+                                    {isBangumiMode ? 'bangumi season import' : 'payload editor'}
                                 </p>
                                 <h3 className="mt-1 text-xl font-black text-slate-800">
-                                    {getTargetTitle(selectedTarget)}导入内容
+                                    {isBangumiMode
+                                        ? 'Bangumi 新番导入'
+                                        : `${getTargetTitle(selectedTarget)}导入内容`}
                                 </h3>
                                 <p className="mt-1 text-sm text-slate-400">
-                                    当前根字段：{selectedRootKey} · {draftLineCount} 行文本
+                                    {isBangumiMode
+                                        ? `当前选择：${bangumiYear} ${bangumiSelectedQuarter?.label ?? ''} · 写入作品库`
+                                        : `当前根字段：${selectedRootKey} · ${draftLineCount} 行文本`}
                                 </p>
                             </div>
 
-                            <div className="flex flex-wrap gap-2">
+                            <div className={['flex flex-wrap gap-2', isBangumiMode ? 'hidden' : ''].join(' ')}>
                                 <button
                                     type="button"
                                     onClick={handleLoadTemplate}
-                                    disabled={!selectedTemplate}
+                                    disabled={isBangumiMode || !selectedTemplate}
                                     className="rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:text-slate-300"
                                 >
                                     载入模板
@@ -861,7 +927,7 @@ function ImportPage() {
                                 <button
                                     type="button"
                                     onClick={() => void handleCopyTemplate()}
-                                    disabled={!selectedTemplate}
+                                    disabled={isBangumiMode || !selectedTemplate}
                                     className="rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:text-slate-300"
                                 >
                                     复制模板
@@ -869,6 +935,7 @@ function ImportPage() {
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
+                                    disabled={isBangumiMode}
                                     className="rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:bg-white"
                                 >
                                     读取文件
@@ -886,20 +953,45 @@ function ImportPage() {
                             </div>
                         </div>
 
-                        <textarea
-                            value={draftText}
-                            onChange={(event) => {
-                                setDraftText(event.target.value)
-                                resetResultState()
-                            }}
-                            spellCheck={false}
-                            className="mt-4 min-h-[320px] w-full resize-y rounded-[26px] border border-white/75 bg-white/68 px-4 py-4 font-mono text-xs leading-6 text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-sky-200 focus:bg-white"
-                            placeholder={
-                                selectedMode === 'CSV'
-                                    ? '第一行写字段名，每行对应一条数据'
-                                    : '粘贴后端模板 JSON'
-                            }
-                        />
+                        {isBangumiMode ? (
+                            <BangumiSeasonPanel
+                                year={bangumiYear}
+                                quarter={bangumiQuarter}
+                                includeWeb={bangumiIncludeWeb}
+                                japaneseOnly={bangumiJapaneseOnly}
+                                onYearChange={(year) => {
+                                    setBangumiYear(year)
+                                    resetResultState()
+                                }}
+                                onQuarterChange={(quarter) => {
+                                    setBangumiQuarter(quarter)
+                                    resetResultState()
+                                }}
+                                onIncludeWebChange={(includeWeb) => {
+                                    setBangumiIncludeWeb(includeWeb)
+                                    resetResultState()
+                                }}
+                                onJapaneseOnlyChange={(japaneseOnly) => {
+                                    setBangumiJapaneseOnly(japaneseOnly)
+                                    resetResultState()
+                                }}
+                            />
+                        ) : (
+                            <textarea
+                                value={draftText}
+                                onChange={(event) => {
+                                    setDraftText(event.target.value)
+                                    resetResultState()
+                                }}
+                                spellCheck={false}
+                                className="mt-4 min-h-[320px] w-full resize-y rounded-[26px] border border-white/75 bg-white/68 px-4 py-4 font-mono text-xs leading-6 text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-sky-200 focus:bg-white"
+                                placeholder={
+                                    selectedMode === 'CSV'
+                                        ? '第一行写字段名，每行对应一条数据'
+                                        : '粘贴后端模板 JSON'
+                                }
+                            />
+                        )}
 
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                             <div className="flex flex-wrap gap-2 text-xs text-slate-400">
@@ -910,7 +1002,7 @@ function ImportPage() {
                                     确认才写入
                                 </span>
                                 <span className="rounded-full bg-white/65 px-3 py-1.5">
-                                    错误行不阻塞合法行
+                                    {isBangumiMode ? '自动缓存封面' : '错误行不阻塞合法行'}
                                 </span>
                             </div>
 
@@ -918,7 +1010,11 @@ function ImportPage() {
                                 <button
                                     type="button"
                                     onClick={() => void handlePreview()}
-                                    disabled={submitting || loadingDocs || !draftText.trim()}
+                                    disabled={
+                                        submitting ||
+                                        loadingDocs ||
+                                        (!isBangumiMode && !draftText.trim())
+                                    }
                                     className="rounded-2xl border border-sky-200 bg-sky-100/85 px-5 py-3 text-sm font-semibold text-sky-700 transition hover:-translate-y-0.5 hover:bg-sky-100 disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-100 disabled:text-slate-300"
                                 >
                                     {submitting ? '处理中' : '预览校验'}
@@ -974,6 +1070,7 @@ type TargetCardProps = {
     title: string
     description: string
     active: boolean
+    disabled?: boolean
     onClick: () => void
 }
 
@@ -1047,14 +1144,17 @@ function ImportFlowStepper({ currentStep }: ImportFlowStepperProps) {
     )
 }
 
-function TargetCard({ title, description, active, onClick }: TargetCardProps) {
+function TargetCard({ title, description, active, disabled = false, onClick }: TargetCardProps) {
     return (
         <button
             type="button"
             onClick={onClick}
+            disabled={disabled}
             className={[
                 'rounded-[24px] border p-4 text-left transition-all duration-200',
-                active
+                disabled
+                    ? 'cursor-not-allowed border-white/50 bg-white/35 text-slate-300'
+                    : active
                     ? 'border-sky-200 bg-sky-100/80 text-sky-700 shadow-sm'
                     : 'border-white/70 bg-white/55 text-slate-500 hover:-translate-y-0.5 hover:bg-white/75',
             ].join(' ')}
@@ -1062,6 +1162,137 @@ function TargetCard({ title, description, active, onClick }: TargetCardProps) {
             <p className="text-lg font-black">{title}</p>
             <p className="mt-1 text-sm leading-6 opacity-75">{description}</p>
         </button>
+    )
+}
+
+type BangumiSeasonPanelProps = {
+    year: number
+    quarter: ReleaseQuarter
+    includeWeb: boolean
+    japaneseOnly: boolean
+    onYearChange: (year: number) => void
+    onQuarterChange: (quarter: ReleaseQuarter) => void
+    onIncludeWebChange: (includeWeb: boolean) => void
+    onJapaneseOnlyChange: (japaneseOnly: boolean) => void
+}
+
+function BangumiSeasonPanel({
+    year,
+    quarter,
+    includeWeb,
+    japaneseOnly,
+    onYearChange,
+    onQuarterChange,
+    onIncludeWebChange,
+    onJapaneseOnlyChange,
+}: BangumiSeasonPanelProps) {
+    const selectedQuarter = bangumiQuarterOptions.find((option) => option.value === quarter)
+
+    return (
+        <div className="mt-4 overflow-hidden rounded-[28px] border border-sky-100/80 bg-gradient-to-br from-sky-50/72 via-white/62 to-violet-50/60 p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-400">
+                        official bangumi api
+                    </p>
+                    <h4 className="mt-1 text-2xl font-black text-slate-800">
+                        {year} {selectedQuarter?.label ?? ''}动画档期
+                    </h4>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                        调用 Bangumi 官方作品浏览接口，拉取对应年份与月份档期的 TV 动画；预览只检查重复和字段，确认写入后会进入作品库并缓存封面。
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-2 rounded-full border border-white/80 bg-white/70 p-1 shadow-sm">
+                    <button
+                        type="button"
+                        onClick={() => onYearChange(year - 1)}
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-lg font-black text-sky-500 transition hover:bg-sky-50"
+                        aria-label="上一年"
+                    >
+                        ‹
+                    </button>
+                    <input
+                        type="number"
+                        min={1900}
+                        max={2100}
+                        value={year}
+                        onChange={(event) => {
+                            const nextYear = Number(event.target.value)
+                            if (!Number.isNaN(nextYear)) {
+                                onYearChange(nextYear)
+                            }
+                        }}
+                        className="h-10 w-24 rounded-full border border-sky-100 bg-white/80 text-center text-lg font-black text-slate-700 outline-none focus:border-sky-200"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => onYearChange(year + 1)}
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-lg font-black text-sky-500 transition hover:bg-sky-50"
+                        aria-label="下一年"
+                    >
+                        ›
+                    </button>
+                </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-4">
+                {bangumiQuarterOptions.map((option) => {
+                    const active = quarter === option.value
+
+                    return (
+                        <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => onQuarterChange(option.value)}
+                            className={[
+                                'rounded-[24px] border p-4 text-left transition-all duration-200',
+                                active
+                                    ? 'scale-[1.02] border-sky-200 bg-white/86 text-sky-700 shadow-md shadow-sky-100/70'
+                                    : 'border-white/70 bg-white/55 text-slate-500 hover:-translate-y-0.5 hover:bg-white/75',
+                            ].join(' ')}
+                        >
+                            <span className="text-2xl font-black">{option.label}</span>
+                            <span className="mt-1 block text-xs font-semibold text-slate-400">
+                                对应 {option.month} 月档
+                            </span>
+                        </button>
+                    )
+                })}
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-[22px] border border-white/75 bg-white/58 p-4 transition hover:bg-white/75">
+                    <input
+                        type="checkbox"
+                        checked={japaneseOnly}
+                        onChange={(event) => onJapaneseOnlyChange(event.target.checked)}
+                        className="mt-1 h-4 w-4 accent-sky-500"
+                    />
+                    <span>
+                        <span className="block text-sm font-black text-slate-700">优先日本动画</span>
+                        <span className="mt-1 block text-xs leading-5 text-slate-400">
+                            使用 Bangumi 的“日本”标签做轻量过滤；如果你发现漏作品，可以关闭后重新预览。
+                        </span>
+                    </span>
+                </label>
+
+                <label className="flex cursor-pointer items-start gap-3 rounded-[22px] border border-white/75 bg-white/58 p-4 transition hover:bg-white/75">
+                    <input
+                        type="checkbox"
+                        checked={includeWeb}
+                        onChange={(event) => onIncludeWebChange(event.target.checked)}
+                        className="mt-1 h-4 w-4 accent-violet-500"
+                    />
+                    <span>
+                        <span className="block text-sm font-black text-slate-700">包含 WEB 动画</span>
+                        <span className="mt-1 block text-xs leading-5 text-slate-400">
+                            默认只导入 TV 动画；打开后会额外拉取 WEB 类目，适合补充网播短片或平台动画。
+                        </span>
+                    </span>
+                </label>
+            </div>
+        </div>
     )
 }
 

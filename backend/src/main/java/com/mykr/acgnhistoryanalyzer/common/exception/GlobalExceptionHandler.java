@@ -20,4 +20,10 @@ public class GlobalExceptionHandler {
 
         return ApiResponse.fail(4000, message);
     }
+
+    @ExceptionHandler(BangumiImportException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public ApiResponse<?> handleBangumiImportException(BangumiImportException ex) {
+        return ApiResponse.fail(5020, ex.getMessage());
+    }
 }

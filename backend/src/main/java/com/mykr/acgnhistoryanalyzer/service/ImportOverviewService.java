@@ -29,6 +29,7 @@ public class ImportOverviewService {
                 "月份档期规则：1=一月，2=四月，3=七月，4=十月。",
                 "subject 导入时 tagNames 会写入结构化标签系统，后续作品库可按标签筛选。",
                 "subject 导入时 coverUrl 可以填写 Bangumi 图片地址，正式导入会尝试缓存成本地 /api/assets/covers 路径。",
+                "Bangumi 新番导入会调用官方 /v0/subjects 接口，按年份与一月/四月/七月/十月档期拉取 TV 动画，可选择是否包含 WEB 动画。",
                 "preview 接口只检查、不写库；正式 import 接口才会真正写数据库。"
         );
 
@@ -50,6 +51,18 @@ public class ImportOverviewService {
                         "POST",
                         "/api/subjects/import",
                         "正式批量导入作品到 subject 表。"
+                ),
+                new ImportEndpointDocResponse(
+                        "Bangumi 新番预览",
+                        "POST",
+                        "/api/import/bangumi/season/preview",
+                        "按年份与月份档期从 Bangumi 拉取动画作品，转换为 subject 导入预览，不写库。"
+                ),
+                new ImportEndpointDocResponse(
+                        "Bangumi 新番导入",
+                        "POST",
+                        "/api/import/bangumi/season/import",
+                        "按年份与月份档期从 Bangumi 拉取动画作品，复用 subject 导入规则正式写入作品库。"
                 ),
                 new ImportEndpointDocResponse(
                         "record 导入模板",
