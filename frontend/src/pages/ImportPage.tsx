@@ -84,6 +84,7 @@ type PreviewItem = {
     message: string
     sourcePlatform?: string | null
     sourceId?: string | null
+    changeSummary?: string | null
 }
 
 type BangumiPreviewProgress = {
@@ -474,6 +475,7 @@ function getPreviewItems(preview: PreviewState | null): PreviewItem[] {
             message: item.message,
             sourcePlatform: item.sourcePlatform,
             sourceId: item.sourceId,
+            changeSummary: item.changeSummary,
         }))
     }
 
@@ -1761,7 +1763,14 @@ function ImportItemList({ items, onExcludeItem, emptyText }: ImportItemListProps
                                 </span>
                             </div>
                             <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-xs leading-5 text-slate-400">{item.message}</p>
+                                <div className="space-y-1">
+                                    <p className="text-xs leading-5 text-slate-400">{item.message}</p>
+                                    {item.changeSummary ? (
+                                        <p className="text-[11px] leading-5 text-slate-500">
+                                            变化摘要：{item.changeSummary}
+                                        </p>
+                                    ) : null}
+                                </div>
                                 {onExcludeItem && item.result === 'CAN_IMPORT' ? (
                                     <button
                                         type="button"

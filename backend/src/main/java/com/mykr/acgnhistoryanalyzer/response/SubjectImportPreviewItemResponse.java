@@ -7,18 +7,26 @@ public class SubjectImportPreviewItemResponse {
     private String message;
     private String sourcePlatform;
     private String sourceId;
+    private String changeSummary;
 
     public SubjectImportPreviewItemResponse(String displayTitle, String result, String message) {
-        this(displayTitle, result, message, null, null);
+        this(displayTitle, result, message, null, null, null);
     }
 
     public SubjectImportPreviewItemResponse(String displayTitle, String result, String message,
                                             String sourcePlatform, String sourceId) {
+        this(displayTitle, result, message, sourcePlatform, sourceId, null);
+    }
+
+    public SubjectImportPreviewItemResponse(String displayTitle, String result, String message,
+                                            String sourcePlatform, String sourceId,
+                                            String changeSummary) {
         this.displayTitle = displayTitle;
         this.result = result;
         this.message = message;
         this.sourcePlatform = sourcePlatform;
         this.sourceId = sourceId;
+        this.changeSummary = changeSummary;
     }
 
     public String getDisplayTitle() {
@@ -39,5 +47,9 @@ public class SubjectImportPreviewItemResponse {
 
     public String getSourceId() {
         return sourceId;
+    }
+
+    public String getChangeSummary() {
+        return changeSummary;
     }
 }

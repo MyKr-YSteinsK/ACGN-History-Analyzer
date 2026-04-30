@@ -104,6 +104,7 @@ export type SubjectImportPreviewItemResponse = {
     message: string
     sourcePlatform?: string | null
     sourceId?: string | null
+    changeSummary?: string | null
 }
 
 export type SubjectImportPreviewResponse = {

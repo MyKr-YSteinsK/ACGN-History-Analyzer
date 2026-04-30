@@ -492,7 +492,8 @@ public class SubjectService {
                             "UPDATED",
                             buildSubjectImportUpdatePreviewMessage(item, resolvedFranchiseId),
                             item.getSourcePlatform(),
-                            item.getSourceId()
+                            item.getSourceId(),
+                            buildSubjectPreviewChangeSummary(existingSubject, item)
                     ));
                 } else {
                     skippedCount++;
@@ -501,7 +502,8 @@ public class SubjectService {
                             "SKIPPED",
                             "作品已存在且标签、评分、集数一致，正式导入时会跳过",
                             item.getSourcePlatform(),
-                            item.getSourceId()
+                            item.getSourceId(),
+                            "标签、评分、集数均无变化"
                     ));
                 }
                 rowNumber++;
@@ -661,24 +663,9 @@ public class SubjectService {
             return false;
         }
 
-        return !equalsText(subject.getTitleCn(), request.getTitleCn())
-                || !equalsText(subject.getSubtitle(), request.getSubtitle())
-                || !equalsText(subject.getDisplayTitle(), request.getDisplayTitle())
-                || !equalsNumber(subject.getSeasonIndex(), request.getSeasonIndex())
-                || !equalsNumber(subject.getPartIndex(), request.getPartIndex())
-                || !equalsNumber(subject.getFranchiseId(), franchiseId)
-                || !equalsText(subject.getCoverUrl(), resolveCoverUrl(request))
-                || !equalsText(subject.getSummary(), request.getSummary())
-                || !equalsNumber(subject.getReleaseYear(), request.getReleaseYear())
-                || !equalsNumber(subject.getReleaseQuarter(), request.getReleaseQuarter())
-                || !equalsText(subject.getCategory(), request.getCategory())
-                || !equalsText(subject.getStudioName(), request.getStudioName())
-                || !equalsText(subject.getPlatformLink(), request.getPlatformLink())
+        return !hasSameTags(subject.getStructuredTags(), request.getTagNames())
                 || !equalsNumber(subject.getPlatformScore(), request.getPlatformScore())
-                || !equalsNumber(subject.getEpisodeCount(), request.getEpisodeCount())
-                || !equalsText(subject.getSourcePlatform(), request.getSourcePlatform())
-                || !equalsText(subject.getSourceId(), request.getSourceId())
-                || !equalsText(subject.getStatus(), request.getStatus());
+                || !equalsNumber(subject.getEpisodeCount(), request.getEpisodeCount());
     }
 
     private Subject applyImportUpdate(Subject target, SubjectCreateRequest request, Long franchiseId) {
@@ -703,8 +690,37 @@ public class SubjectService {
         return target;
     }
 
-    private boolean equalsText(String left, String right) {
-        return normalizeTextKey(left).equals(normalizeTextKey(right));
+    private boolean hasSameTags(Set<Tag> structuredTags, List<String> tagNames) {
+        List<String> existing = structuredTags == null ? List.of() : structuredTags.stream()
+                .map(Tag::getName)
+                .map(this::normalizeTextKey)
+                .sorted()
+                .toList();
+        List<String> incoming = tagService.resolveAllowedSubjectTagNames(tagNames).stream()
+                .map(this::normalizeTextKey)
+                .sorted()
+                .toList();
+        return existing.equals(incoming);
+    }
+
+    private String buildSubjectPreviewChangeSummary(Subject subject, SubjectCreateRequest request) {
+        List<String> changes = new ArrayList<>();
+
+        if (!hasSameTags(subject.getStructuredTags(), request.getTagNames())) {
+            changes.add("标签变化");
+        }
+        if (!equalsNumber(subject.getPlatformScore(), request.getPlatformScore())) {
+            changes.add("评分变化");
+        }
+        if (!equalsNumber(subject.getEpisodeCount(), request.getEpisodeCount())) {
+            changes.add("集数变化");
+        }
+
+        if (changes.isEmpty()) {
+            return "标签、评分、集数均无变化";
+        }
+
+        return String.join("、", changes);
     }
 
     private boolean equalsNumber(Number left, Number right) {
