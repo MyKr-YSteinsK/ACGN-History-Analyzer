@@ -719,6 +719,7 @@ type AnalysisReportProps = {
 }
 
 function AnalysisReport({ report, history, activeCategory }: AnalysisReportProps) {
+    const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
     const visibleWarnings = report.warnings
         .map(polishAnalysisText)
         .filter(Boolean)
@@ -729,6 +730,17 @@ function AnalysisReport({ report, history, activeCategory }: AnalysisReportProps
         activeCategory === 'ALL'
             ? null
             : categoryTheme[activeCategory]
+
+    async function handleCopyMarkdown() {
+        try {
+            await navigator.clipboard.writeText(formatAnalysisReportMarkdown(report))
+            setCopyStatus('success')
+        } catch {
+            setCopyStatus('error')
+        }
+
+        window.setTimeout(() => setCopyStatus('idle'), 2200)
+    }
 
     return (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_370px]">
@@ -752,9 +764,22 @@ function AnalysisReport({ report, history, activeCategory }: AnalysisReportProps
                             </p>
                         </div>
 
-                        <span className="rounded-full border border-emerald-200 bg-emerald-50/85 px-4 py-2 text-xs font-black text-emerald-700">
-                            已生成
-                        </span>
+                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                            <span className="rounded-full border border-emerald-200 bg-emerald-50/85 px-4 py-2 text-xs font-black text-emerald-700">
+                                已生成
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => void handleCopyMarkdown()}
+                                className="rounded-full border border-sky-200 bg-white/75 px-4 py-2 text-xs font-black text-sky-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-50"
+                            >
+                                {copyStatus === 'success'
+                                    ? '已复制'
+                                    : copyStatus === 'error'
+                                      ? '复制失败'
+                                      : '复制 Markdown'}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="mt-5 flex flex-wrap gap-2">
@@ -1161,6 +1186,96 @@ function formatGeneratedAt(value: string) {
     }
 
     return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function formatAnalysisReportMarkdown(report: LlmAnalysisResponse) {
+    const lines: string[] = []
+    const scopeParts = [
+        report.scope.year ? `${report.scope.year} 年` : null,
+        report.scope.quarter ? getReleaseQuarterLabel(report.scope.quarter) : null,
+        report.scope.category ? categoryTheme[report.scope.category].cnName : null,
+    ].filter(Boolean)
+
+    lines.push(`# ${polishAnalysisText(report.title)}`)
+    lines.push('')
+
+    if (scopeParts.length > 0) {
+        lines.push(`分析范围：${scopeParts.join(' / ')}`)
+        lines.push('')
+    }
+
+    lines.push(`生成时间：${formatGeneratedAt(report.generatedAt)}`)
+    lines.push('')
+    lines.push('## 摘要')
+    lines.push('')
+    lines.push(polishAnalysisText(report.summary) || '暂无摘要。')
+    lines.push('')
+
+    if (report.keywords.length > 0) {
+        lines.push('## 关键词')
+        lines.push('')
+        lines.push(report.keywords.map((keyword) => `#${polishAnalysisText(keyword)}`).join(' '))
+        lines.push('')
+    }
+
+    if (report.sections.length > 0) {
+        lines.push('## 分析正文')
+        lines.push('')
+        report.sections.forEach((section, index) => {
+            lines.push(`### ${index + 1}. ${polishAnalysisText(section.title)}`)
+            lines.push('')
+            lines.push(polishAnalysisText(section.content) || '暂无内容。')
+            lines.push('')
+        })
+    }
+
+    if (report.recommendations.length > 0) {
+        lines.push('## 推荐候选')
+        lines.push('')
+        report.recommendations.forEach((item, index) => {
+            lines.push(`### ${index + 1}. ${polishAnalysisText(item.title)}`)
+            lines.push('')
+            lines.push(`- 类型：${categoryTheme[item.category].cnName}`)
+            lines.push(`- 来源：${getSourceLabel(item.source)}`)
+            lines.push(`- 优先级：${getPriorityLabel(item.priority)}`)
+            lines.push(`- 匹配度：${item.matchScore}`)
+            if (item.platformScore !== null && item.platformScore !== undefined) {
+                lines.push(`- 平台评分：${Number(item.platformScore).toFixed(1)}`)
+            }
+            if (item.tags.length > 0) {
+                lines.push(`- 标签：${item.tags.map((tag) => `#${polishAnalysisText(tag)}`).join(' ')}`)
+            }
+            if (item.franchiseName) {
+                lines.push(`- 系列：${polishAnalysisText(item.franchiseName)}`)
+            }
+            lines.push(`- 推荐理由：${polishAnalysisText(item.reason)}`)
+            lines.push(`- 匹配依据：${polishAnalysisText(item.evidence)}`)
+            lines.push(`- 可能风险：${polishAnalysisText(item.risk)}`)
+            lines.push('')
+        })
+    }
+
+    if (report.evidence.length > 0) {
+        lines.push('## 引用依据')
+        lines.push('')
+        report.evidence
+            .map(polishAnalysisText)
+            .filter(Boolean)
+            .forEach((item) => lines.push(`- ${item}`))
+        lines.push('')
+    }
+
+    if (report.warnings.length > 0) {
+        lines.push('## 安全边界')
+        lines.push('')
+        report.warnings
+            .map(polishAnalysisText)
+            .filter(Boolean)
+            .forEach((item) => lines.push(`- ${item}`))
+        lines.push('')
+    }
+
+    return lines.join('\n').trim()
 }
 
 function polishAnalysisText(value: string | null | undefined) {
