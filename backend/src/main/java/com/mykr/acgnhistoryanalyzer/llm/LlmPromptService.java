@@ -80,6 +80,14 @@ public class LlmPromptService {
         return buildBasePrompt(scope);
     }
 
+    public String buildInterestTrendPrompt(String category) {
+        String scope = category == null || category.isBlank()
+                ? "个人 ACGN 兴趣变化趋势分析"
+                : category + " 兴趣变化趋势分析";
+
+        return buildBasePrompt(scope);
+    }
+
     public String buildFranchiseCompletionPrompt(String category) {
         String scope = category == null || category.isBlank()
                 ? "系列补完分析"

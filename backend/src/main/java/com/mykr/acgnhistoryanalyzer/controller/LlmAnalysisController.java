@@ -103,6 +103,13 @@ public class LlmAnalysisController {
         return ApiResponse.success(llmAnalysisService.generatePreferenceContradictions(category));
     }
 
+    @GetMapping("/analysis/interest-trend")
+    public ApiResponse<LlmAnalysisResponse> generateInterestTrend(
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(llmAnalysisService.generateInterestTrend(category));
+    }
+
     @GetMapping("/analysis/franchise-completion")
     public ApiResponse<LlmAnalysisResponse> generateFranchiseCompletion(
             @RequestParam(required = false) String category

@@ -337,6 +337,50 @@ public class LlmContextBuilder {
         return context;
     }
 
+    public Map<String, Object> buildInterestTrendContext(String category) {
+        List<UserSubjectRecordResponse> records = filterByCategory(
+                userSubjectRecordService.getRecords(null, null, null, null),
+                category
+        );
+        Map<String, List<Map<String, Object>>> tagPreferenceGroups = buildTagPreferenceGroups(records);
+        List<Map<String, Object>> yearScoreTrend = buildYearScoreTrend(records);
+        List<Map<String, Object>> yearlyCategoryTrend = buildYearlyCategoryTrend(records);
+        List<Map<String, Object>> yearlyTagTrend = buildYearlyTagTrend(records);
+        Map<String, Object> trendSignals = buildInterestTrendSignals(
+                yearScoreTrend,
+                yearlyCategoryTrend,
+                yearlyTagTrend
+        );
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "INTEREST_TREND");
+        context.put("category", category);
+        context.put("comparisonLabel", "最早年份到最近年份");
+        context.put("totalRecords", records.size());
+        context.put("previousYearTotalRecords", readTrendCount(yearScoreTrend, false));
+        context.put("yearOverYearDiff", readTrendCount(yearScoreTrend, true) - readTrendCount(yearScoreTrend, false));
+        context.put("averageScore", averageScore(records));
+        context.put("highScoreCount", countScoreAtLeast(records, 45));
+        context.put("lowScoreCount", countScoreBelow(records, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(records));
+        context.put("quarterDistribution", buildQuarterDistribution(records));
+        context.put("scoreBands", buildScoreBands(records));
+        context.put("categoryScoreStats", buildCategoryScoreStats(records));
+        context.put("yearScoreTrend", yearScoreTrend);
+        context.put("yearlyCategoryTrend", yearlyCategoryTrend);
+        context.put("yearlyTagTrend", yearlyTagTrend);
+        context.put("interestTrendSignals", trendSignals);
+        context.put("topRecords", buildRecordHighlights(records, true));
+        context.put("lowScoreRecords", buildRecordHighlights(records, false));
+        context.put("topTags", buildTagStats(records));
+        context.put("tagPreferenceGroups", tagPreferenceGroups);
+        context.put("profileSignals", buildTasteProfileSignals(records, tagPreferenceGroups));
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
     public Map<String, Object> buildFranchiseCompletionContext(String category) {
         List<UserSubjectRecordResponse> allRecords =
                 userSubjectRecordService.getRecords(null, null, null, null);
@@ -816,6 +860,147 @@ public class LlmContextBuilder {
                     return item;
                 })
                 .toList();
+    }
+
+    private List<Map<String, Object>> buildYearlyCategoryTrend(List<UserSubjectRecordResponse> records) {
+        return records.stream()
+                .filter(record -> record.getRecordYear() != null)
+                .collect(Collectors.groupingBy(
+                        UserSubjectRecordResponse::getRecordYear,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ))
+                .entrySet()
+                .stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    Map<String, Long> distribution = buildCategoryDistribution(entry.getValue());
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("year", entry.getKey());
+                    item.put("total", entry.getValue().size());
+                    item.put("categoryDistribution", distribution);
+                    item.put("dominantCategory", topDistributionKey(distribution));
+                    return item;
+                })
+                .toList();
+    }
+
+    private List<Map<String, Object>> buildYearlyTagTrend(List<UserSubjectRecordResponse> records) {
+        return records.stream()
+                .filter(record -> record.getRecordYear() != null)
+                .collect(Collectors.groupingBy(
+                        UserSubjectRecordResponse::getRecordYear,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ))
+                .entrySet()
+                .stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("year", entry.getKey());
+                    item.put("topTags", buildTagStats(entry.getValue()).stream().limit(5).toList());
+                    return item;
+                })
+                .toList();
+    }
+
+    private Map<String, Object> buildInterestTrendSignals(
+            List<Map<String, Object>> yearScoreTrend,
+            List<Map<String, Object>> yearlyCategoryTrend,
+            List<Map<String, Object>> yearlyTagTrend
+    ) {
+        Map<String, Object> signals = new LinkedHashMap<>();
+        if (yearScoreTrend.isEmpty()) {
+            signals.put("coveredYears", 0);
+            signals.put("countDiff", 0);
+            signals.put("averageScoreDiff", BigDecimal.ZERO);
+            signals.put("earliestYear", null);
+            signals.put("latestYear", null);
+            return signals;
+        }
+
+        Map<String, Object> first = yearScoreTrend.get(0);
+        Map<String, Object> latest = yearScoreTrend.get(yearScoreTrend.size() - 1);
+        Map<String, Object> strongestYear = yearScoreTrend.stream()
+                .max(Comparator.comparing(item -> readTrendInteger(item, "count")))
+                .orElse(latest);
+        Map<String, Object> highestAverageYear = yearScoreTrend.stream()
+                .max(Comparator.comparing(item -> readTrendBigDecimal(item, "averageScore")))
+                .orElse(latest);
+
+        signals.put("coveredYears", yearScoreTrend.size());
+        signals.put("earliestYear", first.get("year"));
+        signals.put("latestYear", latest.get("year"));
+        signals.put("earliestCount", first.get("count"));
+        signals.put("latestCount", latest.get("count"));
+        signals.put("countDiff", readTrendInteger(latest, "count") - readTrendInteger(first, "count"));
+        signals.put("earliestAverageScore", first.get("averageScore"));
+        signals.put("latestAverageScore", latest.get("averageScore"));
+        signals.put("averageScoreDiff", readTrendBigDecimal(latest, "averageScore")
+                .subtract(readTrendBigDecimal(first, "averageScore"))
+                .setScale(1, RoundingMode.HALF_UP));
+        signals.put("strongestYear", strongestYear.get("year"));
+        signals.put("strongestYearCount", strongestYear.get("count"));
+        signals.put("highestAverageYear", highestAverageYear.get("year"));
+        signals.put("highestAverageScore", highestAverageYear.get("averageScore"));
+        signals.put("earliestDominantCategory", readTrendValue(yearlyCategoryTrend, 0, "dominantCategory"));
+        signals.put("latestDominantCategory", readTrendValue(
+                yearlyCategoryTrend,
+                yearlyCategoryTrend.size() - 1,
+                "dominantCategory"
+        ));
+        signals.put("earliestTopTags", readTrendValue(yearlyTagTrend, 0, "topTags"));
+        signals.put("latestTopTags", readTrendValue(
+                yearlyTagTrend,
+                yearlyTagTrend.size() - 1,
+                "topTags"
+        ));
+        return signals;
+    }
+
+    private int readTrendCount(List<Map<String, Object>> trend, boolean latest) {
+        if (trend.isEmpty()) {
+            return 0;
+        }
+
+        Map<String, Object> item = latest ? trend.get(trend.size() - 1) : trend.get(0);
+        return readTrendInteger(item, "count");
+    }
+
+    private int readTrendInteger(Map<String, Object> item, String key) {
+        Object value = item.get(key);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return 0;
+    }
+
+    private BigDecimal readTrendBigDecimal(Map<String, Object> item, String key) {
+        Object value = item.get(key);
+        if (value instanceof BigDecimal bigDecimal) {
+            return bigDecimal;
+        }
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue()).setScale(1, RoundingMode.HALF_UP);
+        }
+        return BigDecimal.ZERO;
+    }
+
+    private Object readTrendValue(List<Map<String, Object>> trend, int index, String key) {
+        if (trend.isEmpty() || index < 0 || index >= trend.size()) {
+            return null;
+        }
+
+        return trend.get(index).get(key);
+    }
+
+    private String topDistributionKey(Map<String, Long> distribution) {
+        return distribution.entrySet()
+                .stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(null);
     }
 
     private Map<String, List<Map<String, Object>>> buildTagPreferenceGroups(
@@ -1318,6 +1503,13 @@ public class LlmContextBuilder {
             evidence.add(scope + " 口味画像样本 " + context.get("totalRecords") + " 条");
         } else if ("PREFERENCE_CONTRADICTION".equals(analysisType)) {
             evidence.add(scope + " 偏好矛盾样本 " + context.get("totalRecords") + " 条");
+        } else if ("INTEREST_TREND".equals(analysisType)) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> trendSignals = (Map<String, Object>) context.get("interestTrendSignals");
+            evidence.add(scope + " 兴趣趋势样本 " + context.get("totalRecords") + " 条");
+            evidence.add("覆盖年份 " + trendSignals.get("coveredYears")
+                    + " 年，从 " + trendSignals.get("earliestYear")
+                    + " 到 " + trendSignals.get("latestYear"));
         } else if ("FRANCHISE_COMPLETION".equals(analysisType)) {
             @SuppressWarnings("unchecked")
             Map<String, Object> franchiseStats = (Map<String, Object>) context.get("franchiseCompletionStats");

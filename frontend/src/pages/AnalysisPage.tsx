@@ -3,6 +3,7 @@ import {
     getCollectionBacklogAnalysis,
     getComprehensiveReportAnalysis,
     getFranchiseCompletionAnalysis,
+    getInterestTrendAnalysis,
     getPreferenceContradictionAnalysis,
     getQuestionAnswerAnalysis,
     getQuarterlyAnalysis,
@@ -38,6 +39,7 @@ type AnalysisMode =
     | 'COLLECTION_BACKLOG'
     | 'TASTE_PROFILE'
     | 'PREFERENCE_CONTRADICTION'
+    | 'INTEREST_TREND'
     | 'FRANCHISE_COMPLETION'
     | 'COMPREHENSIVE_REPORT'
     | 'QUESTION_ANSWER'
@@ -125,6 +127,12 @@ const analysisModes: AnalysisModeMeta[] = [
         label: '偏好矛盾',
         description: '发现看得多但不稳、低频但高命中的方向',
         accent: 'from-slate-100/90 via-white/70 to-rose-50/70',
+    },
+    {
+        value: 'INTEREST_TREND',
+        label: '兴趣趋势',
+        description: '观察多年记录中的类型、评分和标签变化',
+        accent: 'from-cyan-100/90 via-white/70 to-violet-50/70',
     },
     {
         value: 'FRANCHISE_COMPLETION',
@@ -252,23 +260,27 @@ function AnalysisPage() {
                                   ? await getTasteProfileAnalysis({
                                         category,
                                     })
-                                  : analysisMode === 'PREFERENCE_CONTRADICTION'
-                                    ? await getPreferenceContradictionAnalysis({
-                                          category,
-                                      })
-                                    : analysisMode === 'FRANCHISE_COMPLETION'
-                                      ? await getFranchiseCompletionAnalysis({
+                                    : analysisMode === 'PREFERENCE_CONTRADICTION'
+                                      ? await getPreferenceContradictionAnalysis({
                                             category,
                                         })
-                                      : analysisMode === 'COMPREHENSIVE_REPORT'
-                                        ? await getComprehensiveReportAnalysis({
-                                              year: selectedYear,
+                                      : analysisMode === 'INTEREST_TREND'
+                                        ? await getInterestTrendAnalysis({
                                               category,
                                           })
-                                        : await getYearlyAnalysis({
-                                              year: selectedYear,
-                                              category,
-                                          })
+                                        : analysisMode === 'FRANCHISE_COMPLETION'
+                                          ? await getFranchiseCompletionAnalysis({
+                                                category,
+                                            })
+                                          : analysisMode === 'COMPREHENSIVE_REPORT'
+                                            ? await getComprehensiveReportAnalysis({
+                                                  year: selectedYear,
+                                                  category,
+                                              })
+                                            : await getYearlyAnalysis({
+                                                  year: selectedYear,
+                                                  category,
+                                              })
             setReport(response)
         } catch (generateError) {
             setReport(null)
@@ -1173,6 +1185,10 @@ function buildScopeText(
 
     if (mode === 'PREFERENCE_CONTRADICTION') {
         return `${categoryName} · 偏好矛盾`
+    }
+
+    if (mode === 'INTEREST_TREND') {
+        return `${categoryName} · 兴趣趋势`
     }
 
     if (mode === 'FRANCHISE_COMPLETION') {

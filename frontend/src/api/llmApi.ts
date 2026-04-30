@@ -11,6 +11,7 @@ export type LlmAnalysisType =
     | 'COLLECTION_BACKLOG'
     | 'TASTE_PROFILE'
     | 'PREFERENCE_CONTRADICTION'
+    | 'INTEREST_TREND'
     | 'FRANCHISE_COMPLETION'
     | 'COMPREHENSIVE_REPORT'
     | 'HOME_INSIGHT'
@@ -106,6 +107,10 @@ export type PreferenceContradictionAnalysisParams = {
     category?: AcgnCategory
 }
 
+export type InterestTrendAnalysisParams = {
+    category?: AcgnCategory
+}
+
 export type FranchiseCompletionAnalysisParams = {
     category?: AcgnCategory
 }
@@ -163,6 +168,10 @@ export function getTasteProfileAnalysis(params: TasteProfileAnalysisParams) {
 
 export function getPreferenceContradictionAnalysis(params: PreferenceContradictionAnalysisParams) {
     return apiGet<LlmAnalysisResponse>('/llm/analysis/preference-contradictions', params)
+}
+
+export function getInterestTrendAnalysis(params: InterestTrendAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/interest-trend', params)
 }
 
 export function getFranchiseCompletionAnalysis(params: FranchiseCompletionAnalysisParams) {

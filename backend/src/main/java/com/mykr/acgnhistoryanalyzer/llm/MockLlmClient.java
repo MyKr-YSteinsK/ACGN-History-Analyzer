@@ -89,6 +89,10 @@ public class MockLlmClient implements LlmClient {
             return displayCategory + " 偏好矛盾分析";
         }
 
+        if ("INTEREST_TREND".equals(analysisType)) {
+            return displayCategory + " 兴趣变化趋势分析";
+        }
+
         if ("FRANCHISE_COMPLETION".equals(analysisType)) {
             return displayCategory + " 系列补完分析";
         }
@@ -160,6 +164,15 @@ public class MockLlmClient implements LlmClient {
             return scope + " 会重点寻找“看得多但不一定喜欢”和“看得少但命中很高”的方向，用来解释偏好边界。";
         }
 
+        if ("INTEREST_TREND".equals(analysisType)) {
+            Map<String, Object> signals = readObjectMap(context, "interestTrendSignals");
+            return scope + " 会按年份整理记录数量、均分、类型重心和标签线索。当前覆盖 "
+                    + signals.getOrDefault("coveredYears", 0)
+                    + " 个年份，从 " + signals.getOrDefault("earliestYear", "未知年份")
+                    + " 到 " + signals.getOrDefault("latestYear", "未知年份")
+                    + "，适合解释个人兴趣是扩大、收缩还是转向。";
+        }
+
         if ("FRANCHISE_COMPLETION".equals(analysisType)) {
             Map<String, Long> stats = readLongMap(context, "franchiseCompletionStats");
             return scope + " 会围绕已有正式记录触发的系列进行整理，当前纳入 "
@@ -205,6 +218,7 @@ public class MockLlmClient implements LlmClient {
             case "COLLECTION_BACKLOG" -> "补坑建议";
             case "TASTE_PROFILE" -> "口味画像";
             case "PREFERENCE_CONTRADICTION" -> "偏好矛盾";
+            case "INTEREST_TREND" -> "兴趣趋势";
             case "FRANCHISE_COMPLETION" -> "系列补完";
             case "COMPREHENSIVE_REPORT" -> "一键报告";
             case "HOME_INSIGHT" -> "首页解读";
@@ -365,6 +379,31 @@ public class MockLlmClient implements LlmClient {
                     new LlmAnalysisSectionResponse(
                             "解释建议",
                             "这类分析适合辅助推荐和自我理解，不适合直接当成绝对结论。样本少的标签要保守看待，样本多但均分偏低的标签则更适合作为风险提醒。"
+                    )
+            );
+        }
+
+        if ("INTEREST_TREND".equals(readStringValue(context, "analysisType", ""))) {
+            return List.of(
+                    new LlmAnalysisSectionResponse(
+                            "趋势概览",
+                            buildInterestTrendOverviewContent(context, totalRecords, averageScore)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "年度变化",
+                            buildInterestTrendYearContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "类型转向",
+                            buildInterestTrendCategoryContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "标签迁移",
+                            buildInterestTrendTagContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "解释建议",
+                            "兴趣趋势更适合看长期方向，不适合把单一年份的偶然高低分直接当成口味转变。样本年份越多，趋势解释越稳定。"
                     )
             );
         }
@@ -888,6 +927,64 @@ public class MockLlmClient implements LlmClient {
                 + "。这部分用于展示系统为什么给出上面的回答。";
     }
 
+    private String buildInterestTrendOverviewContent(
+            Map<String, Object> context,
+            Integer totalRecords,
+            String averageScore
+    ) {
+        Map<String, Object> signals = readObjectMap(context, "interestTrendSignals");
+        if (totalRecords == null || totalRecords == 0) {
+            return "当前还没有足够正式记录生成兴趣趋势。系统会保留入口，等跨年份数据增加后再判断兴趣扩张、收缩或转向。";
+        }
+
+        return "当前长期样本共 " + totalRecords + " 条，整体均分 "
+                + averageScore + " / 50，覆盖 " + signals.getOrDefault("coveredYears", 0)
+                + " 个年份。记录数量从 " + signals.getOrDefault("earliestCount", 0)
+                + " 条变化到 " + signals.getOrDefault("latestCount", 0)
+                + " 条，均分变化 " + formatSignedValue(signals.get("averageScoreDiff"))
+                + "。记录最多的年份是 " + signals.getOrDefault("strongestYear", "未知")
+                + " 年，均分最高的年份是 " + signals.getOrDefault("highestAverageYear", "未知") + " 年。";
+    }
+
+    private String buildInterestTrendYearContent(Map<String, Object> context) {
+        List<Map<String, Object>> trend = readMapList(context, "yearScoreTrend");
+        if (trend.isEmpty()) {
+            return "当前没有跨年份趋势样本。";
+        }
+
+        return trend.stream()
+                .map(item -> item.get("year") + " 年："
+                        + item.get("count") + " 条，均分 "
+                        + item.get("averageScore") + "，高分 "
+                        + item.get("highScoreCount") + " 条")
+                .collect(java.util.stream.Collectors.joining("；"));
+    }
+
+    private String buildInterestTrendCategoryContent(Map<String, Object> context) {
+        List<Map<String, Object>> trend = readMapList(context, "yearlyCategoryTrend");
+        if (trend.isEmpty()) {
+            return "当前没有足够数据判断类型重心变化。";
+        }
+
+        return trend.stream()
+                .map(item -> item.get("year") + " 年主类型为 "
+                        + item.get("dominantCategory") + "，分布："
+                        + formatMap(readNestedLongMap(item, "categoryDistribution")))
+                .collect(java.util.stream.Collectors.joining("；"));
+    }
+
+    private String buildInterestTrendTagContent(Map<String, Object> context) {
+        List<Map<String, Object>> trend = readMapList(context, "yearlyTagTrend");
+        if (trend.isEmpty()) {
+            return "当前没有足够标签数据判断兴趣迁移。";
+        }
+
+        return trend.stream()
+                .map(item -> item.get("year") + " 年标签线索："
+                        + formatTagList(readNestedMapList(item, "topTags")))
+                .collect(java.util.stream.Collectors.joining("；"));
+    }
+
     private String buildFranchiseCompletionOverviewContent(Map<String, Object> context) {
         Map<String, Long> stats = readLongMap(context, "franchiseCompletionStats");
         long franchiseCount = stats.getOrDefault("franchiseCount", 0L);
@@ -999,6 +1096,10 @@ public class MockLlmClient implements LlmClient {
             return displayCategory + " 偏好矛盾范围";
         }
 
+        if ("INTEREST_TREND".equals(analysisType)) {
+            return displayCategory + " 兴趣变化趋势范围";
+        }
+
         if ("FRANCHISE_COMPLETION".equals(analysisType)) {
             return displayCategory + " 系列补完范围";
         }
@@ -1095,6 +1196,19 @@ public class MockLlmClient implements LlmClient {
                 .toList();
     }
 
+    private Map<String, Object> readObjectMap(Map<String, Object> context, String key) {
+        Object value = context.get(key);
+        if (!(value instanceof Map<?, ?> map)) {
+            return Map.of();
+        }
+
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            result.put(String.valueOf(entry.getKey()), entry.getValue());
+        }
+        return result;
+    }
+
     private List<String> readStringList(Map<String, Object> context, String key) {
         Object value = context.get(key);
         if (!(value instanceof List<?> list)) {
@@ -1169,6 +1283,22 @@ public class MockLlmClient implements LlmClient {
         return result;
     }
 
+    private Map<String, Long> readNestedLongMap(Map<String, Object> item, String key) {
+        Object value = item.get(key);
+        if (!(value instanceof Map<?, ?> map)) {
+            return Map.of();
+        }
+
+        java.util.Map<String, Long> result = new java.util.LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            Object rawValue = entry.getValue();
+            if (rawValue instanceof Number number) {
+                result.put(String.valueOf(entry.getKey()), number.longValue());
+            }
+        }
+        return result;
+    }
+
     private String formatMap(Map<String, Long> map) {
         if (map.isEmpty()) {
             return "暂无数据";
@@ -1177,6 +1307,29 @@ public class MockLlmClient implements LlmClient {
         return map.entrySet().stream()
                 .map(entry -> entry.getKey() + " " + entry.getValue() + " 条")
                 .collect(java.util.stream.Collectors.joining("、"));
+    }
+
+    private String formatTagList(List<Map<String, Object>> tags) {
+        if (tags.isEmpty()) {
+            return "暂无稳定标签";
+        }
+
+        return tags.stream()
+                .limit(4)
+                .map(item -> item.get("name") + "×" + item.get("count"))
+                .collect(java.util.stream.Collectors.joining("、"));
+    }
+
+    private String formatSignedValue(Object value) {
+        if (value == null) {
+            return "0";
+        }
+
+        String text = String.valueOf(value);
+        if (text.startsWith("-") || "0".equals(text) || "0.0".equals(text)) {
+            return text;
+        }
+        return "+" + text;
     }
 
     private String topDistributionItem(Map<String, Long> map) {

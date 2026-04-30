@@ -152,6 +152,18 @@ public class LlmAnalysisService {
         ));
     }
 
+    public LlmAnalysisResponse generateInterestTrend(String category) {
+        String normalizedCategory = normalizeBlankToNull(category);
+        String prompt = llmPromptService.buildInterestTrendPrompt(normalizedCategory);
+        Map<String, Object> context = llmContextBuilder.buildInterestTrendContext(normalizedCategory);
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "INTEREST_TREND",
+                prompt,
+                context
+        ));
+    }
+
     public LlmAnalysisResponse generateFranchiseCompletion(String category) {
         String normalizedCategory = normalizeBlankToNull(category);
         String prompt = llmPromptService.buildFranchiseCompletionPrompt(normalizedCategory);
