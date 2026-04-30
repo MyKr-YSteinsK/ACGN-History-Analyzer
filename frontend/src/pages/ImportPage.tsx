@@ -104,25 +104,25 @@ const importModes: Array<{
     {
         value: 'EXCEL',
         title: 'Excel',
-        description: '后续扩展',
+        description: '表格批量导入入口',
         enabled: false,
     },
     {
         value: 'BANGUMI',
         title: 'Bangumi 链接',
-        description: '后续接平台解析',
+        description: '平台链接解析入口',
         enabled: false,
     },
     {
         value: 'BACKUP',
         title: 'JSON 备份',
-        description: '后续恢复全量数据',
+        description: '全量备份恢复入口',
         enabled: false,
     },
     {
         value: 'MANUAL',
         title: '快速录入',
-        description: '后续做轻量表单',
+        description: '轻量手动录入入口',
         enabled: false,
     },
 ]
@@ -161,6 +161,29 @@ const importTips = [
     {
         title: '收藏 / 记录匹配作品',
         description: '收藏可用 subjectId 或作品唯一键；记录用作品唯一键定位已有作品。',
+    },
+]
+
+const importFlowSteps = [
+    {
+        step: 1,
+        title: '选择对象',
+        description: '作品库、收藏夹或个人记录',
+    },
+    {
+        step: 2,
+        title: '准备内容',
+        description: '粘贴 JSON / CSV 或读取文件',
+    },
+    {
+        step: 3,
+        title: '预览校验',
+        description: '检查可导入、警告和错误',
+    },
+    {
+        step: 4,
+        title: '确认写入',
+        description: '合法数据写入数据库',
     },
 ]
 
@@ -496,6 +519,13 @@ function ImportPage() {
     const draftLineCount = useMemo(() => {
         return draftText.trim() ? draftText.trim().split(/\r?\n/).length : 0
     }, [draftText])
+    const currentFlowStep = activeResult
+        ? 4
+        : activePreview
+          ? 3
+          : draftText.trim()
+            ? 2
+            : 1
 
     const loadDocs = useCallback(async () => {
         setLoadingDocs(true)
@@ -688,6 +718,8 @@ function ImportPage() {
                 description="先预览校验，再确认写入。当前支持作品库、收藏夹和个人记录的 JSON / CSV 导入。"
             />
 
+            <ImportFlowStepper currentStep={currentFlowStep} />
+
             <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {importTips.map((tip) => (
                     <div
@@ -872,10 +904,10 @@ function ImportPage() {
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                             <div className="flex flex-wrap gap-2 text-xs text-slate-400">
                                 <span className="rounded-full bg-white/65 px-3 py-1.5">
-                                    Preview 不写库
+                                    预览不写库
                                 </span>
                                 <span className="rounded-full bg-white/65 px-3 py-1.5">
-                                    Import 才写入
+                                    确认才写入
                                 </span>
                                 <span className="rounded-full bg-white/65 px-3 py-1.5">
                                     错误行不阻塞合法行
@@ -943,6 +975,76 @@ type TargetCardProps = {
     description: string
     active: boolean
     onClick: () => void
+}
+
+type ImportFlowStepperProps = {
+    currentStep: number
+}
+
+function ImportFlowStepper({ currentStep }: ImportFlowStepperProps) {
+    return (
+        <GlassCard className="overflow-hidden">
+            <div className="bg-gradient-to-br from-white/68 via-sky-50/50 to-violet-50/45 p-5">
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                            import workflow
+                        </p>
+                        <h3 className="mt-1 text-xl font-black text-slate-800">
+                            批量导入流程
+                        </h3>
+                    </div>
+
+                    <span className="rounded-full border border-white/75 bg-white/65 px-4 py-2 text-xs font-black text-slate-500">
+                        当前第 {currentStep} 步
+                    </span>
+                </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-4">
+                    {importFlowSteps.map((item) => {
+                        const active = currentStep === item.step
+                        const completed = currentStep > item.step
+
+                        return (
+                            <div
+                                key={item.step}
+                                className={[
+                                    'relative overflow-hidden rounded-[24px] border p-4 shadow-sm transition-all duration-300',
+                                    active
+                                        ? 'scale-[1.015] border-sky-200 bg-sky-100/78 text-sky-700'
+                                        : completed
+                                          ? 'border-emerald-100 bg-emerald-50/70 text-emerald-700'
+                                          : 'border-white/70 bg-white/55 text-slate-400',
+                                ].join(' ')}
+                            >
+                                <div
+                                    className={[
+                                        'mb-3 h-1.5 rounded-full',
+                                        active
+                                            ? 'bg-sky-300'
+                                            : completed
+                                              ? 'bg-emerald-300'
+                                              : 'bg-slate-200/80',
+                                    ].join(' ')}
+                                />
+                                <div className="flex items-start gap-3">
+                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/75 bg-white/70 text-sm font-black">
+                                        {completed ? '✓' : item.step}
+                                    </span>
+                                    <div>
+                                        <p className="text-sm font-black">{item.title}</p>
+                                        <p className="mt-1 text-xs leading-5 opacity-75">
+                                            {item.description}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+        </GlassCard>
+    )
 }
 
 function TargetCard({ title, description, active, onClick }: TargetCardProps) {

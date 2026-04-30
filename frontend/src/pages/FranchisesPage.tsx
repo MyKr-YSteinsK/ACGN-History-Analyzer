@@ -46,6 +46,13 @@ type FranchiseStats = {
     platformAverage: number | null
 }
 
+type FranchiseOverviewStats = {
+    franchiseCount: number
+    subjectCount: number
+    watchedCount: number
+    crossMediaCount: number
+}
+
 type PendingRemoveSubject = {
     franchise: FranchiseDetailResponse
     subject: SubjectCardView
@@ -125,6 +132,28 @@ function calculateStats(subjects: SubjectCardView[]): FranchiseStats {
             scoreList.length > 0
                 ? scoreList.reduce((sum, score) => sum + score, 0) / scoreList.length
                 : null,
+    }
+}
+
+function calculateOverviewStats(franchises: FranchiseDetailResponse[]): FranchiseOverviewStats {
+    const subjects = franchises.flatMap((franchise) =>
+        franchise.subjects.map(mapSubjectResponseToCardView),
+    )
+    const crossMediaCount = franchises.filter((franchise) => {
+        const categorySet = new Set(
+            franchise.subjects
+                .map(mapSubjectResponseToCardView)
+                .map((subject) => subject.category),
+        )
+
+        return categorySet.size >= 2
+    }).length
+
+    return {
+        franchiseCount: franchises.length,
+        subjectCount: subjects.length,
+        watchedCount: subjects.filter((subject) => subject.libraryStatus === 'WATCHED').length,
+        crossMediaCount,
     }
 }
 
@@ -250,6 +279,10 @@ function FranchisesPage() {
             count: subjects.filter((subject) => subject.category === category).length,
         }))
     }, [selectedFranchise])
+    const overviewStats = useMemo(
+        () => calculateOverviewStats(franchises),
+        [franchises],
+    )
 
     const loadFranchises = useCallback(async () => {
         setLoading(true)
@@ -380,6 +413,11 @@ function FranchisesPage() {
             {feedbackMessage ? (
                 <FeedbackBanner>{feedbackMessage}</FeedbackBanner>
             ) : null}
+
+            <FranchiseOverviewStrip
+                stats={overviewStats}
+                selectedTitle={selectedFranchise ? getFranchiseTitle(selectedFranchise) : '未选择系列'}
+            />
 
             <section className="grid gap-5 xl:grid-cols-[minmax(300px,340px)_1fr] xl:items-start">
                 <GlassCard className="overflow-hidden p-5 xl:sticky xl:top-6 xl:max-h-[calc(100vh-2rem)]">
@@ -792,6 +830,51 @@ function FranchisesPage() {
 type StatChipProps = {
     label: string
     value: string | number
+}
+
+type FranchiseOverviewStripProps = {
+    stats: FranchiseOverviewStats
+    selectedTitle: string
+}
+
+function FranchiseOverviewStrip({ stats, selectedTitle }: FranchiseOverviewStripProps) {
+    return (
+        <GlassCard className="overflow-hidden">
+            <div className="bg-gradient-to-br from-white/68 via-sky-50/45 to-violet-50/45 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                            franchise overview
+                        </p>
+                        <h3 className="mt-1 line-clamp-1 text-xl font-black text-slate-800">
+                            {selectedTitle}
+                        </h3>
+                    </div>
+
+                    <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
+                        <OverviewMetric label="系列数" value={stats.franchiseCount} />
+                        <OverviewMetric label="作品数" value={stats.subjectCount} />
+                        <OverviewMetric label="已看" value={stats.watchedCount} />
+                        <OverviewMetric label="跨媒介" value={stats.crossMediaCount} />
+                    </div>
+                </div>
+            </div>
+        </GlassCard>
+    )
+}
+
+type OverviewMetricProps = {
+    label: string
+    value: number
+}
+
+function OverviewMetric({ label, value }: OverviewMetricProps) {
+    return (
+        <div className="rounded-[22px] border border-white/75 bg-white/62 px-4 py-3 text-center shadow-sm backdrop-blur">
+            <p className="text-2xl font-black text-slate-800">{value}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-400">{label}</p>
+        </div>
+    )
 }
 
 function StatChip({ label, value }: StatChipProps) {
