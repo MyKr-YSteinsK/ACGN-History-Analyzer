@@ -1,0 +1,412 @@
+package com.mykr.acgnhistoryanalyzer.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mykr.acgnhistoryanalyzer.common.exception.BangumiImportException;
+import com.mykr.acgnhistoryanalyzer.request.BangumiSeasonImportRequest;
+import com.mykr.acgnhistoryanalyzer.request.SubjectBatchImportRequest;
+import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
+import com.mykr.acgnhistoryanalyzer.response.SubjectImportPreviewResponse;
+import com.mykr.acgnhistoryanalyzer.response.SubjectImportResponse;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+@Service
+public class BangumiSeasonImportService {
+
+    private static final String BANGUMI_API_BASE = "https://api.bgm.tv/v0";
+    private static final String BANGUMI_SUBJECT_BASE = "https://bangumi.tv/subject/";
+    private static final String USER_AGENT = "ACGN-History-Analyzer/1.0 (local season import)";
+    private static final int SUBJECT_TYPE_ANIME = 2;
+    private static final int ANIME_CATEGORY_TV = 1;
+    private static final int ANIME_CATEGORY_WEB = 5;
+    private static final int PAGE_SIZE = 50;
+    private static final int MAX_PAGE_COUNT = 8;
+
+    private final ObjectMapper objectMapper;
+    private final SubjectService subjectService;
+    private final HttpClient httpClient;
+
+    public BangumiSeasonImportService(ObjectMapper objectMapper, SubjectService subjectService) {
+        this.objectMapper = objectMapper;
+        this.subjectService = subjectService;
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+    }
+
+    public SubjectImportPreviewResponse previewSeason(BangumiSeasonImportRequest request) {
+        SubjectBatchImportRequest batchRequest = buildSubjectBatchImportRequest(request);
+        return subjectService.previewImportSubjects(batchRequest);
+    }
+
+    public SubjectImportResponse importSeason(BangumiSeasonImportRequest request) {
+        SubjectBatchImportRequest batchRequest = buildSubjectBatchImportRequest(request);
+        return subjectService.importSubjects(batchRequest);
+    }
+
+    private SubjectBatchImportRequest buildSubjectBatchImportRequest(BangumiSeasonImportRequest request) {
+        List<JsonNode> bangumiSubjects = fetchSeasonSubjects(request);
+        List<SubjectCreateRequest> subjects = bangumiSubjects.stream()
+                .filter(subject -> shouldKeepSubject(subject, request))
+                .map(subject -> toSubjectCreateRequest(subject, request))
+                .toList();
+
+        SubjectBatchImportRequest batchRequest = new SubjectBatchImportRequest();
+        batchRequest.setSubjects(subjects);
+        return batchRequest;
+    }
+
+    private List<JsonNode> fetchSeasonSubjects(BangumiSeasonImportRequest request) {
+        int month = toBangumiMonth(request.getQuarter());
+        Set<Integer> categories = new LinkedHashSet<>();
+        categories.add(ANIME_CATEGORY_TV);
+        if (Boolean.TRUE.equals(request.getIncludeWeb())) {
+            categories.add(ANIME_CATEGORY_WEB);
+        }
+
+        Map<String, JsonNode> subjectById = new LinkedHashMap<>();
+        for (Integer category : categories) {
+            fetchCategorySubjects(request.getYear(), month, category)
+                    .forEach(subject -> {
+                        String id = subject.path("id").asText("");
+                        if (!id.isBlank()) {
+                            subjectById.putIfAbsent(id, subject);
+                        }
+                    });
+        }
+        return new ArrayList<>(subjectById.values());
+    }
+
+    private List<JsonNode> fetchCategorySubjects(Integer year, int month, int category) {
+        List<JsonNode> subjects = new ArrayList<>();
+        int offset = 0;
+        int pageCount = 0;
+
+        while (pageCount < MAX_PAGE_COUNT) {
+            JsonNode page = fetchBangumiSubjectsPage(year, month, category, offset);
+            JsonNode data = page.path("data");
+            if (!data.isArray() || data.isEmpty()) {
+                break;
+            }
+
+            data.forEach(subjects::add);
+
+            int total = page.path("total").asInt(subjects.size());
+            int limit = page.path("limit").asInt(PAGE_SIZE);
+            offset += limit;
+            pageCount++;
+
+            if (offset >= total) {
+                break;
+            }
+        }
+
+        return subjects;
+    }
+
+    private JsonNode fetchBangumiSubjectsPage(Integer year, int month, int category, int offset) {
+        String url = BANGUMI_API_BASE
+                + "/subjects?type=" + SUBJECT_TYPE_ANIME
+                + "&cat=" + category
+                + "&year=" + year
+                + "&month=" + month
+                + "&sort=rank"
+                + "&limit=" + PAGE_SIZE
+                + "&offset=" + offset;
+
+        HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(url))
+                .GET()
+                .timeout(Duration.ofSeconds(20))
+                .header("Accept", "application/json")
+                .header("User-Agent", USER_AGENT)
+                .build();
+
+        try {
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new BangumiImportException("Bangumi 接口请求失败，HTTP " + response.statusCode());
+            }
+            return objectMapper.readTree(response.body());
+        } catch (IOException ex) {
+            throw new BangumiImportException("Bangumi 接口返回解析失败", ex);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new BangumiImportException("Bangumi 接口请求被中断", ex);
+        }
+    }
+
+    private SubjectCreateRequest toSubjectCreateRequest(JsonNode subject, BangumiSeasonImportRequest request) {
+        SubjectCreateRequest createRequest = new SubjectCreateRequest();
+        String bangumiId = subject.path("id").asText("");
+        String name = subject.path("name").asText("");
+        String nameCn = subject.path("name_cn").asText("");
+        String displayTitle = firstText(nameCn, name, "Bangumi Subject " + bangumiId);
+
+        createRequest.setTitleCn(displayTitle);
+        createRequest.setDisplayTitle(displayTitle);
+        createRequest.setSubtitle(hasText(nameCn) && hasText(name) && !nameCn.equals(name) ? name : null);
+        createRequest.setCoverUrl(resolveCoverUrl(subject));
+        createRequest.setSummary(truncate(subject.path("summary").asText(null), 2000));
+        createRequest.setReleaseYear(request.getYear());
+        createRequest.setReleaseQuarter(request.getQuarter());
+        createRequest.setCategory("ANIME");
+        createRequest.setStudioName(truncate(resolveStudioName(subject), 255));
+        createRequest.setPlatformLink(BANGUMI_SUBJECT_BASE + bangumiId);
+        createRequest.setPlatformScore(resolvePlatformScore(subject));
+        createRequest.setEpisodeCount(resolveEpisodeCount(subject));
+        createRequest.setTagNames(resolveTagNames(subject, request.getYear()));
+        createRequest.setSourcePlatform("BANGUMI");
+        createRequest.setSourceId(bangumiId);
+        createRequest.setStatus("NORMAL");
+        return createRequest;
+    }
+
+    private boolean shouldKeepSubject(JsonNode subject, BangumiSeasonImportRequest request) {
+        if (subject.path("type").asInt() != SUBJECT_TYPE_ANIME) {
+            return false;
+        }
+        if (subject.path("nsfw").asBoolean(false)) {
+            return false;
+        }
+
+        String platform = subject.path("platform").asText("").toUpperCase(Locale.ROOT);
+        boolean tvAnime = "TV".equals(platform);
+        boolean webAnime = Boolean.TRUE.equals(request.getIncludeWeb()) && "WEB".equals(platform);
+        if (!tvAnime && !webAnime) {
+            return false;
+        }
+
+        String date = subject.path("date").asText("");
+        if (hasText(date) && !date.startsWith(request.getYear() + "-" + String.format("%02d", toBangumiMonth(request.getQuarter())))) {
+            return false;
+        }
+
+        return !Boolean.TRUE.equals(request.getJapaneseOnly()) || hasBangumiTag(subject, "日本");
+    }
+
+    private boolean hasBangumiTag(JsonNode subject, String tagName) {
+        JsonNode metaTags = subject.path("meta_tags");
+        if (metaTags.isArray()) {
+            for (JsonNode tag : metaTags) {
+                if (tagName.equals(tag.asText())) {
+                    return true;
+                }
+            }
+        }
+
+        JsonNode tags = subject.path("tags");
+        if (tags.isArray()) {
+            for (JsonNode tag : tags) {
+                if (tagName.equals(tag.path("name").asText())) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private String resolveCoverUrl(JsonNode subject) {
+        JsonNode images = subject.path("images");
+        return firstText(
+                images.path("large").asText(null),
+                images.path("common").asText(null),
+                subject.path("image").asText(null),
+                images.path("medium").asText(null),
+                images.path("small").asText(null)
+        );
+    }
+
+    private BigDecimal resolvePlatformScore(JsonNode subject) {
+        double score = subject.path("rating").path("score").asDouble(0);
+        if (score <= 0) {
+            return null;
+        }
+        return BigDecimal.valueOf(score);
+    }
+
+    private Integer resolveEpisodeCount(JsonNode subject) {
+        int totalEpisodes = subject.path("total_episodes").asInt(0);
+        if (totalEpisodes > 0) {
+            return totalEpisodes;
+        }
+
+        int episodes = subject.path("eps").asInt(0);
+        if (episodes > 0) {
+            return episodes;
+        }
+
+        String infoboxEpisodes = findInfoboxValue(subject, "话数", "話数", "集数");
+        if (!hasText(infoboxEpisodes)) {
+            return null;
+        }
+
+        String digits = infoboxEpisodes.replaceAll("[^0-9]", "");
+        if (!hasText(digits)) {
+            return null;
+        }
+
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private String resolveStudioName(JsonNode subject) {
+        return findInfoboxValue(
+                subject,
+                "动画制作",
+                "動畫制作",
+                "动画制作公司",
+                "动画制片厂",
+                "製作",
+                "制作"
+        );
+    }
+
+    private String findInfoboxValue(JsonNode subject, String... keys) {
+        JsonNode infobox = subject.path("infobox");
+        if (!infobox.isArray()) {
+            return null;
+        }
+
+        Set<String> keySet = Set.of(keys);
+        for (JsonNode item : infobox) {
+            String key = item.path("key").asText("");
+            if (keySet.contains(key)) {
+                String value = flattenInfoValue(item.path("value"));
+                if (hasText(value)) {
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String flattenInfoValue(JsonNode value) {
+        if (value == null || value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+        if (value.isTextual() || value.isNumber() || value.isBoolean()) {
+            return value.asText();
+        }
+        if (value.isArray()) {
+            List<String> parts = new ArrayList<>();
+            for (JsonNode item : value) {
+                String text = flattenInfoValue(item);
+                if (hasText(text)) {
+                    parts.add(text);
+                }
+            }
+            return String.join(" / ", parts);
+        }
+        if (value.isObject()) {
+            String valueText = firstText(
+                    value.path("v").asText(null),
+                    value.path("name").asText(null),
+                    value.path("text").asText(null)
+            );
+            if (hasText(valueText)) {
+                return valueText;
+            }
+        }
+        return null;
+    }
+
+    private List<String> resolveTagNames(JsonNode subject, Integer year) {
+        Set<String> tagNames = new LinkedHashSet<>();
+        addTagsFromArray(tagNames, subject.path("meta_tags"), year, true);
+        addTagsFromArray(tagNames, subject.path("tags"), year, false);
+        return tagNames.stream().limit(12).toList();
+    }
+
+    private void addTagsFromArray(Set<String> tagNames, JsonNode tags, Integer year, boolean plainArray) {
+        if (!tags.isArray()) {
+            return;
+        }
+        for (JsonNode tag : tags) {
+            String name = plainArray ? tag.asText("") : tag.path("name").asText("");
+            String normalized = normalizeTagName(name, year);
+            if (hasText(normalized)) {
+                tagNames.add(normalized);
+            }
+        }
+    }
+
+    private String normalizeTagName(String value, Integer year) {
+        if (!hasText(value)) {
+            return null;
+        }
+
+        String tag = value.trim();
+        if (tag.length() > 32) {
+            return null;
+        }
+
+        String lowerTag = tag.toLowerCase(Locale.ROOT);
+        if (tag.equals("TV")
+                || tag.equals("WEB")
+                || tag.equals("OVA")
+                || tag.equals("剧场版")
+                || tag.equals("日本")
+                || lowerTag.equals("bangumi")
+                || tag.matches("\\d{4}")
+                || tag.matches("\\d{4}年\\d{1,2}月")
+                || (year != null && tag.contains(String.valueOf(year)) && tag.contains("月"))) {
+            return null;
+        }
+
+        return tag;
+    }
+
+    private int toBangumiMonth(Integer quarter) {
+        return switch (quarter) {
+            case 1 -> 1;
+            case 2 -> 4;
+            case 3 -> 7;
+            case 4 -> 10;
+            default -> throw new IllegalArgumentException("不支持的月份档期：" + quarter);
+        };
+    }
+
+    private String firstText(String... values) {
+        for (String value : values) {
+            if (hasText(value)) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (!hasText(value)) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() <= maxLength) {
+            return trimmed;
+        }
+        return trimmed.substring(0, maxLength);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+}
