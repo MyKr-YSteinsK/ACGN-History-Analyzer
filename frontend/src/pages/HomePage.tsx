@@ -30,6 +30,8 @@ import type { SubjectCardView } from '../types/subject'
 type CategoryCount = {
     category: AcgnCategory
     count: number
+    previousCount?: number
+    diff?: number
 }
 
 type QuarterCount = {
@@ -150,6 +152,20 @@ function formatChange(value: number) {
     return String(value)
 }
 
+function getPreviousQuarterPosition(year: number, quarter: ReleaseQuarter) {
+    if (quarter === 1) {
+        return {
+            year: year - 1,
+            quarter: 4 as ReleaseQuarter,
+        }
+    }
+
+    return {
+        year,
+        quarter: (quarter - 1) as ReleaseQuarter,
+    }
+}
+
 function HomePage() {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
     const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(getCurrentQuarter())
@@ -239,10 +255,17 @@ function HomePage() {
     }, [selectedCategoryYearRecords, selectedQuarter])
 
     const yearCategoryCounts = useMemo(() => {
-        return categoryOrder.map<CategoryCount>((category) => ({
-            category,
-            count: countRecords(records, selectedYear, category),
-        }))
+        return categoryOrder.map<CategoryCount>((category) => {
+            const currentCount = countRecords(records, selectedYear, category)
+            const previousCount = countRecords(records, selectedYear - 1, category)
+
+            return {
+                category,
+                count: currentCount,
+                previousCount,
+                diff: currentCount - previousCount,
+            }
+        })
     }, [records, selectedYear])
 
     const quarterCategoryCounts = useMemo(() => {
@@ -259,10 +282,17 @@ function HomePage() {
         }))
     }, [records, selectedCategory, selectedYear])
 
-    const yearChangeRows = useMemo(() => {
+    const quarterChangeRows = useMemo(() => {
+        const previousPosition = getPreviousQuarterPosition(selectedYear, selectedQuarter)
+
         return categoryOrder.map((category) => {
             const currentCount = countRecords(records, selectedYear, category, selectedQuarter)
-            const previousCount = countRecords(records, selectedYear - 1, category, selectedQuarter)
+            const previousCount = countRecords(
+                records,
+                previousPosition.year,
+                category,
+                previousPosition.quarter,
+            )
 
             return {
                 category,
@@ -272,6 +302,23 @@ function HomePage() {
             }
         })
     }, [records, selectedQuarter, selectedYear])
+
+    const scoreBandRows = useMemo(() => {
+        const bands = [
+            { label: '47-50', min: 47, max: 50 },
+            { label: '40-46', min: 40, max: 46 },
+            { label: '30-39', min: 30, max: 39 },
+            { label: '0-29', min: 0, max: 29 },
+        ]
+
+        return bands.map((band) => ({
+            ...band,
+            count: selectedQuarterRecords.filter((record) => {
+                const score = record.scoreValue ?? -1
+                return score >= band.min && score <= band.max
+            }).length,
+        }))
+    }, [selectedQuarterRecords])
 
     const topRecords = useMemo(() => {
         return sortRecordsByScore(
@@ -288,9 +335,9 @@ function HomePage() {
     )
     const maxYearCategoryCount = Math.max(1, ...yearCategoryCounts.map((item) => item.count))
     const maxQuarterCategoryCount = Math.max(1, ...quarterCategoryCounts.map((item) => item.count))
-    const maxChangeAbs = Math.max(1, ...yearChangeRows.map((item) => Math.abs(item.diff)))
-    const selectedChangeRow =
-        yearChangeRows.find((item) => item.category === selectedCategory) ?? yearChangeRows[0]
+    const maxChangeAbs = Math.max(1, ...quarterChangeRows.map((item) => Math.abs(item.diff)))
+    const maxScoreBandCount = Math.max(1, ...scoreBandRows.map((item) => item.count))
+    const previousQuarterPosition = getPreviousQuarterPosition(selectedYear, selectedQuarter)
 
     function handleYearChange(year: number) {
         const preferredQuarter = getPreferredQuarter(
@@ -400,6 +447,30 @@ function HomePage() {
                                 />
                             ))}
                         </div>
+
+                        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_0.9fr]">
+                            <StatSummaryCard
+                                label="同比增减"
+                                value={formatChange(
+                                    yearCategoryCounts.find((item) => item.category === selectedCategory)?.diff ?? 0,
+                                )}
+                                hint={`${selectedYear} 相比 ${selectedYear - 1}`}
+                            />
+                            <StatSummaryCard
+                                label="当前类型占比"
+                                value={`${Math.round(
+                                    (selectedCategoryTotal / Math.max(1, totalYearRecords)) * 100,
+                                )}%`}
+                                hint="当前年份总记录占比"
+                            />
+                            <StatSummaryCard
+                                label="当前季度记录"
+                                value={String(selectedQuarterTotal)}
+                                hint={`${selectedYear}${selectedQuarterTheme.displayName}`}
+                            />
+                        </div>
+                    </div>
+                </GlassCard>
                     </div>
                 </GlassCard>
 
@@ -449,7 +520,7 @@ function HomePage() {
                     </GlassCard>
                 </div>
 
-                <div className="grid gap-5 xl:grid-cols-[1fr_1fr_0.92fr]">
+                <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr_0.92fr]">
                     <GlassCard className="overflow-hidden">
                         <div
                             className={[
@@ -458,44 +529,18 @@ function HomePage() {
                             ].join(' ')}
                         >
                             <SectionHeader
-                                eyebrow="type composition"
-                                title={`${selectedQuarterTheme.displayName}类型构成`}
-                                description="点击类型会同步切换全局类型。"
-                            />
-
-                            <div className="mt-4 grid grid-cols-2 gap-3">
-                                {quarterCategoryCounts.map((item) => (
-                                    <QuarterCompositionCard
-                                        key={item.category}
-                                        item={item}
-                                        active={item.category === selectedCategory}
-                                        total={maxQuarterCategoryCount}
-                                        onClick={() => handleCategoryChange(item.category)}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    </GlassCard>
-
-                    <GlassCard className="overflow-hidden">
-                        <div
-                            className={[
-                                'bg-gradient-to-br p-5 transition-all duration-300',
-                                selectedCategoryTheme.softGradient,
-                            ].join(' ')}
-                        >
-                            <SectionHeader
-                                eyebrow="year change"
-                                title="相对往年同期变化"
-                                description={`${selectedQuarterTheme.displayName} · 当前类型 ${formatChange(selectedChangeRow?.diff ?? 0)}`}
+                                eyebrow="quarter change"
+                                title="相对上期变化"
+                                description={`${selectedYear}${selectedQuarterTheme.displayName} 对比 ${previousQuarterPosition.year}${quarterTheme[previousQuarterPosition.quarter].displayName}`}
                             />
 
                             <div className="mt-4 grid gap-2.5">
-                                {yearChangeRows.map((item) => (
-                                    <YearChangeRow
+                                {quarterChangeRows.map((item) => (
+                                    <QuarterChangeRow
                                         key={item.category}
                                         row={item}
                                         active={item.category === selectedCategory}
+                                        total={maxQuarterCategoryCount}
                                         maxAbs={maxChangeAbs}
                                         onClick={() => handleCategoryChange(item.category)}
                                     />
@@ -503,6 +548,13 @@ function HomePage() {
                             </div>
                         </div>
                     </GlassCard>
+
+                    <ScoreBandPanel
+                        rows={scoreBandRows}
+                        maxCount={maxScoreBandCount}
+                        category={selectedCategory}
+                        quarter={selectedQuarter}
+                    />
 
                     <HomeInsightPanel
                         report={homeInsight}
@@ -533,6 +585,22 @@ function HomePage() {
 type MetricPillProps = {
     label: string
     value: number | string
+}
+
+type StatSummaryCardProps = {
+    label: string
+    value: string
+    hint: string
+}
+
+function StatSummaryCard({ label, value, hint }: StatSummaryCardProps) {
+    return (
+        <div className="rounded-[22px] border border-white/70 bg-white/58 px-4 py-3 shadow-sm backdrop-blur">
+            <p className="text-xs font-semibold text-slate-400">{label}</p>
+            <p className="mt-1 text-2xl font-black text-slate-800">{value}</p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-400">{hint}</p>
+        </div>
+    )
 }
 
 type HomeInsightPanelProps = {
@@ -745,8 +813,18 @@ function CategoryOverviewCard({ item, active, total, onClick }: CategoryOverview
 
             <div className="mt-3 flex items-end justify-between gap-3">
                 <span className="text-sm font-semibold text-slate-500">{theme.cnName}</span>
-                <span className={['text-3xl font-black', theme.text].join(' ')}>
-                    {item.count}
+                <span className="text-right">
+                    <span className={['block text-3xl font-black', theme.text].join(' ')}>
+                        {item.count}
+                    </span>
+                    <span
+                        className={[
+                            'mt-0.5 block text-xs font-black',
+                            (item.diff ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                        ].join(' ')}
+                    >
+                        {formatChange(item.diff ?? 0)}
+                    </span>
                 </span>
             </div>
 
@@ -777,12 +855,12 @@ function SeasonBarChart({
                             onSelect,
                         }: SeasonBarChartProps) {
     return (
-        <div className="mt-5 flex h-[210px] items-end gap-4">
+        <div className="mt-5 flex h-[190px] items-end gap-4 overflow-hidden rounded-[28px] border border-white/60 bg-white/28 px-4 pb-3 pt-4">
             {values.map((item) => {
                 const theme = quarterTheme[item.quarter]
                 const selected = selectedQuarter === item.quarter
                 const disabled = item.count === 0
-                const height = item.count === 0 ? 18 : 32 + (item.count / maxCount) * 138
+                const height = item.count === 0 ? 14 : Math.min(118, 24 + (item.count / maxCount) * 94)
 
                 return (
                     <button
@@ -810,7 +888,7 @@ function SeasonBarChart({
 
                         <span
                             className={[
-                                'rounded-full px-3 py-1 text-sm font-black',
+                                'rounded-full px-3 py-1 text-xs font-black',
                                 selected ? `${theme.bg} ${theme.text}` : 'text-slate-400',
                             ].join(' ')}
                         >
@@ -934,54 +1012,7 @@ function TopScoreCard({ record, category, onOpenDetail }: TopScoreCardProps) {
     )
 }
 
-type QuarterCompositionCardProps = {
-    item: CategoryCount
-    active: boolean
-    total: number
-    onClick: () => void
-}
-
-function QuarterCompositionCard({
-                                    item,
-                                    active,
-                                    total,
-                                    onClick,
-                                }: QuarterCompositionCardProps) {
-    const theme = categoryTheme[item.category]
-    const percent = Math.min(100, Math.round((item.count / Math.max(1, total)) * 100))
-
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={[
-                'rounded-[24px] border p-4 text-left transition-all duration-200',
-                active
-                    ? `${theme.border} bg-gradient-to-br ${theme.softGradient} scale-[1.015] shadow-sm`
-                    : 'border-white/70 bg-white/55 hover:-translate-y-0.5 hover:bg-white/75',
-            ].join(' ')}
-        >
-            <div className="flex items-center justify-between gap-3">
-                <span className={['text-sm font-black', theme.text].join(' ')}>
-                    {theme.cnName}
-                </span>
-                <span className="text-3xl font-black text-slate-800">{item.count}</span>
-            </div>
-
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/80">
-                <div
-                    className={[
-                        'h-full rounded-full transition-all duration-300',
-                        active ? theme.bg : 'bg-slate-200/70',
-                    ].join(' ')}
-                    style={{ width: `${Math.max(8, percent)}%` }}
-                />
-            </div>
-        </button>
-    )
-}
-
-type YearChangeRowProps = {
+type QuarterChangeRowProps = {
     row: {
         category: AcgnCategory
         currentCount: number
@@ -989,13 +1020,15 @@ type YearChangeRowProps = {
         diff: number
     }
     active: boolean
+    total: number
     maxAbs: number
     onClick: () => void
 }
 
-function YearChangeRow({ row, active, maxAbs, onClick }: YearChangeRowProps) {
+function QuarterChangeRow({ row, active, total, maxAbs, onClick }: QuarterChangeRowProps) {
     const theme = categoryTheme[row.category]
     const percent = Math.min(100, Math.round((Math.abs(row.diff) / Math.max(1, maxAbs)) * 100))
+    const countPercent = Math.min(100, Math.round((row.currentCount / Math.max(1, total)) * 100))
     const diffClassName = row.diff >= 0 ? 'text-emerald-600' : 'text-rose-600'
 
     return (
@@ -1003,7 +1036,7 @@ function YearChangeRow({ row, active, maxAbs, onClick }: YearChangeRowProps) {
             type="button"
             onClick={onClick}
             className={[
-                'grid w-full grid-cols-[76px_1fr_70px] items-center gap-3 rounded-[20px] border p-3 text-left transition-all duration-200',
+                'grid w-full grid-cols-[76px_1fr_78px] items-center gap-3 rounded-[20px] border p-3 text-left transition-all duration-200',
                 active
                     ? `${theme.border} bg-white/72 shadow-sm`
                     : 'border-white/70 bg-white/50 hover:-translate-y-0.5 hover:bg-white/75',
@@ -1014,6 +1047,12 @@ function YearChangeRow({ row, active, maxAbs, onClick }: YearChangeRowProps) {
             <div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-900/[0.06]">
                     <div
+                        className={['h-full rounded-full transition-all duration-300', theme.bg].join(' ')}
+                        style={{ width: `${Math.max(8, countPercent)}%` }}
+                    />
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-900/[0.04]">
+                    <div
                         className={[
                             'h-full rounded-full transition-all duration-300',
                             row.diff >= 0 ? 'bg-emerald-200' : 'bg-rose-200',
@@ -1022,14 +1061,77 @@ function YearChangeRow({ row, active, maxAbs, onClick }: YearChangeRowProps) {
                     />
                 </div>
                 <p className="mt-1 text-[11px] text-slate-400">
-                    今年 {row.currentCount} / 去年 {row.previousCount}
+                    本期 {row.currentCount} / 上期 {row.previousCount}
                 </p>
             </div>
 
-            <span className={['text-right text-lg font-black', diffClassName].join(' ')}>
-                {formatChange(row.diff)}
-            </span>
+            <div className="text-right">
+                <span className="block text-lg font-black text-slate-800">{row.currentCount}</span>
+                <span className={['block text-xs font-black', diffClassName].join(' ')}>
+                    {formatChange(row.diff)}
+                </span>
+            </div>
         </button>
+    )
+}
+
+type ScoreBandPanelProps = {
+    rows: Array<{
+        label: string
+        count: number
+    }>
+    maxCount: number
+    category: AcgnCategory
+    quarter: ReleaseQuarter
+}
+
+function ScoreBandPanel({ rows, maxCount, category, quarter }: ScoreBandPanelProps) {
+    const theme = categoryTheme[category]
+    const quarterDisplayName = quarterTheme[quarter].displayName
+
+    return (
+        <GlassCard className="overflow-hidden">
+            <div
+                className={[
+                    'h-full bg-gradient-to-br p-5 transition-all duration-300',
+                    theme.softGradient,
+                ].join(' ')}
+            >
+                <SectionHeader
+                    eyebrow="score bands"
+                    title="分数区间分布"
+                    description={`${quarterDisplayName} · ${theme.cnName} · 个人评分`}
+                />
+
+                <div className="mt-4 grid gap-3">
+                    {rows.map((row) => {
+                        const percent = Math.min(100, Math.round((row.count / maxCount) * 100))
+
+                        return (
+                            <div
+                                key={row.label}
+                                className="rounded-[22px] border border-white/70 bg-white/58 p-3 shadow-sm"
+                            >
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className={['text-sm font-black', theme.text].join(' ')}>
+                                        {row.label}
+                                    </span>
+                                    <span className="text-lg font-black text-slate-800">
+                                        {row.count}
+                                    </span>
+                                </div>
+                                <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/80">
+                                    <div
+                                        className={['h-full rounded-full transition-all duration-300', theme.bg].join(' ')}
+                                        style={{ width: `${Math.max(8, percent)}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+        </GlassCard>
     )
 }
 

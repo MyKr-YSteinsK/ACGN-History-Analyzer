@@ -314,18 +314,6 @@ public class SubjectService {
             }
 
             String sourceUniqueKey = buildSourceUniqueKey(item);
-            if (sourceUniqueKey != null && subjectSourceUniqueExistsForCreate(item)) {
-                skippedCount++;
-                items.add(new SubjectImportItemResponse(
-                        null,
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "来源作品已存在，已跳过"
-                ));
-                rowNumber++;
-                continue;
-            }
-
             if (sourceUniqueKey != null && !batchSourceKeys.add(sourceUniqueKey)) {
                 skippedCount++;
                 items.add(new SubjectImportItemResponse(
@@ -365,15 +353,29 @@ public class SubjectService {
                 continue;
             }
 
-            boolean exists = subjectBusinessUniqueExistsForCreate(item);
-            if (exists) {
-                skippedCount++;
-                items.add(new SubjectImportItemResponse(
-                        null,
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "作品已存在，已跳过"
-                ));
+            Subject existingSubject = findImportMatch(item);
+            if (existingSubject != null) {
+                if (hasSubjectChanged(existingSubject, item, resolvedFranchiseId)) {
+                    Subject updatedSubject = applyImportUpdate(existingSubject, item, resolvedFranchiseId);
+                    tagService.syncSubjectTags(updatedSubject, item.getTagNames());
+                    Subject savedSubject = subjectRepository.save(updatedSubject);
+                    importedCount++;
+
+                    items.add(new SubjectImportItemResponse(
+                            savedSubject.getId(),
+                            savedSubject.getDisplayTitle(),
+                            "UPDATED",
+                            buildSubjectImportUpdateMessage(item, resolvedFranchiseId)
+                    ));
+                } else {
+                    skippedCount++;
+                    items.add(new SubjectImportItemResponse(
+                            existingSubject.getId(),
+                            existingSubject.getDisplayTitle(),
+                            "SKIPPED",
+                            "作品已存在且标签、评分、集数一致，已跳过"
+                    ));
+                }
                 rowNumber++;
                 continue;
             }
@@ -407,6 +409,7 @@ public class SubjectService {
 
         int canImportCount = 0;
         int skippedCount = 0;
+        int updatedCount = 0;
 
         int rowNumber = 1;
         for (SubjectCreateRequest item : request.getSubjects()) {
@@ -416,19 +419,24 @@ public class SubjectService {
                 items.add(new SubjectImportPreviewItemResponse(
                         buildSubjectImportLabel(item, rowNumber),
                         "ERROR",
-                        validationMessage
+                        validationMessage,
+                        item == null ? null : item.getSourcePlatform(),
+                        item == null ? null : item.getSourceId()
                 ));
                 rowNumber++;
                 continue;
             }
 
             String sourceUniqueKey = buildSourceUniqueKey(item);
-            if (sourceUniqueKey != null && subjectSourceUniqueExistsForCreate(item)) {
+            Subject existingBySource = findExistingBySource(item);
+            if (sourceUniqueKey != null && existingBySource != null && !batchSourceKeys.add(sourceUniqueKey)) {
                 skippedCount++;
                 items.add(new SubjectImportPreviewItemResponse(
                         item.getDisplayTitle(),
                         "SKIPPED",
-                        "来源作品已存在，正式导入时会跳过"
+                        "同一批次内来源作品重复，已跳过",
+                        item.getSourcePlatform(),
+                        item.getSourceId()
                 ));
                 rowNumber++;
                 continue;
@@ -439,7 +447,9 @@ public class SubjectService {
                 items.add(new SubjectImportPreviewItemResponse(
                         item.getDisplayTitle(),
                         "SKIPPED",
-                        "同一批次内来源作品重复，正式导入时会跳过"
+                        "同一批次内来源作品重复，已跳过",
+                        item.getSourcePlatform(),
+                        item.getSourceId()
                 ));
                 rowNumber++;
                 continue;
@@ -451,7 +461,9 @@ public class SubjectService {
                 items.add(new SubjectImportPreviewItemResponse(
                         item.getDisplayTitle(),
                         "SKIPPED",
-                        "同一批次内作品唯一信息重复，正式导入时会跳过"
+                        "同一批次内作品唯一信息重复，正式导入时会跳过",
+                        item.getSourcePlatform(),
+                        item.getSourceId()
                 ));
                 rowNumber++;
                 continue;
@@ -462,30 +474,47 @@ public class SubjectService {
                 items.add(new SubjectImportPreviewItemResponse(
                         item.getDisplayTitle(),
                         "SKIPPED",
-                        "franchiseId 对应的系列不存在，正式导入时会跳过"
+                        "franchiseId 对应的系列不存在，正式导入时会跳过",
+                        item.getSourcePlatform(),
+                        item.getSourceId()
                 ));
                 rowNumber++;
                 continue;
             }
 
-            boolean exists = subjectBusinessUniqueExistsForCreate(item);
-            if (exists) {
-                skippedCount++;
-                items.add(new SubjectImportPreviewItemResponse(
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "作品已存在，正式导入时会跳过"
-                ));
+            Subject existingSubject = findImportMatch(item);
+            Long resolvedFranchiseId = resolveFranchiseIdForImport(item);
+            if (existingSubject != null) {
+                if (hasSubjectChanged(existingSubject, item, resolvedFranchiseId)) {
+                    updatedCount++;
+                    items.add(new SubjectImportPreviewItemResponse(
+                            item.getDisplayTitle(),
+                            "UPDATED",
+                            buildSubjectImportUpdatePreviewMessage(item, resolvedFranchiseId),
+                            item.getSourcePlatform(),
+                            item.getSourceId()
+                    ));
+                } else {
+                    skippedCount++;
+                    items.add(new SubjectImportPreviewItemResponse(
+                            item.getDisplayTitle(),
+                            "SKIPPED",
+                            "作品已存在且标签、评分、集数一致，正式导入时会跳过",
+                            item.getSourcePlatform(),
+                            item.getSourceId()
+                    ));
+                }
                 rowNumber++;
                 continue;
             }
 
             canImportCount++;
-            Long resolvedFranchiseId = resolveFranchiseIdForImport(item);
             items.add(new SubjectImportPreviewItemResponse(
                     item.getDisplayTitle(),
                     "CAN_IMPORT",
-                    buildSubjectImportPreviewMessage(item, resolvedFranchiseId)
+                    buildSubjectImportPreviewMessage(item, resolvedFranchiseId),
+                    item.getSourcePlatform(),
+                    item.getSourceId()
             ));
             rowNumber++;
         }
@@ -494,6 +523,7 @@ public class SubjectService {
                 request.getSubjects().size(),
                 canImportCount,
                 skippedCount,
+                updatedCount,
                 items
         );
     }
@@ -598,6 +628,95 @@ public class SubjectService {
         return null;
     }
 
+    private Subject findExistingBySource(SubjectCreateRequest request) {
+        if (!hasText(request.getSourcePlatform()) || !hasText(request.getSourceId())) {
+            return null;
+        }
+
+        return subjectRepository.findAll().stream()
+                .filter(subject -> normalizeTextKey(subject.getSourcePlatform()).equals(normalizeTextKey(request.getSourcePlatform())))
+                .filter(subject -> normalizeTextKey(subject.getSourceId()).equals(normalizeTextKey(request.getSourceId())))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private Subject findImportMatch(SubjectCreateRequest request) {
+        Subject matchedBySource = findExistingBySource(request);
+        if (matchedBySource != null) {
+            return matchedBySource;
+        }
+
+        List<Subject> matchedByBusiness = subjectRepository.findAllByBusinessUnique(
+                normalizeTextKey(request.getTitleCn()),
+                normalizeTextKey(request.getSubtitle()),
+                normalizeNumberKey(request.getSeasonIndex()),
+                normalizeNumberKey(request.getPartIndex()),
+                normalizeTextKey(request.getCategory())
+        );
+        return matchedByBusiness.isEmpty() ? null : matchedByBusiness.get(0);
+    }
+
+    private boolean hasSubjectChanged(Subject subject, SubjectCreateRequest request, Long franchiseId) {
+        if (subject == null || request == null) {
+            return false;
+        }
+
+        return !equalsText(subject.getTitleCn(), request.getTitleCn())
+                || !equalsText(subject.getSubtitle(), request.getSubtitle())
+                || !equalsText(subject.getDisplayTitle(), request.getDisplayTitle())
+                || !equalsNumber(subject.getSeasonIndex(), request.getSeasonIndex())
+                || !equalsNumber(subject.getPartIndex(), request.getPartIndex())
+                || !equalsNumber(subject.getFranchiseId(), franchiseId)
+                || !equalsText(subject.getCoverUrl(), resolveCoverUrl(request))
+                || !equalsText(subject.getSummary(), request.getSummary())
+                || !equalsNumber(subject.getReleaseYear(), request.getReleaseYear())
+                || !equalsNumber(subject.getReleaseQuarter(), request.getReleaseQuarter())
+                || !equalsText(subject.getCategory(), request.getCategory())
+                || !equalsText(subject.getStudioName(), request.getStudioName())
+                || !equalsText(subject.getPlatformLink(), request.getPlatformLink())
+                || !equalsNumber(subject.getPlatformScore(), request.getPlatformScore())
+                || !equalsNumber(subject.getEpisodeCount(), request.getEpisodeCount())
+                || !equalsText(subject.getSourcePlatform(), request.getSourcePlatform())
+                || !equalsText(subject.getSourceId(), request.getSourceId())
+                || !equalsText(subject.getStatus(), request.getStatus());
+    }
+
+    private Subject applyImportUpdate(Subject target, SubjectCreateRequest request, Long franchiseId) {
+        target.setTitleCn(request.getTitleCn());
+        target.setSubtitle(request.getSubtitle());
+        target.setDisplayTitle(request.getDisplayTitle());
+        target.setSeasonIndex(request.getSeasonIndex());
+        target.setPartIndex(request.getPartIndex());
+        target.setFranchiseId(franchiseId);
+        target.setCoverUrl(resolveCoverUrl(request));
+        target.setSummary(request.getSummary());
+        target.setReleaseYear(request.getReleaseYear());
+        target.setReleaseQuarter(request.getReleaseQuarter());
+        target.setCategory(request.getCategory());
+        target.setStudioName(request.getStudioName());
+        target.setPlatformLink(request.getPlatformLink());
+        target.setPlatformScore(request.getPlatformScore());
+        target.setEpisodeCount(request.getEpisodeCount());
+        target.setSourcePlatform(request.getSourcePlatform());
+        target.setSourceId(request.getSourceId());
+        target.setStatus(request.getStatus());
+        return target;
+    }
+
+    private boolean equalsText(String left, String right) {
+        return normalizeTextKey(left).equals(normalizeTextKey(right));
+    }
+
+    private boolean equalsNumber(Number left, Number right) {
+        if (left == null && right == null) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        return left.doubleValue() == right.doubleValue();
+    }
+
     private Long resolveFranchiseIdByName(String franchiseName) {
         if (!hasText(franchiseName)) {
             return null;
@@ -625,11 +744,25 @@ public class SubjectService {
         return "可以导入";
     }
 
+    private String buildSubjectImportUpdatePreviewMessage(SubjectCreateRequest request, Long resolvedFranchiseId) {
+        if (request.getFranchiseId() == null && hasText(request.getFranchiseName()) && resolvedFranchiseId == null) {
+            return "作品已存在，将更新原始数据；franchiseName 未匹配到已有系列，仍按无系列作品处理";
+        }
+        return "作品已存在，将更新原始数据";
+    }
+
     private String buildSubjectImportSuccessMessage(SubjectCreateRequest request, Long resolvedFranchiseId) {
         if (request.getFranchiseId() == null && hasText(request.getFranchiseName()) && resolvedFranchiseId == null) {
             return "导入成功；franchiseName 未匹配到已有系列，已按无系列作品导入";
         }
         return "导入成功";
+    }
+
+    private String buildSubjectImportUpdateMessage(SubjectCreateRequest request, Long resolvedFranchiseId) {
+        if (request.getFranchiseId() == null && hasText(request.getFranchiseName()) && resolvedFranchiseId == null) {
+            return "更新成功；franchiseName 未匹配到已有系列，已按无系列作品更新";
+        }
+        return "更新成功";
     }
 
     private String validateSubjectImportItem(SubjectCreateRequest item) {

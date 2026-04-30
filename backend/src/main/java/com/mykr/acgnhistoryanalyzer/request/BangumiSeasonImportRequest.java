@@ -4,6 +4,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
+import java.util.List;
+
 public class BangumiSeasonImportRequest {
 
     @NotNull(message = "年份不能为空")
@@ -19,6 +21,8 @@ public class BangumiSeasonImportRequest {
     private Boolean includeWeb = false;
 
     private Boolean japaneseOnly = true;
+
+    private List<String> excludedSourceIds;
 
     public Integer getYear() {
         return year;
@@ -50,5 +54,13 @@ public class BangumiSeasonImportRequest {
 
     public void setJapaneseOnly(Boolean japaneseOnly) {
         this.japaneseOnly = japaneseOnly;
+    }
+
+    public List<String> getExcludedSourceIds() {
+        return excludedSourceIds;
+    }
+
+    public void setExcludedSourceIds(List<String> excludedSourceIds) {
+        this.excludedSourceIds = excludedSourceIds;
     }
 }

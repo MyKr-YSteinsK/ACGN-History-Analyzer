@@ -31,9 +31,6 @@ import {
     type UserSubjectRecordImportResponse,
 } from '../api/recordApi'
 import {
-    importSubjects,
-    previewImportSubjects,
-    type SubjectBatchImportRequest,
     type SubjectImportItemResponse,
     type SubjectImportPreviewItemResponse,
     type SubjectImportPreviewResponse,
@@ -42,6 +39,7 @@ import {
 import { FeedbackBanner } from '../components/common/FeedbackState'
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
+import { quarterTheme } from '../theme/acgnTheme'
 import type { ReleaseQuarter } from '../types/common'
 
 type ImportTarget = 'SUBJECT' | 'COLLECTION' | 'RECORD'
@@ -49,7 +47,6 @@ type ImportTarget = 'SUBJECT' | 'COLLECTION' | 'RECORD'
 type ImportMode = 'JSON' | 'CSV' | 'EXCEL' | 'BANGUMI' | 'BACKUP' | 'MANUAL'
 
 type ParsedPayload =
-    | SubjectBatchImportRequest
     | UserSubjectCollectionBatchImportRequest
     | UserSubjectRecordBatchImportRequest
 
@@ -84,6 +81,14 @@ type ImportResultState =
 type PreviewItem = {
     title: string
     result: string
+    message: string
+    sourcePlatform?: string | null
+    sourceId?: string | null
+}
+
+type BangumiPreviewProgress = {
+    active: boolean
+    percent: number
     message: string
 }
 
@@ -243,11 +248,31 @@ function getImportItemFilter(item: PreviewItem): Exclude<ImportItemFilter, 'ALL'
         return 'SUCCESS'
     }
 
+    if (item.result === 'UPDATED') {
+        return 'WARNING'
+    }
+
+    if (item.result === 'SKIPPED') {
+        return 'WARNING'
+    }
+
     if (item.result === 'ERROR') {
         return 'ERROR'
     }
 
     return 'WARNING'
+}
+
+function getPreviewItemKey(item: PreviewItem, index: number) {
+    if (item.sourceId) {
+        return `${item.sourcePlatform ?? 'SOURCE'}:${item.sourceId}`
+    }
+
+    return `${item.title}:${index}`
+}
+
+function isImportablePreviewItem(item: PreviewItem) {
+    return item.result === 'CAN_IMPORT'
 }
 
 function stringifyTemplate(template: ImportTemplateResponse | null) {
@@ -447,6 +472,8 @@ function getPreviewItems(preview: PreviewState | null): PreviewItem[] {
             title: item.displayTitle,
             result: item.result,
             message: item.message,
+            sourcePlatform: item.sourcePlatform,
+            sourceId: item.sourceId,
         }))
     }
 
@@ -508,6 +535,14 @@ function pickTemplate(
     return recordTemplate
 }
 
+function isModeAllowedForTarget(mode: ImportMode, target: ImportTarget) {
+    if (target === 'SUBJECT') {
+        return mode === 'BANGUMI'
+    }
+
+    return mode === 'JSON' || mode === 'CSV'
+}
+
 function ImportPage() {
     const [overview, setOverview] = useState<ImportOverviewResponse | null>(null)
     const [subjectTemplate, setSubjectTemplate] = useState<ImportTemplateResponse | null>(null)
@@ -515,9 +550,10 @@ function ImportPage() {
         useState<ImportTemplateResponse | null>(null)
     const [recordTemplate, setRecordTemplate] = useState<ImportTemplateResponse | null>(null)
     const [selectedTarget, setSelectedTarget] = useState<ImportTarget>('SUBJECT')
-    const [selectedMode, setSelectedMode] = useState<ImportMode>('JSON')
+    const [selectedMode, setSelectedMode] = useState<ImportMode>('BANGUMI')
     const [draftText, setDraftText] = useState('')
     const [preview, setPreview] = useState<PreviewState | null>(null)
+    const [excludedPreviewKeys, setExcludedPreviewKeys] = useState<string[]>([])
     const [importResult, setImportResult] = useState<ImportResultState | null>(null)
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [loadingDocs, setLoadingDocs] = useState(false)
@@ -528,6 +564,8 @@ function ImportPage() {
     const [bangumiJapaneseOnly, setBangumiJapaneseOnly] = useState(true)
     const [bangumiJobStatus, setBangumiJobStatus] =
         useState<BangumiImportJobStatusResponse | null>(null)
+    const [bangumiPreviewProgress, setBangumiPreviewProgress] =
+        useState<BangumiPreviewProgress | null>(null)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
 
     const selectedTemplate = pickTemplate(
@@ -537,8 +575,33 @@ function ImportPage() {
         recordTemplate,
     )
     const selectedRootKey = getTargetRootKey(selectedTarget)
-    const previewItems = getPreviewItems(preview)
-    const resultItems = getImportResultItems(importResult)
+    const previewItems = useMemo(() => getPreviewItems(preview), [preview])
+    const activePreviewItems = useMemo(
+        () =>
+            previewItems.filter(
+                (item, index) =>
+                    !excludedPreviewKeys.includes(getPreviewItemKey(item, index)),
+            ),
+        [excludedPreviewKeys, previewItems],
+    )
+    const resultItems = useMemo(() => getImportResultItems(importResult), [importResult])
+    const previewItemMetrics = useMemo(() => {
+        return previewItems.reduce(
+            (accumulator, item) => {
+                if (item.result === 'ERROR') {
+                    accumulator.error += 1
+                } else if (item.result === 'UPDATED') {
+                    accumulator.updated += 1
+                } else if (item.result === 'SKIPPED') {
+                    accumulator.skipped += 1
+                } else {
+                    accumulator.canImport += 1
+                }
+                return accumulator
+            },
+            { canImport: 0, updated: 0, skipped: 0, error: 0 },
+        )
+    }, [previewItems])
 
     const activePreview =
         preview && preview.target === selectedTarget ? preview.data : null
@@ -554,9 +617,22 @@ function ImportPage() {
             quarter: bangumiQuarter,
             includeWeb: bangumiIncludeWeb,
             japaneseOnly: bangumiJapaneseOnly,
+            excludedSourceIds: previewItems
+                .filter((item, index) => excludedPreviewKeys.includes(getPreviewItemKey(item, index)))
+                .filter((item) => item.sourcePlatform === 'BANGUMI' && item.sourceId)
+                .map((item) => item.sourceId as string),
         }),
-        [bangumiIncludeWeb, bangumiJapaneseOnly, bangumiQuarter, bangumiYear],
+        [
+            bangumiIncludeWeb,
+            bangumiJapaneseOnly,
+            bangumiQuarter,
+            bangumiYear,
+            excludedPreviewKeys,
+            previewItems,
+        ],
     )
+    const activeCanImportCount = activePreviewItems.filter(isImportablePreviewItem).length
+    const activeSkippedCount = activePreviewItems.length - activeCanImportCount
 
     const draftLineCount = useMemo(() => {
         return draftText.trim() ? draftText.trim().split(/\r?\n/).length : 0
@@ -591,7 +667,7 @@ function ImportPage() {
             setSubjectTemplate(subjectTemplateResponse)
             setCollectionTemplate(collectionTemplateResponse)
             setRecordTemplate(recordTemplateResponse)
-            setDraftText(JSON.stringify(subjectTemplateResponse.templateBody, null, 2))
+            setDraftText('')
         } catch (error) {
             setFeedbackMessage(getErrorMessage(error))
         } finally {
@@ -607,9 +683,11 @@ function ImportPage() {
 
     function resetResultState() {
         setPreview(null)
+        setExcludedPreviewKeys([])
         setImportResult(null)
         setFeedbackMessage(null)
         setBangumiJobStatus(null)
+        setBangumiPreviewProgress(null)
     }
 
     async function waitForBangumiImportJob(jobId: string) {
@@ -637,12 +715,18 @@ function ImportPage() {
     }
 
     function handleTargetChange(target: ImportTarget) {
-        if (isBangumiMode && target !== 'SUBJECT') {
-            setSelectedMode('JSON')
-        }
-
         setSelectedTarget(target)
         resetResultState()
+
+        if (target === 'SUBJECT') {
+            setSelectedMode('BANGUMI')
+            setDraftText('')
+            return
+        }
+
+        if (selectedMode === 'BANGUMI') {
+            setSelectedMode('JSON')
+        }
 
         const nextTemplate = pickTemplate(
             target,
@@ -657,6 +741,10 @@ function ImportPage() {
     }
 
     function handleModeChange(mode: ImportMode) {
+        if (!isModeAllowedForTarget(mode, selectedTarget)) {
+            return
+        }
+
         setSelectedMode(mode)
         resetResultState()
 
@@ -710,12 +798,48 @@ function ImportPage() {
     async function handlePreview() {
         setSubmitting(true)
         setPreview(null)
+        setExcludedPreviewKeys([])
         setImportResult(null)
         setFeedbackMessage(null)
+        let previewTimer: number | undefined
 
         try {
             if (isBangumiMode) {
+                setBangumiPreviewProgress({
+                    active: true,
+                    percent: 8,
+                    message: '正在连接 Bangumi，准备获取候选作品',
+                })
+                previewTimer = window.setInterval(() => {
+                    setBangumiPreviewProgress((current) => {
+                        if (!current || !current.active) {
+                            return current
+                        }
+
+                        const nextPercent = Math.min(88, current.percent + 7)
+                        const nextMessage =
+                            nextPercent < 35
+                                ? '正在获取 Bangumi 作品列表'
+                                : nextPercent < 65
+                                  ? '正在整理标题、评分、集数和标签'
+                                  : '正在进行重复检查与导入预校验'
+
+                        return {
+                            active: true,
+                            percent: nextPercent,
+                            message: nextMessage,
+                        }
+                    })
+                }, 650)
                 const response = await previewBangumiSeasonImport(bangumiPayload)
+                if (previewTimer !== undefined) {
+                    window.clearInterval(previewTimer)
+                }
+                setBangumiPreviewProgress({
+                    active: false,
+                    percent: 100,
+                    message: `预览完成，可导入 ${response.canImportCount} 条作品`,
+                })
                 setSelectedTarget('SUBJECT')
                 setPreview({ target: 'SUBJECT', data: response })
                 setFeedbackMessage(
@@ -726,10 +850,7 @@ function ImportPage() {
 
             const payload = parseDraftPayload(draftText, selectedMode, selectedTarget)
 
-            if (selectedTarget === 'SUBJECT') {
-                const response = await previewImportSubjects(payload as SubjectBatchImportRequest)
-                setPreview({ target: 'SUBJECT', data: response })
-            } else if (selectedTarget === 'COLLECTION') {
+            if (selectedTarget === 'COLLECTION') {
                 const response = await previewImportCollections(
                     payload as UserSubjectCollectionBatchImportRequest,
                 )
@@ -741,6 +862,18 @@ function ImportPage() {
                 setPreview({ target: 'RECORD', data: response })
             }
         } catch (error) {
+            if (previewTimer !== undefined) {
+                window.clearInterval(previewTimer)
+            }
+            setBangumiPreviewProgress((current) =>
+                current
+                    ? {
+                          active: false,
+                          percent: current.percent,
+                          message: '预览失败，请查看错误信息',
+                      }
+                    : current,
+            )
             setFeedbackMessage(getErrorMessage(error))
         } finally {
             setSubmitting(false)
@@ -772,11 +905,7 @@ function ImportPage() {
 
             const payload = parseDraftPayload(draftText, selectedMode, selectedTarget)
 
-            if (selectedTarget === 'SUBJECT') {
-                const response = await importSubjects(payload as SubjectBatchImportRequest)
-                setImportResult({ target: 'SUBJECT', data: response })
-                setFeedbackMessage(`已导入 ${response.importedCount} 条作品`)
-            } else if (selectedTarget === 'COLLECTION') {
+            if (selectedTarget === 'COLLECTION') {
                 const response = await importCollections(
                     payload as UserSubjectCollectionBatchImportRequest,
                 )
@@ -816,11 +945,11 @@ function ImportPage() {
     }
 
     return (
-        <div className="space-y-6 content-enter">
+        <div className="space-y-6 pb-10 lg:pb-16 content-enter">
             <PageHero
                 eyebrow="IMPORT"
                 title="导入中心"
-                description="先预览校验，再确认写入。当前支持 JSON / CSV 批量导入，也可以按年份档期从 Bangumi 自动导入新番作品。"
+                description="作品库只走 Bangumi 自动导入；收藏夹和个人记录使用 JSON / CSV 手动导入。所有数据先预览校验，再确认写入。"
             />
 
             <ImportFlowStepper currentStep={currentFlowStep} />
@@ -857,22 +986,20 @@ function ImportPage() {
                             <div className="grid gap-3 md:grid-cols-3">
                                 <TargetCard
                                     title="作品库"
-                                    description="导入作品本体，建议先于记录导入"
+                                    description="仅允许 Bangumi 自动导入，避免污染作品库"
                                     active={selectedTarget === 'SUBJECT'}
                                     onClick={() => handleTargetChange('SUBJECT')}
                                 />
                                 <TargetCard
                                     title="收藏夹"
-                                    description="导入想看 / 搁置，正式记录会覆盖收藏状态"
+                                    description="允许 JSON / CSV 导入想看与搁置"
                                     active={selectedTarget === 'COLLECTION'}
-                                    disabled={isBangumiMode}
                                     onClick={() => handleTargetChange('COLLECTION')}
                                 />
                                 <TargetCard
                                     title="个人记录"
-                                    description="导入正式看过 / 读过 / 玩过的记录"
+                                    description="允许 JSON / CSV 导入正式记录"
                                     active={selectedTarget === 'RECORD'}
-                                    disabled={isBangumiMode}
                                     onClick={() => handleTargetChange('RECORD')}
                                 />
                             </div>
@@ -912,20 +1039,23 @@ function ImportPage() {
                         </h3>
 
                         <div className="mt-4 grid gap-2">
-                            {importModes.map((mode) => {
+                            {importModes
+                                .filter((mode) => isModeAllowedForTarget(mode.value, selectedTarget))
+                                .map((mode) => {
                                 const active = selectedMode === mode.value
+                                const enabled = mode.enabled
 
                                 return (
                                     <button
                                         key={mode.value}
                                         type="button"
-                                        disabled={!mode.enabled}
+                                        disabled={!enabled}
                                         onClick={() => handleModeChange(mode.value)}
                                         className={[
                                             'rounded-[20px] border p-3 text-left transition-all duration-200',
                                             active
                                                 ? 'border-sky-200 bg-sky-100/80 text-sky-700 shadow-sm'
-                                                : mode.enabled
+                                                : enabled
                                                   ? 'border-white/70 bg-white/55 text-slate-500 hover:-translate-y-0.5 hover:bg-white/75'
                                                   : 'cursor-not-allowed border-white/50 bg-white/35 text-slate-300',
                                         ].join(' ')}
@@ -1005,6 +1135,7 @@ function ImportPage() {
                                 includeWeb={bangumiIncludeWeb}
                                 japaneseOnly={bangumiJapaneseOnly}
                                 jobStatus={bangumiJobStatus}
+                                previewProgress={bangumiPreviewProgress}
                                 onYearChange={(year) => {
                                     setBangumiYear(year)
                                     resetResultState()
@@ -1072,7 +1203,7 @@ function ImportPage() {
                                     disabled={
                                         submitting ||
                                         !activePreview ||
-                                        activePreview.canImportCount === 0
+                                        activeCanImportCount === 0
                                     }
                                     className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
@@ -1091,11 +1222,23 @@ function ImportPage() {
             <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
                 <PreviewPanel
                     title="预览校验"
-                    totalCount={activePreview?.totalCount ?? 0}
-                    canImportCount={activePreview?.canImportCount ?? 0}
-                    skippedCount={activePreview?.skippedCount ?? 0}
-                    items={previewItems}
-                    emptyText="先点击预览校验，查看可导入、警告和跳过项。"
+                    totalCount={activePreviewItems.length}
+                    canImportCount={previewItemMetrics.canImport}
+                    updatedCount={previewItemMetrics.updated}
+                    skippedCount={previewItemMetrics.skipped}
+                    errorCount={previewItemMetrics.error}
+                    items={activePreviewItems}
+                    onExcludeItem={
+                        isBangumiMode
+                            ? (item, index) => {
+                                  setExcludedPreviewKeys((currentKeys) => [
+                                      ...currentKeys,
+                                      getPreviewItemKey(item, index),
+                                  ])
+                              }
+                            : undefined
+                    }
+                    emptyText="先点击预览校验，查看可导入、更新、跳过和错误项。"
                 />
 
                 <ResultPanel
@@ -1104,8 +1247,8 @@ function ImportPage() {
                 />
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-                <TemplateFieldPanel template={selectedTemplate} />
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-stretch">
+                <TemplateFieldPanel template={selectedTemplate} bangumiMode={isBangumiMode} />
                 <EndpointPanel overview={overview} />
             </div>
         </div>
@@ -1217,6 +1360,7 @@ type BangumiSeasonPanelProps = {
     includeWeb: boolean
     japaneseOnly: boolean
     jobStatus: BangumiImportJobStatusResponse | null
+    previewProgress: BangumiPreviewProgress | null
     onYearChange: (year: number) => void
     onQuarterChange: (quarter: ReleaseQuarter) => void
     onIncludeWebChange: (includeWeb: boolean) => void
@@ -1229,18 +1373,37 @@ function BangumiSeasonPanel({
     includeWeb,
     japaneseOnly,
     jobStatus,
+    previewProgress,
     onYearChange,
     onQuarterChange,
     onIncludeWebChange,
     onJapaneseOnlyChange,
 }: BangumiSeasonPanelProps) {
     const selectedQuarter = bangumiQuarterOptions.find((option) => option.value === quarter)
+    const visibleYears = [year - 1, year, year + 1]
     const progressPercent = jobStatus?.percent ?? 0
     const progressMessage = jobStatus?.errorMessage || jobStatus?.message || '等待导入任务开始'
+    const visibleProgress = jobStatus
+        ? {
+              title: 'Bangumi 导入进度',
+              stage: jobStatus.stage,
+              percent: progressPercent,
+              message: progressMessage,
+              status: jobStatus.status,
+          }
+        : previewProgress
+          ? {
+                title: 'Bangumi 预览进度',
+                stage: previewProgress.active ? 'PREVIEWING' : 'PREVIEWED',
+                percent: previewProgress.percent,
+                message: previewProgress.message,
+                status: previewProgress.active ? 'RUNNING' : 'SUCCESS',
+            }
+          : null
     const progressTone =
-        jobStatus?.status === 'FAILED'
+        visibleProgress?.status === 'FAILED'
             ? 'from-rose-400 to-orange-300'
-            : jobStatus?.status === 'SUCCESS'
+            : visibleProgress?.status === 'SUCCESS'
               ? 'from-emerald-400 to-sky-300'
               : 'from-sky-400 to-violet-300'
 
@@ -1259,35 +1422,43 @@ function BangumiSeasonPanel({
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2 rounded-full border border-white/80 bg-white/70 p-1 shadow-sm">
+                <div className="flex items-center gap-2 rounded-[24px] border border-white/80 bg-white/70 p-1.5 shadow-sm">
                     <button
                         type="button"
                         onClick={() => onYearChange(year - 1)}
-                        className="flex h-10 w-10 items-center justify-center rounded-full text-lg font-black text-sky-500 transition hover:bg-sky-50"
+                        className="flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50/80 text-lg font-black text-sky-600 transition hover:-translate-x-0.5 hover:bg-sky-100"
                         aria-label="上一年"
                     >
-                        ‹
+                        &lt;
                     </button>
-                    <input
-                        type="number"
-                        min={1900}
-                        max={2100}
-                        value={year}
-                        onChange={(event) => {
-                            const nextYear = Number(event.target.value)
-                            if (!Number.isNaN(nextYear)) {
-                                onYearChange(nextYear)
-                            }
-                        }}
-                        className="h-10 w-24 rounded-full border border-sky-100 bg-white/80 text-center text-lg font-black text-slate-700 outline-none focus:border-sky-200"
-                    />
+                    <div className="grid grid-cols-3 gap-1.5">
+                        {visibleYears.map((visibleYear) => {
+                            const active = visibleYear === year
+
+                            return (
+                                <button
+                                    key={visibleYear}
+                                    type="button"
+                                    onClick={() => onYearChange(visibleYear)}
+                                    className={[
+                                        'h-10 rounded-2xl border px-4 text-sm font-black transition-all duration-200',
+                                        active
+                                            ? 'scale-[1.03] border-sky-200 bg-sky-100/90 text-sky-700 shadow-sm'
+                                            : 'border-white/75 bg-white/60 text-slate-400 hover:bg-white hover:text-slate-600',
+                                    ].join(' ')}
+                                >
+                                    {visibleYear}
+                                </button>
+                            )
+                        })}
+                    </div>
                     <button
                         type="button"
                         onClick={() => onYearChange(year + 1)}
-                        className="flex h-10 w-10 items-center justify-center rounded-full text-lg font-black text-sky-500 transition hover:bg-sky-50"
+                        className="flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50/80 text-lg font-black text-sky-600 transition hover:translate-x-0.5 hover:bg-sky-100"
                         aria-label="下一年"
                     >
-                        ›
+                        &gt;
                     </button>
                 </div>
             </div>
@@ -1295,6 +1466,7 @@ function BangumiSeasonPanel({
             <div className="mt-5 grid gap-3 sm:grid-cols-4">
                 {bangumiQuarterOptions.map((option) => {
                     const active = quarter === option.value
+                    const theme = quarterTheme[option.value]
 
                     return (
                         <button
@@ -1304,7 +1476,7 @@ function BangumiSeasonPanel({
                             className={[
                                 'rounded-[24px] border p-4 text-left transition-all duration-200',
                                 active
-                                    ? 'scale-[1.02] border-sky-200 bg-white/86 text-sky-700 shadow-md shadow-sky-100/70'
+                                    ? `scale-[1.02] ${theme.border} ${theme.bg} ${theme.text} shadow-md shadow-sky-100/70`
                                     : 'border-white/70 bg-white/55 text-slate-500 hover:-translate-y-0.5 hover:bg-white/75',
                             ].join(' ')}
                         >
@@ -1349,19 +1521,19 @@ function BangumiSeasonPanel({
                 </label>
             </div>
 
-            {jobStatus ? (
+            {visibleProgress ? (
                 <div className="mt-5 rounded-[24px] border border-white/75 bg-white/68 p-4 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <p className="text-sm font-black text-slate-700">
-                                Bangumi 导入进度
+                                {visibleProgress.title}
                             </p>
                             <p className="mt-1 text-xs leading-5 text-slate-400">
-                                {progressMessage}
+                                {visibleProgress.message}
                             </p>
                         </div>
                         <span className="rounded-full border border-sky-100 bg-sky-50/85 px-3 py-1 text-xs font-black text-sky-600">
-                            {jobStatus.stage} · {progressPercent}%
+                            {visibleProgress.stage} · {visibleProgress.percent}%
                         </span>
                     </div>
 
@@ -1371,7 +1543,7 @@ function BangumiSeasonPanel({
                                 'h-full rounded-full bg-gradient-to-r transition-all duration-500',
                                 progressTone,
                             ].join(' ')}
-                            style={{ width: `${Math.max(3, progressPercent)}%` }}
+                            style={{ width: `${Math.max(3, visibleProgress.percent)}%` }}
                         />
                     </div>
                 </div>
@@ -1384,8 +1556,11 @@ type PreviewPanelProps = {
     title: string
     totalCount: number
     canImportCount: number
+    updatedCount: number
     skippedCount: number
+    errorCount: number
     items: PreviewItem[]
+    onExcludeItem?: (item: PreviewItem, index: number) => void
     emptyText: string
 }
 
@@ -1393,27 +1568,31 @@ function PreviewPanel({
                           title,
                           totalCount,
                           canImportCount,
+                          updatedCount,
                           skippedCount,
+                          errorCount,
                           items,
+                          onExcludeItem,
                           emptyText,
                       }: PreviewPanelProps) {
-    const errorCount = items.filter((item) => item.result === 'ERROR').length
-    const warningCount = Math.max(0, skippedCount - errorCount)
+    const warningCount = Math.max(0, skippedCount)
 
     return (
         <GlassCard className="overflow-hidden">
             <div className="bg-gradient-to-br from-white/62 via-white/45 to-emerald-50/45 p-5">
                 <h3 className="text-xl font-black text-slate-800">{title}</h3>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
                     <StatCard label="总数" value={totalCount} />
                     <StatCard label="可导入" value={canImportCount} tone="good" />
-                    <StatCard label="警告" value={warningCount} tone="warn" />
+                    <StatCard label="更新" value={updatedCount} tone="warn" />
+                    <StatCard label="跳过" value={warningCount} tone="normal" />
                     <StatCard label="错误" value={errorCount} tone="danger" />
                 </div>
 
                 <ImportItemList
                     items={items}
+                    onExcludeItem={onExcludeItem}
                     emptyText={emptyText}
                 />
             </div>
@@ -1432,17 +1611,19 @@ type ResultPanelProps = {
 
 function ResultPanel({ result, items }: ResultPanelProps) {
     const errorCount = items.filter((item) => item.result === 'ERROR').length
-    const warningCount = Math.max(0, (result?.skippedCount ?? 0) - errorCount)
+    const updatedCount = items.filter((item) => item.result === 'UPDATED').length
+    const skippedCount = items.filter((item) => item.result === 'SKIPPED').length
 
     return (
         <GlassCard className="overflow-hidden">
             <div className="bg-gradient-to-br from-white/62 via-white/45 to-amber-50/45 p-5">
                 <h3 className="text-xl font-black text-slate-800">写入结果</h3>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
                     <StatCard label="总数" value={result?.totalCount ?? 0} />
                     <StatCard label="已导入" value={result?.importedCount ?? 0} tone="good" />
-                    <StatCard label="跳过" value={warningCount} tone="warn" />
+                    <StatCard label="更新" value={updatedCount} tone="warn" />
+                    <StatCard label="跳过" value={skippedCount} tone="normal" />
                     <StatCard label="错误" value={errorCount} tone="danger" />
                 </div>
 
@@ -1483,10 +1664,11 @@ function StatCard({ label, value, tone = 'normal' }: StatCardProps) {
 
 type ImportItemListProps = {
     items: PreviewItem[]
+    onExcludeItem?: (item: PreviewItem, index: number) => void
     emptyText: string
 }
 
-function ImportItemList({ items, emptyText }: ImportItemListProps) {
+function ImportItemList({ items, onExcludeItem, emptyText }: ImportItemListProps) {
     const [filter, setFilter] = useState<ImportItemFilter>('ALL')
     const successCount = items.filter((item) => getImportItemFilter(item) === 'SUCCESS').length
     const warningCount = items.filter((item) => getImportItemFilter(item) === 'WARNING').length
@@ -1545,37 +1727,54 @@ function ImportItemList({ items, emptyText }: ImportItemListProps) {
             ) : null}
 
             <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
-            {visibleItems.map((item, index) => {
-                const canImport = item.result === 'CAN_IMPORT' || item.result === 'IMPORTED'
-                const hasError = item.result === 'ERROR'
-                const className = canImport
-                    ? 'border-emerald-100 bg-emerald-50/70 text-emerald-700'
-                    : hasError
-                      ? 'border-rose-100 bg-rose-50/75 text-rose-700'
-                    : 'border-orange-100 bg-orange-50/70 text-orange-700'
+                {visibleItems.map((item, index) => {
+                    const canImport = item.result === 'CAN_IMPORT' || item.result === 'IMPORTED'
+                    const hasError = item.result === 'ERROR'
+                    const className = canImport
+                        ? 'border-emerald-100 bg-emerald-50/70 text-emerald-700'
+                        : hasError
+                          ? 'border-rose-100 bg-rose-50/75 text-rose-700'
+                          : 'border-orange-100 bg-orange-50/70 text-orange-700'
 
-                return (
-                    <div
-                        key={`${item.title}-${index}`}
-                        className="rounded-[20px] border border-white/70 bg-white/58 p-3 shadow-sm"
-                    >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="line-clamp-1 text-sm font-bold text-slate-700">
-                                {item.title}
-                            </p>
-                            <span
-                                className={[
-                                    'rounded-full border px-2.5 py-0.5 text-[11px] font-black',
-                                    className,
-                                ].join(' ')}
-                            >
-                                {item.result}
-                            </span>
+                    return (
+                        <div
+                            key={`${item.title}-${index}`}
+                            className="rounded-[20px] border border-white/70 bg-white/58 p-3 shadow-sm"
+                        >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="line-clamp-1 text-sm font-bold text-slate-700">
+                                    {item.title}
+                                </p>
+                                <span
+                                    className={[
+                                        'rounded-full border px-2.5 py-0.5 text-[11px] font-black',
+                                        className,
+                                    ].join(' ')}
+                                >
+                                    {item.result === 'CAN_IMPORT'
+                                        ? '可导入'
+                                        : item.result === 'UPDATED'
+                                          ? '更新'
+                                          : item.result === 'SKIPPED'
+                                            ? '跳过'
+                                            : item.result}
+                                </span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs leading-5 text-slate-400">{item.message}</p>
+                                {onExcludeItem && item.result === 'CAN_IMPORT' ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => onExcludeItem(item, index)}
+                                        className="rounded-full border border-rose-100 bg-rose-50/80 px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-100"
+                                    >
+                                        排除
+                                    </button>
+                                ) : null}
+                            </div>
                         </div>
-                        <p className="mt-1 text-xs leading-5 text-slate-400">{item.message}</p>
-                    </div>
-                )
-            })}
+                    )
+                })}
             </div>
         </div>
     )
@@ -1583,19 +1782,37 @@ function ImportItemList({ items, emptyText }: ImportItemListProps) {
 
 type TemplateFieldPanelProps = {
     template: ImportTemplateResponse | null
+    bangumiMode?: boolean
 }
 
-function TemplateFieldPanel({ template }: TemplateFieldPanelProps) {
-    return (
-        <GlassCard className="overflow-hidden">
-            <div className="bg-gradient-to-br from-white/62 via-white/45 to-slate-50/60 p-5">
-                <h3 className="text-xl font-black text-slate-800">模板字段说明</h3>
-                <p className="mt-1 text-sm text-slate-400">
-                    {template?.recommendedOrder ?? '模板字段正在加载'}
-                </p>
+function TemplateFieldPanel({ template, bangumiMode = false }: TemplateFieldPanelProps) {
+    const bangumiFields = [
+        { fieldName: 'year', required: true, description: '选择要导入的新番年份。', example: '2026' },
+        { fieldName: 'quarter', required: true, description: '选择一月、四月、七月、十月档期。', example: '一月' },
+        { fieldName: 'includeWeb', required: false, description: '是否额外纳入 WEB 动画。', example: 'false' },
+        { fieldName: 'japaneseOnly', required: false, description: '是否只保留日本动画标签命中的作品。', example: 'true' },
+    ]
+    const fields = bangumiMode ? bangumiFields : (template?.fields ?? [])
 
-                <div className="mt-4 max-h-[420px] space-y-2 overflow-auto pr-1">
-                    {(template?.fields ?? []).map((field) => (
+    return (
+        <GlassCard className="h-full overflow-hidden">
+            <div className="flex h-full flex-col bg-gradient-to-br from-white/62 via-white/45 to-slate-50/60 p-5">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 className="text-xl font-black text-slate-800">模板字段说明</h3>
+                        <p className="mt-1 text-sm text-slate-400">
+                            {bangumiMode
+                                ? '作品库只通过 Bangumi 新番导入；手动模板仅用于收藏夹和个人记录。'
+                                : template?.recommendedOrder ?? '模板字段正在加载'}
+                        </p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-white/75 bg-white/65 px-3 py-1 text-[11px] font-semibold text-slate-400">
+                        {bangumiMode ? 'Bangumi only' : '手动模板'}
+                    </span>
+                </div>
+
+                <div className="mt-4 grid flex-1 content-start gap-2 md:grid-cols-2">
+                    {fields.map((field) => (
                         <div
                             key={field.fieldName}
                             className="rounded-[20px] border border-white/70 bg-white/58 p-3"
@@ -1620,6 +1837,11 @@ function TemplateFieldPanel({ template }: TemplateFieldPanelProps) {
                             <p className="mt-1 text-[11px] text-slate-400">
                                 示例：{field.example ?? '空'}
                             </p>
+                            {field.notes ? (
+                                <p className="mt-1 text-[11px] leading-5 text-slate-400">
+                                    {field.notes}
+                                </p>
+                            ) : null}
                         </div>
                     ))}
                 </div>
@@ -1634,14 +1856,21 @@ type EndpointPanelProps = {
 
 function EndpointPanel({ overview }: EndpointPanelProps) {
     return (
-        <GlassCard className="overflow-hidden">
-            <div className="bg-gradient-to-br from-white/62 via-white/45 to-violet-50/45 p-5">
-                <h3 className="text-xl font-black text-slate-800">导入接口链路</h3>
-                <p className="mt-1 text-sm text-slate-400">
-                    {overview?.moduleName ?? '导入模块'}
-                </p>
+        <GlassCard className="h-full overflow-hidden">
+            <div className="flex h-full flex-col bg-gradient-to-br from-white/62 via-white/45 to-violet-50/45 p-5">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 className="text-xl font-black text-slate-800">导入接口链路</h3>
+                        <p className="mt-1 text-sm text-slate-400">
+                            {overview?.moduleName ?? '导入模块'}
+                        </p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-white/75 bg-white/65 px-3 py-1 text-[11px] font-semibold text-slate-400">
+                        {overview?.endpoints?.length ?? 0} 项
+                    </span>
+                </div>
 
-                <div className="mt-4 grid gap-2">
+                <div className="mt-4 grid flex-1 content-start gap-2 overflow-auto pr-1">
                     {(overview?.endpoints ?? []).map((endpoint) => (
                         <div
                             key={`${endpoint.method}-${endpoint.path}`}

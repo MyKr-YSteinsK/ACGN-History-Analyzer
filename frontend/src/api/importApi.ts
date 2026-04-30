@@ -42,6 +42,7 @@ export type BangumiSeasonImportRequest = {
     quarter: ReleaseQuarter
     includeWeb: boolean
     japaneseOnly: boolean
+    excludedSourceIds?: string[]
 }
 
 export type BangumiImportJobStartResponse = {

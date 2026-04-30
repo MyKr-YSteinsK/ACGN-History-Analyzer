@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-    deleteFranchise,
     getFranchiseById,
     getFranchises,
-    removeSubjectFromFranchise,
     type FranchiseDetailResponse,
 } from '../api/franchiseApi'
 import { getApiErrorMessage } from '../api/request'
 import { getSubjectById } from '../api/subjectApi'
-import ConfirmDialog from '../components/common/ConfirmDialog'
 import CoverImage from '../components/common/CoverImage'
 import {
     EmptyState,
@@ -51,11 +48,6 @@ type FranchiseOverviewStats = {
     subjectCount: number
     watchedCount: number
     crossMediaCount: number
-}
-
-type PendingRemoveSubject = {
-    franchise: FranchiseDetailResponse
-    subject: SubjectCardView
 }
 
 const categoryScopeOptions: Array<{
@@ -194,11 +186,6 @@ function FranchisesPage() {
     const [listError, setListError] = useState<string | null>(null)
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
-    const [pendingDeleteFranchise, setPendingDeleteFranchise] =
-        useState<FranchiseDetailResponse | null>(null)
-    const [pendingRemoveSubject, setPendingRemoveSubject] =
-        useState<PendingRemoveSubject | null>(null)
-    const [deleteLoading, setDeleteLoading] = useState(false)
 
     const selectedFranchise = useMemo(
         () =>
@@ -337,73 +324,8 @@ function FranchisesPage() {
         setSelectedFranchiseId(franchiseId)
     }
 
-    function requestDeleteFranchise(franchise: FranchiseDetailResponse) {
-        setPendingDeleteFranchise(franchise)
-    }
-
-    function requestRemoveSubject(franchise: FranchiseDetailResponse, subject: SubjectCardView) {
-        setPendingRemoveSubject({ franchise, subject })
-    }
-
-    function closeDeleteDialog() {
-        if (deleteLoading) {
-            return
-        }
-
-        setPendingDeleteFranchise(null)
-        setPendingRemoveSubject(null)
-    }
-
-    async function confirmDeleteFranchise() {
-        if (!pendingDeleteFranchise) {
-            return
-        }
-
-        const franchiseToDelete = pendingDeleteFranchise
-        setDeleteLoading(true)
-        setFeedbackMessage(null)
-
-        try {
-            await deleteFranchise(franchiseToDelete.id)
-            setPendingDeleteFranchise(null)
-            setSelectedSubject(null)
-            setFeedbackMessage(`已删除系列《${getFranchiseTitle(franchiseToDelete)}》，作品已保留在作品库`)
-            await loadFranchises()
-        } catch (error) {
-            setFeedbackMessage(getApiErrorMessage(error))
-        } finally {
-            setDeleteLoading(false)
-        }
-    }
-
-    async function confirmRemoveSubject() {
-        if (!pendingRemoveSubject) {
-            return
-        }
-
-        const pending = pendingRemoveSubject
-        setDeleteLoading(true)
-        setFeedbackMessage(null)
-
-        try {
-            await removeSubjectFromFranchise(pending.franchise.id, pending.subject.id)
-            setPendingRemoveSubject(null)
-            setSelectedSubject((current) =>
-                current?.id === pending.subject.id ? null : current,
-            )
-            setFeedbackMessage(
-                `已将《${pending.subject.displayTitle}》从《${getFranchiseTitle(pending.franchise)}》中移出`,
-            )
-            await loadFranchises()
-        } catch (error) {
-            setFeedbackMessage(getApiErrorMessage(error))
-        } finally {
-            setDeleteLoading(false)
-        }
-    }
-
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-10 lg:pb-16">
             <PageHero
                 eyebrow="FRANCHISES"
                 title="系列管理"
@@ -577,7 +499,7 @@ function FranchisesPage() {
                                     scopeTheme?.softGradient ?? neutralPanelGradient,
                                 ].join(' ')}
                             >
-                                <div className="flex flex-wrap items-start justify-between gap-5">
+                                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)] xl:items-start">
                                     <div className="min-w-0">
                                         <p className="text-xs font-semibold tracking-[0.24em] text-slate-400">
                                             SERIES DETAIL
@@ -591,8 +513,8 @@ function FranchisesPage() {
                                         </p>
                                     </div>
 
-                                    <div className="flex flex-col items-stretch gap-3">
-                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                    <div className="flex flex-col items-stretch gap-3 xl:justify-self-end">
+                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[340px]">
                                             <StatChip label="作品数" value={stats.total} />
                                             <StatChip label="已看" value={stats.watched} />
                                             <StatChip label="想看" value={stats.want} />
@@ -606,13 +528,6 @@ function FranchisesPage() {
                                             />
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            onClick={() => requestDeleteFranchise(selectedFranchise)}
-                                            className="self-end rounded-2xl border border-rose-100 bg-rose-50/85 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:-translate-y-0.5 hover:bg-rose-100"
-                                        >
-                                            删除系列
-                                        </button>
                                     </div>
                                 </div>
 
@@ -754,7 +669,6 @@ function FranchisesPage() {
                                                     key={subject.id}
                                                     subject={subject}
                                                     onOpen={() => void handleOpenSubject(subject)}
-                                                    onRemove={() => requestRemoveSubject(selectedFranchise, subject)}
                                                 />
                                             ))}
                                         </div>
@@ -794,35 +708,6 @@ function FranchisesPage() {
                 showStatusActions={false}
             />
 
-            <ConfirmDialog
-                open={pendingDeleteFranchise !== null}
-                title="删除系列？"
-                description={
-                    pendingDeleteFranchise
-                        ? `这会删除系列《${getFranchiseTitle(pendingDeleteFranchise)}》，但不会删除作品库中的作品；该系列下作品会变成未关联系列。`
-                        : ''
-                }
-                confirmText="删除系列"
-                loading={deleteLoading}
-                tone="danger"
-                onCancel={closeDeleteDialog}
-                onConfirm={() => void confirmDeleteFranchise()}
-            />
-
-            <ConfirmDialog
-                open={pendingRemoveSubject !== null}
-                title="移出系列？"
-                description={
-                    pendingRemoveSubject
-                        ? `这会把《${pendingRemoveSubject.subject.displayTitle}》从《${getFranchiseTitle(pendingRemoveSubject.franchise)}》中移出，不会删除作品库作品。`
-                        : ''
-                }
-                confirmText="移出系列"
-                loading={deleteLoading}
-                tone="danger"
-                onCancel={closeDeleteDialog}
-                onConfirm={() => void confirmRemoveSubject()}
-            />
         </div>
     )
 }
@@ -889,10 +774,9 @@ function StatChip({ label, value }: StatChipProps) {
 type TimelineSubjectCardProps = {
     subject: SubjectCardView
     onOpen: () => void
-    onRemove: () => void
 }
 
-function TimelineSubjectCard({ subject, onOpen, onRemove }: TimelineSubjectCardProps) {
+function TimelineSubjectCard({ subject, onOpen }: TimelineSubjectCardProps) {
     const category = categoryTheme[subject.category]
     const seasonPart = formatSeasonPart(subject)
 
@@ -979,21 +863,13 @@ function TimelineSubjectCard({ subject, onOpen, onRemove }: TimelineSubjectCardP
 
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="mt-3">
                     <button
                         type="button"
                         onClick={onOpen}
-                        className="rounded-2xl border border-white/75 bg-white/78 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-900 hover:text-white"
+                        className="w-full rounded-2xl border border-white/75 bg-white/78 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-900 hover:text-white"
                     >
                         查看详情
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={onRemove}
-                        className="rounded-2xl border border-rose-100 bg-rose-50/82 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:-translate-y-0.5 hover:bg-rose-100"
-                    >
-                        移出
                     </button>
                 </div>
             </div>

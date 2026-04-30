@@ -102,12 +102,15 @@ export type SubjectImportPreviewItemResponse = {
     displayTitle: string
     result: string
     message: string
+    sourcePlatform?: string | null
+    sourceId?: string | null
 }
 
 export type SubjectImportPreviewResponse = {
     totalCount: number
     canImportCount: number
     skippedCount: number
+    updatedCount: number
     items: SubjectImportPreviewItemResponse[]
 }
 
