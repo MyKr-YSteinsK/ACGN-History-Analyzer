@@ -1793,10 +1793,34 @@ function TemplateFieldPanel({ template, bangumiMode = false }: TemplateFieldPane
         example: string
         notes?: string
     }> = [
-        { fieldName: 'year', required: true, description: '选择要导入的新番年份。', example: '2026' },
-        { fieldName: 'quarter', required: true, description: '选择一月、四月、七月、十月档期。', example: '一月' },
-        { fieldName: 'includeWeb', required: false, description: '是否额外纳入 WEB 动画。', example: 'false' },
-        { fieldName: 'japaneseOnly', required: false, description: '是否只保留日本动画标签命中的作品。', example: 'true' },
+        {
+            fieldName: 'year',
+            required: true,
+            description: '选择要导入的新番年份。',
+            example: '2026',
+            notes: '用于决定拉取哪个年份的 Bangumi 番剧。',
+        },
+        {
+            fieldName: 'quarter',
+            required: true,
+            description: '选择一月、四月、七月、十月档期。',
+            example: '一月',
+            notes: '对应季度档期，系统会按档期抓取作品。',
+        },
+        {
+            fieldName: 'includeWeb',
+            required: false,
+            description: '是否额外纳入 WEB 动画。',
+            example: 'false',
+            notes: '开启后会把部分 WEB 播放作品一起纳入预览。',
+        },
+        {
+            fieldName: 'japaneseOnly',
+            required: false,
+            description: '是否只保留日本动画标签命中的作品。',
+            example: 'true',
+            notes: '用于过滤非日本动画或标签不匹配的条目。',
+        },
     ]
     const fields = bangumiMode ? bangumiFields : (template?.fields ?? [])
 

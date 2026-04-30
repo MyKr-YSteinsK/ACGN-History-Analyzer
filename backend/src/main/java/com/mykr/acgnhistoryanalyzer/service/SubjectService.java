@@ -65,7 +65,7 @@ public class SubjectService {
 
     public SubjectResponse createSubject(SubjectCreateRequest request) {
         Subject subject = buildSubjectFromRequest(request, resolveFranchiseIdForCreate(request));
-        tagService.syncSubjectTags(subject, request.getTagNames());
+        tagService.syncSubjectTags(subject, tagService.resolveAllowedSubjectTagNames(request.getTagNames()));
         Subject savedSubject = subjectRepository.save(subject);
         return toResponse(savedSubject);
     }
@@ -254,7 +254,7 @@ public class SubjectService {
         existingSubject.setPlatformLink(request.getPlatformLink());
         existingSubject.setPlatformScore(request.getPlatformScore());
         existingSubject.setEpisodeCount(request.getEpisodeCount());
-        tagService.syncSubjectTags(existingSubject, request.getTagNames());
+        tagService.syncSubjectTags(existingSubject, tagService.resolveAllowedSubjectTagNames(request.getTagNames()));
         existingSubject.setSourcePlatform(request.getSourcePlatform());
         existingSubject.setSourceId(request.getSourceId());
         existingSubject.setStatus(request.getStatus());
@@ -357,7 +357,7 @@ public class SubjectService {
             if (existingSubject != null) {
                 if (hasSubjectChanged(existingSubject, item, resolvedFranchiseId)) {
                     Subject updatedSubject = applyImportUpdate(existingSubject, item, resolvedFranchiseId);
-                    tagService.syncSubjectTags(updatedSubject, item.getTagNames());
+                    tagService.syncSubjectTags(updatedSubject, tagService.resolveAllowedSubjectTagNames(item.getTagNames()));
                     Subject savedSubject = subjectRepository.save(updatedSubject);
                     importedCount++;
 
@@ -381,7 +381,7 @@ public class SubjectService {
             }
 
             Subject subject = buildSubjectFromRequest(item, resolvedFranchiseId);
-            tagService.syncSubjectTags(subject, item.getTagNames());
+            tagService.syncSubjectTags(subject, tagService.resolveAllowedSubjectTagNames(item.getTagNames()));
             Subject savedSubject = subjectRepository.save(subject);
             importedCount++;
 

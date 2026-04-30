@@ -12,6 +12,13 @@ import java.util.*;
 public class TagService {
 
     private static final int MAX_SUBJECT_TAG_COUNT = 12;
+    private static final Set<String> SUBJECT_ALLOWED_TAG_NAMES = Set.of(
+            "漫画改", "小说改", "游戏改", "原创", "奇幻", "战斗", "冒险", "科幻",
+            "悬疑", "校园", "青春", "恋爱", "喜剧", "日常", "治愈", "致郁", "运动",
+            "音乐", "偶像", "机战", "异世界", "转生", "后宫", "百合", "乙女",
+            "女性向", "历史", "战争", "职场", "美食", "家庭", "社团", "短片",
+            "3D", "少儿向", "少年向", "少女向"
+    );
 
     private final TagRepository tagRepository;
 
@@ -44,6 +51,25 @@ public class TagService {
         }
 
         subject.setStructuredTags(resolvedTags);
+    }
+
+    public List<String> resolveAllowedSubjectTagNames(List<String> tagNames) {
+        if (tagNames == null || tagNames.isEmpty()) {
+            return List.of();
+        }
+
+        LinkedHashSet<String> resolved = new LinkedHashSet<>();
+        for (String tagName : tagNames) {
+            String cleaned = cleanTagName(tagName);
+            if (!cleaned.isEmpty()) {
+                String normalized = normalizeSubjectCommonTag(cleaned);
+                if (normalized != null) {
+                    resolved.add(normalized);
+                }
+            }
+        }
+
+        return new ArrayList<>(resolved);
     }
 
     public List<TagResponse> toResponses(Collection<Tag> tags) {
@@ -153,6 +179,50 @@ public class TagService {
                         false,
                         "NORMAL"
                 )));
+    }
+
+    private String normalizeSubjectCommonTag(String tagName) {
+        String lowerTag = tagName.toLowerCase(Locale.ROOT);
+        return switch (lowerTag) {
+            case "漫画改", "漫改" -> "漫画改";
+            case "小说改", "轻小说改", "轻改", "ラノベ改" -> "小说改";
+            case "游戏改", "galgame改", "gal改" -> "游戏改";
+            case "原创", "原創" -> "原创";
+            case "奇幻", "魔法" -> "奇幻";
+            case "战斗", "动作", "热血" -> "战斗";
+            case "冒险" -> "冒险";
+            case "科幻", "sf" -> "科幻";
+            case "悬疑", "推理" -> "悬疑";
+            case "校园", "学园" -> "校园";
+            case "青春" -> "青春";
+            case "恋爱", "爱情" -> "恋爱";
+            case "喜剧", "搞笑" -> "喜剧";
+            case "日常" -> "日常";
+            case "治愈" -> "治愈";
+            case "致郁" -> "致郁";
+            case "运动" -> "运动";
+            case "音乐" -> "音乐";
+            case "偶像" -> "偶像";
+            case "机战", "机器人" -> "机战";
+            case "异世界" -> "异世界";
+            case "转生" -> "转生";
+            case "后宫" -> "后宫";
+            case "百合" -> "百合";
+            case "乙女" -> "乙女";
+            case "女性向" -> "女性向";
+            case "历史" -> "历史";
+            case "战争" -> "战争";
+            case "职场" -> "职场";
+            case "美食" -> "美食";
+            case "家庭" -> "家庭";
+            case "社团" -> "社团";
+            case "泡面番", "短片" -> "短片";
+            case "3d", "3dcg" -> "3D";
+            case "子供向", "少儿" -> "少儿向";
+            case "少年向" -> "少年向";
+            case "少女向" -> "少女向";
+            default -> SUBJECT_ALLOWED_TAG_NAMES.contains(tagName) ? tagName : null;
+        };
     }
 
     private String cleanTagName(String tagName) {
