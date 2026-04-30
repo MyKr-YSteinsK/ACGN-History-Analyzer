@@ -25,3 +25,5 @@ Thumbs.db
 
 # Local cached cover images
 uploads/
+/sql/cleanup_duplicate_subjects.sql
+/docs/thesis-demo-route.md
