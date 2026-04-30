@@ -45,7 +45,7 @@ const navItems: NavItem[] = [
     {
         path: '/analysis',
         label: '智能分析',
-        description: 'Mock 报告与 AI 功能入口',
+        description: '偏好报告与智能问答',
     },
 ]
 

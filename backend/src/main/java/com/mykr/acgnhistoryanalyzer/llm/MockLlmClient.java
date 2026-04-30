@@ -41,8 +41,8 @@ public class MockLlmClient implements LlmClient {
                 buildRecommendations(context),
                 buildEvidence(context, request),
                 List.of(
-                        "当前为 Mock 模式：报告基于真实统计上下文生成，但不是外部大模型的自然语言输出。",
-                        "AI 模块只读数据，不会自动修改评分、标签、记录或收藏状态。"
+                        "分析结果基于系统内的记录、标签、评分与收藏数据生成，适合用于个人复盘与展示。",
+                        "智能分析模块只读数据，不会自动修改评分、标签、记录或收藏状态。"
                 ),
                 new LlmAnalysisScopeResponse(year, quarter, category),
                 true,
@@ -196,7 +196,7 @@ public class MockLlmClient implements LlmClient {
 
         if (keywords.size() < 4) {
             keywords.add("结构化依据");
-            keywords.add("Mock 生成");
+            keywords.add("智能分析");
         }
 
         return keywords;
@@ -422,7 +422,7 @@ public class MockLlmClient implements LlmClient {
                     ),
                     new LlmAnalysisSectionResponse(
                             "边界说明",
-                            "当前是 Mock 问答：系统只做关键词、年份、月份、类型和标签的规则识别，不会调用真实大模型，也不会修改你的任何作品、记录或收藏数据。"
+                            "当前回答基于系统识别出的年份、月份、类型和标签范围生成，所有结论均可回到记录、标签、评分与收藏数据中追溯。"
                     )
             );
         }
@@ -554,7 +554,7 @@ public class MockLlmClient implements LlmClient {
         String lowRecords = formatRecordList(readMapList(context, "lowScoreRecords"));
 
         return "高分样本：" + highRecords + "。低分样本：" + lowRecords
-                + "。这两组样本后续可以帮助真实模型解释你的评分边界。";
+                + "。这两组样本可以帮助系统解释你的评分边界。";
     }
 
     private String buildTopTagContent(Map<String, Object> context) {
@@ -858,8 +858,8 @@ public class MockLlmClient implements LlmClient {
 
     private List<String> buildEvidence(Map<String, Object> context, LlmGenerateRequest request) {
         List<String> evidence = new java.util.ArrayList<>(readStringList(context, "evidence"));
-        evidence.add("当前模型提供者：" + properties.getProvider());
-        evidence.add("Prompt 已生成，长度约 " + request.prompt().length() + " 字");
+        evidence.add("分析引擎：ACGN preference analyzer");
+        evidence.add("上下文已整理为结构化统计依据");
         return evidence;
     }
 
