@@ -35,7 +35,16 @@ public class MockLlmClient implements LlmClient {
         return new LlmAnalysisResponse(
                 request.analysisType(),
                 buildTitle(analysisType, year, quarter, displayCategory),
-                buildSummary(analysisType, year, quarter, displayCategory, totalRecords, averageScore, highScoreCount),
+                buildSummary(
+                        context,
+                        analysisType,
+                        year,
+                        quarter,
+                        displayCategory,
+                        totalRecords,
+                        averageScore,
+                        highScoreCount
+                ),
                 buildKeywords(context, analysisType),
                 buildSections(context, totalRecords, averageScore, highScoreCount, lowScoreCount, yearOverYearDiff),
                 buildRecommendations(context),
@@ -80,6 +89,10 @@ public class MockLlmClient implements LlmClient {
             return displayCategory + " 偏好矛盾分析";
         }
 
+        if ("FRANCHISE_COMPLETION".equals(analysisType)) {
+            return displayCategory + " 系列补完分析";
+        }
+
         if ("COMPREHENSIVE_REPORT".equals(analysisType)) {
             return year + " 年 " + displayCategory + " 一键智能分析报告";
         }
@@ -104,6 +117,7 @@ public class MockLlmClient implements LlmClient {
     }
 
     private String buildSummary(
+            Map<String, Object> context,
             String analysisType,
             Integer year,
             Integer quarter,
@@ -146,6 +160,16 @@ public class MockLlmClient implements LlmClient {
             return scope + " 会重点寻找“看得多但不一定喜欢”和“看得少但命中很高”的方向，用来解释偏好边界。";
         }
 
+        if ("FRANCHISE_COMPLETION".equals(analysisType)) {
+            Map<String, Long> stats = readLongMap(context, "franchiseCompletionStats");
+            return scope + " 会围绕已有正式记录触发的系列进行整理，当前纳入 "
+                    + stats.getOrDefault("franchiseCount", 0L)
+                    + " 个系列、" + stats.getOrDefault("seriesSubjectCount", 0L)
+                    + " 部系列内作品，其中仍有 "
+                    + stats.getOrDefault("unrecordedSubjectCount", 0L)
+                    + " 部未形成正式记录。";
+        }
+
         if ("COMPREHENSIVE_REPORT".equals(analysisType)) {
             return scope + " 会整合年度统计、长期评分结构、标签偏好、口味画像、偏好矛盾和推荐候选。"
                     + "本次年度样本 " + totalRecords + " 条，并会同时参考长期正式记录。";
@@ -181,6 +205,7 @@ public class MockLlmClient implements LlmClient {
             case "COLLECTION_BACKLOG" -> "补坑建议";
             case "TASTE_PROFILE" -> "口味画像";
             case "PREFERENCE_CONTRADICTION" -> "偏好矛盾";
+            case "FRANCHISE_COMPLETION" -> "系列补完";
             case "COMPREHENSIVE_REPORT" -> "一键报告";
             case "HOME_INSIGHT" -> "首页解读";
             case "QUESTION_ANSWER" -> "自然问答";
@@ -340,6 +365,27 @@ public class MockLlmClient implements LlmClient {
                     new LlmAnalysisSectionResponse(
                             "解释建议",
                             "这类分析适合辅助推荐和自我理解，不适合直接当成绝对结论。样本少的标签要保守看待，样本多但均分偏低的标签则更适合作为风险提醒。"
+                    )
+            );
+        }
+
+        if ("FRANCHISE_COMPLETION".equals(readStringValue(context, "analysisType", ""))) {
+            return List.of(
+                    new LlmAnalysisSectionResponse(
+                            "系列补完概览",
+                            buildFranchiseCompletionOverviewContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "优先补完系列",
+                            buildFranchisePriorityContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "系列状态判断",
+                            buildFranchiseStatusContent(context)
+                    ),
+                    new LlmAnalysisSectionResponse(
+                            "使用建议",
+                            "系列补完分析只围绕已经有正式记录牵引出的系列展开，不会把作品库里所有未记录作品都塞进系列建议。这样既能保留系列页特色，也能避免库存作品过多时造成噪音。"
                     )
             );
         }
@@ -842,6 +888,62 @@ public class MockLlmClient implements LlmClient {
                 + "。这部分用于展示系统为什么给出上面的回答。";
     }
 
+    private String buildFranchiseCompletionOverviewContent(Map<String, Object> context) {
+        Map<String, Long> stats = readLongMap(context, "franchiseCompletionStats");
+        long franchiseCount = stats.getOrDefault("franchiseCount", 0L);
+        long seriesSubjectCount = stats.getOrDefault("seriesSubjectCount", 0L);
+        long watchedSubjectCount = stats.getOrDefault("watchedSubjectCount", 0L);
+        long unrecordedSubjectCount = stats.getOrDefault("unrecordedSubjectCount", 0L);
+
+        if (franchiseCount == 0) {
+            return "当前还没有足够的系列样本。系列补完分析需要至少一个系列中存在正式记录，系统才会把同系列作品纳入补完判断。";
+        }
+
+        return "当前纳入 " + franchiseCount + " 个系列，系列内共有 "
+                + seriesSubjectCount + " 部作品，其中已正式记录 " + watchedSubjectCount
+                + " 部，未形成正式记录 " + unrecordedSubjectCount
+                + " 部。这个模块的重点是解释系列推进状态，而不是简单推荐新作品。";
+    }
+
+    private String buildFranchisePriorityContent(Map<String, Object> context) {
+        List<Map<String, Object>> items = readMapList(context, "franchiseCompletionItems");
+        if (items.isEmpty()) {
+            return "当前没有可排序的系列补完候选。";
+        }
+
+        return items.stream()
+                .limit(5)
+                .map(item -> item.get("franchiseName") + "（已记录 "
+                        + item.get("watchedCount") + "/" + item.get("totalSubjects")
+                        + "，待补 " + item.get("unrecordedCount")
+                        + "，状态：" + item.get("status") + "）")
+                .collect(java.util.stream.Collectors.joining("；"));
+    }
+
+    private String buildFranchiseStatusContent(Map<String, Object> context) {
+        List<Map<String, Object>> items = readMapList(context, "franchiseCompletionItems");
+        if (items.isEmpty()) {
+            return "系列样本不足时，建议先在作品库中维护 franchiseName，并至少添加一条同系列正式记录。";
+        }
+
+        String nextCandidates = items.stream()
+                .limit(3)
+                .map(item -> {
+                    List<Map<String, Object>> candidates = readNestedMapList(item, "nextCandidates");
+                    String candidateText = candidates.isEmpty()
+                            ? "暂无待补作品"
+                            : candidates.stream()
+                                    .limit(3)
+                                    .map(candidate -> candidate.get("title") + "（"
+                                            + subjectStatusLabel(String.valueOf(candidate.get("status"))) + "）")
+                                    .collect(java.util.stream.Collectors.joining("、"));
+                    return item.get("franchiseName") + "：" + candidateText;
+                })
+                .collect(java.util.stream.Collectors.joining("；"));
+
+        return "待补作品会按发行年份、月份档期、季数和 Part 排序，方便观察系列顺序。当前可关注：" + nextCandidates + "。";
+    }
+
     private String buildRecommendationSummaryContent(Map<String, Object> context) {
         List<LlmRecommendationResponse> recommendations = buildRecommendations(context);
         if (recommendations.isEmpty()) {
@@ -895,6 +997,10 @@ public class MockLlmClient implements LlmClient {
 
         if ("PREFERENCE_CONTRADICTION".equals(analysisType)) {
             return displayCategory + " 偏好矛盾范围";
+        }
+
+        if ("FRANCHISE_COMPLETION".equals(analysisType)) {
+            return displayCategory + " 系列补完范围";
         }
 
         if ("COMPREHENSIVE_REPORT".equals(analysisType)) {
@@ -968,6 +1074,22 @@ public class MockLlmClient implements LlmClient {
                 .map(item -> {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> map = (Map<String, Object>) item;
+                    return map;
+                })
+                .toList();
+    }
+
+    private List<Map<String, Object>> readNestedMapList(Map<String, Object> item, String key) {
+        Object value = item.get(key);
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+
+        return list.stream()
+                .filter(Map.class::isInstance)
+                .map(nestedItem -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> map = (Map<String, Object>) nestedItem;
                     return map;
                 })
                 .toList();
@@ -1122,6 +1244,15 @@ public class MockLlmClient implements LlmClient {
             case "HIGH" -> "高优先级";
             case "MEDIUM" -> "中优先级";
             default -> "低优先级";
+        };
+    }
+
+    private String subjectStatusLabel(String status) {
+        return switch (status) {
+            case "WATCHED" -> "已记录";
+            case "WANT" -> "想看";
+            case "PAUSED" -> "搁置";
+            default -> "未记录";
         };
     }
 

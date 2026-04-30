@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import {
     getCollectionBacklogAnalysis,
     getComprehensiveReportAnalysis,
+    getFranchiseCompletionAnalysis,
     getPreferenceContradictionAnalysis,
     getQuestionAnswerAnalysis,
     getQuarterlyAnalysis,
@@ -37,6 +38,7 @@ type AnalysisMode =
     | 'COLLECTION_BACKLOG'
     | 'TASTE_PROFILE'
     | 'PREFERENCE_CONTRADICTION'
+    | 'FRANCHISE_COMPLETION'
     | 'COMPREHENSIVE_REPORT'
     | 'QUESTION_ANSWER'
 
@@ -123,6 +125,12 @@ const analysisModes: AnalysisModeMeta[] = [
         label: '偏好矛盾',
         description: '发现看得多但不稳、低频但高命中的方向',
         accent: 'from-slate-100/90 via-white/70 to-rose-50/70',
+    },
+    {
+        value: 'FRANCHISE_COMPLETION',
+        label: '系列补完',
+        description: '按系列关系整理已看、想看、搁置和待补作品',
+        accent: 'from-indigo-100/90 via-white/70 to-emerald-50/70',
     },
 ]
 
@@ -248,15 +256,19 @@ function AnalysisPage() {
                                     ? await getPreferenceContradictionAnalysis({
                                           category,
                                       })
-                                    : analysisMode === 'COMPREHENSIVE_REPORT'
-                                      ? await getComprehensiveReportAnalysis({
-                                            year: selectedYear,
+                                    : analysisMode === 'FRANCHISE_COMPLETION'
+                                      ? await getFranchiseCompletionAnalysis({
                                             category,
                                         })
-                                      : await getYearlyAnalysis({
-                                            year: selectedYear,
-                                            category,
-                                        })
+                                      : analysisMode === 'COMPREHENSIVE_REPORT'
+                                        ? await getComprehensiveReportAnalysis({
+                                              year: selectedYear,
+                                              category,
+                                          })
+                                        : await getYearlyAnalysis({
+                                              year: selectedYear,
+                                              category,
+                                          })
             setReport(response)
         } catch (generateError) {
             setReport(null)
@@ -1161,6 +1173,10 @@ function buildScopeText(
 
     if (mode === 'PREFERENCE_CONTRADICTION') {
         return `${categoryName} · 偏好矛盾`
+    }
+
+    if (mode === 'FRANCHISE_COMPLETION') {
+        return `${categoryName} · 系列补完`
     }
 
     if (mode === 'COMPREHENSIVE_REPORT') {

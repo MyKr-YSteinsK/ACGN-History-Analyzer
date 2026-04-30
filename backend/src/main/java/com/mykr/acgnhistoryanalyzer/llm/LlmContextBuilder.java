@@ -337,6 +337,52 @@ public class LlmContextBuilder {
         return context;
     }
 
+    public Map<String, Object> buildFranchiseCompletionContext(String category) {
+        List<UserSubjectRecordResponse> allRecords =
+                userSubjectRecordService.getRecords(null, null, null, null);
+        List<UserSubjectRecordResponse> scopedRecords = filterByCategory(allRecords, category);
+        List<Map<String, Object>> franchiseItems = buildFranchiseCompletionItems(category, allRecords);
+
+        int totalSeriesSubjects = franchiseItems.stream()
+                .mapToInt(item -> (Integer) item.get("totalSubjects"))
+                .sum();
+        int totalWatchedSubjects = franchiseItems.stream()
+                .mapToInt(item -> (Integer) item.get("watchedCount"))
+                .sum();
+        int totalUnrecordedSubjects = franchiseItems.stream()
+                .mapToInt(item -> (Integer) item.get("unrecordedCount"))
+                .sum();
+
+        Map<String, Object> franchiseStats = new LinkedHashMap<>();
+        franchiseStats.put("franchiseCount", franchiseItems.size());
+        franchiseStats.put("seriesSubjectCount", totalSeriesSubjects);
+        franchiseStats.put("watchedSubjectCount", totalWatchedSubjects);
+        franchiseStats.put("unrecordedSubjectCount", totalUnrecordedSubjects);
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisType", "FRANCHISE_COMPLETION");
+        context.put("category", category);
+        context.put("comparisonLabel", "系列待补作品");
+        context.put("totalRecords", scopedRecords.size());
+        context.put("previousYearTotalRecords", allRecords.size());
+        context.put("yearOverYearDiff", totalUnrecordedSubjects);
+        context.put("averageScore", averageScore(scopedRecords));
+        context.put("highScoreCount", countScoreAtLeast(scopedRecords, 45));
+        context.put("lowScoreCount", countScoreBelow(scopedRecords, 30));
+        context.put("categoryDistribution", buildCategoryDistribution(scopedRecords));
+        context.put("quarterDistribution", buildQuarterDistribution(scopedRecords));
+        context.put("scoreBands", buildScoreBands(scopedRecords));
+        context.put("topRecords", buildRecordHighlights(scopedRecords, true));
+        context.put("lowScoreRecords", buildRecordHighlights(scopedRecords, false));
+        context.put("topTags", buildTagStats(scopedRecords));
+        context.put("franchiseCompletionStats", franchiseStats);
+        context.put("franchiseCompletionItems", franchiseItems);
+        context.put("collectionCandidates", buildCollectionCandidateStats(category));
+        context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
+        context.put("evidence", buildEvidence(context));
+        return context;
+    }
+
     public Map<String, Object> buildComprehensiveReportContext(Integer year, String category) {
         List<UserSubjectRecordResponse> allRecords = filterByCategory(
                 userSubjectRecordService.getRecords(null, null, null, null),
@@ -854,6 +900,194 @@ public class LlmContextBuilder {
                 .toList();
     }
 
+    private List<Map<String, Object>> buildFranchiseCompletionItems(
+            String category,
+            List<UserSubjectRecordResponse> allRecords
+    ) {
+        Map<Long, UserSubjectRecordResponse> recordMap = allRecords.stream()
+                .collect(Collectors.toMap(
+                        UserSubjectRecordResponse::getSubjectId,
+                        record -> record,
+                        (first, second) -> first
+                ));
+        Map<Long, UserSubjectCollection> collectionMap = userSubjectCollectionRepository.findAll()
+                .stream()
+                .collect(Collectors.toMap(
+                        UserSubjectCollection::getSubjectId,
+                        collection -> collection,
+                        (first, second) -> first
+                ));
+
+        return subjectRepository.findAll()
+                .stream()
+                .filter(subject -> "NORMAL".equalsIgnoreCase(subject.getStatus()))
+                .filter(subject -> subject.getFranchiseId() != null)
+                .filter(subject -> category == null || category.isBlank()
+                        || category.equalsIgnoreCase(subject.getCategory()))
+                .collect(Collectors.groupingBy(
+                        Subject::getFranchiseId,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ))
+                .entrySet()
+                .stream()
+                .filter(entry -> entry.getValue().stream()
+                        .anyMatch(subject -> recordMap.containsKey(subject.getId())))
+                .map(entry -> buildFranchiseCompletionItem(
+                        entry.getKey(),
+                        entry.getValue(),
+                        recordMap,
+                        collectionMap
+                ))
+                .sorted(Comparator
+                        .comparing((Map<String, Object> item) -> (Integer) item.get("unrecordedCount")).reversed()
+                        .thenComparing(item -> (Integer) item.get("wantCount"), Comparator.reverseOrder())
+                        .thenComparing(item -> String.valueOf(item.get("franchiseName"))))
+                .limit(10)
+                .toList();
+    }
+
+    private Map<String, Object> buildFranchiseCompletionItem(
+            Long franchiseId,
+            List<Subject> subjects,
+            Map<Long, UserSubjectRecordResponse> recordMap,
+            Map<Long, UserSubjectCollection> collectionMap
+    ) {
+        List<UserSubjectRecordResponse> watchedRecords = subjects.stream()
+                .map(subject -> recordMap.get(subject.getId()))
+                .filter(Objects::nonNull)
+                .toList();
+        int watchedCount = watchedRecords.size();
+        int wantCount = countCollectionSubjects(subjects, collectionMap, CollectionType.WANT, recordMap);
+        int pausedCount = countCollectionSubjects(subjects, collectionMap, CollectionType.PAUSED, recordMap);
+        int totalSubjects = subjects.size();
+        int unrecordedCount = Math.max(0, totalSubjects - watchedCount);
+
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("franchiseId", franchiseId);
+        item.put("franchiseName", resolveFranchiseName(franchiseId));
+        item.put("totalSubjects", totalSubjects);
+        item.put("watchedCount", watchedCount);
+        item.put("unrecordedCount", unrecordedCount);
+        item.put("wantCount", wantCount);
+        item.put("pausedCount", pausedCount);
+        item.put("averageScore", averageScore(watchedRecords));
+        item.put("highScoreCount", countScoreAtLeast(watchedRecords, 45));
+        item.put("status", resolveFranchiseCompletionStatus(
+                totalSubjects,
+                watchedCount,
+                wantCount,
+                pausedCount
+        ));
+        item.put("categoryDistribution", buildSubjectCategoryDistribution(subjects));
+        item.put("timeline", subjects.stream()
+                .sorted(franchiseSubjectComparator())
+                .limit(12)
+                .map(subject -> toFranchiseSubjectItem(subject, recordMap, collectionMap))
+                .toList());
+        item.put("nextCandidates", subjects.stream()
+                .filter(subject -> !recordMap.containsKey(subject.getId()))
+                .sorted(franchiseSubjectComparator())
+                .limit(5)
+                .map(subject -> toFranchiseSubjectItem(subject, recordMap, collectionMap))
+                .toList());
+        return item;
+    }
+
+    private int countCollectionSubjects(
+            List<Subject> subjects,
+            Map<Long, UserSubjectCollection> collectionMap,
+            CollectionType collectionType,
+            Map<Long, UserSubjectRecordResponse> recordMap
+    ) {
+        return (int) subjects.stream()
+                .filter(subject -> !recordMap.containsKey(subject.getId()))
+                .map(subject -> collectionMap.get(subject.getId()))
+                .filter(Objects::nonNull)
+                .filter(collection -> collection.getCollectionType() == collectionType)
+                .count();
+    }
+
+    private Comparator<Subject> franchiseSubjectComparator() {
+        return Comparator
+                .comparing(Subject::getReleaseYear, Comparator.nullsLast(Integer::compareTo))
+                .thenComparing(Subject::getReleaseQuarter, Comparator.nullsLast(Integer::compareTo))
+                .thenComparing(Subject::getSeasonIndex, Comparator.nullsLast(Integer::compareTo))
+                .thenComparing(Subject::getPartIndex, Comparator.nullsLast(Integer::compareTo))
+                .thenComparing(Subject::getDisplayTitle);
+    }
+
+    private Map<String, Object> toFranchiseSubjectItem(
+            Subject subject,
+            Map<Long, UserSubjectRecordResponse> recordMap,
+            Map<Long, UserSubjectCollection> collectionMap
+    ) {
+        UserSubjectRecordResponse record = recordMap.get(subject.getId());
+        UserSubjectCollection collection = collectionMap.get(subject.getId());
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("subjectId", subject.getId());
+        item.put("title", subject.getDisplayTitle());
+        item.put("category", subject.getCategory());
+        item.put("releaseYear", subject.getReleaseYear());
+        item.put("releaseQuarter", subject.getReleaseQuarter());
+        item.put("seasonIndex", subject.getSeasonIndex());
+        item.put("partIndex", subject.getPartIndex());
+        item.put("score", record == null ? null : record.getScoreValue());
+        item.put("status", resolveFranchiseSubjectStatus(record, collection));
+        return item;
+    }
+
+    private String resolveFranchiseSubjectStatus(
+            UserSubjectRecordResponse record,
+            UserSubjectCollection collection
+    ) {
+        if (record != null) {
+            return "WATCHED";
+        }
+
+        if (collection == null) {
+            return "NONE";
+        }
+
+        return collection.getCollectionType() == CollectionType.WANT ? "WANT" : "PAUSED";
+    }
+
+    private Map<String, Long> buildSubjectCategoryDistribution(List<Subject> subjects) {
+        Map<String, Long> grouped = subjects.stream()
+                .filter(subject -> subject.getCategory() != null)
+                .collect(Collectors.groupingBy(
+                        Subject::getCategory,
+                        Collectors.counting()
+                ));
+
+        Map<String, Long> distribution = new LinkedHashMap<>();
+        for (String category : CATEGORY_ORDER) {
+            distribution.put(category, grouped.getOrDefault(category, 0L));
+        }
+        return distribution;
+    }
+
+    private String resolveFranchiseCompletionStatus(
+            int totalSubjects,
+            int watchedCount,
+            int wantCount,
+            int pausedCount
+    ) {
+        if (totalSubjects > 0 && watchedCount >= totalSubjects) {
+            return "已补完";
+        }
+
+        if (wantCount > 0) {
+            return "优先补完";
+        }
+
+        if (pausedCount > 0) {
+            return "谨慎恢复";
+        }
+
+        return "待观察";
+    }
+
     private Map<String, Long> buildCollectionCandidateStats(String category) {
         List<UserSubjectCollection> collections = userSubjectCollectionRepository.findAll().stream()
                 .filter(collection -> matchesCollectionCategory(collection, category))
@@ -1084,6 +1318,12 @@ public class LlmContextBuilder {
             evidence.add(scope + " 口味画像样本 " + context.get("totalRecords") + " 条");
         } else if ("PREFERENCE_CONTRADICTION".equals(analysisType)) {
             evidence.add(scope + " 偏好矛盾样本 " + context.get("totalRecords") + " 条");
+        } else if ("FRANCHISE_COMPLETION".equals(analysisType)) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> franchiseStats = (Map<String, Object>) context.get("franchiseCompletionStats");
+            evidence.add(scope + " 系列补完样本 " + franchiseStats.get("franchiseCount") + " 个系列");
+            evidence.add("系列内作品 " + franchiseStats.get("seriesSubjectCount")
+                    + " 部，已正式记录 " + franchiseStats.get("watchedSubjectCount") + " 部");
         } else if ("COMPREHENSIVE_REPORT".equals(analysisType)) {
             evidence.add(year + " 年 " + scope + " 年度正式记录 " + context.get("totalRecords") + " 条");
             evidence.add(scope + " 长期画像样本 " + context.get("longTermTotalRecords") + " 条");
@@ -1105,8 +1345,12 @@ public class LlmContextBuilder {
 
         evidence.add("个人评分均值 " + context.get("averageScore") + " / 50，高分记录 "
                 + context.get("highScoreCount") + " 条，低分记录 " + context.get("lowScoreCount") + " 条");
-        evidence.add("相对" + context.get("comparisonLabel") + "变化 "
-                + formatDiff((Integer) context.get("yearOverYearDiff")) + " 条");
+        if ("FRANCHISE_COMPLETION".equals(analysisType)) {
+            evidence.add("待补系列内未记录作品 " + context.get("yearOverYearDiff") + " 部");
+        } else {
+            evidence.add("相对" + context.get("comparisonLabel") + "变化 "
+                    + formatDiff((Integer) context.get("yearOverYearDiff")) + " 条");
+        }
 
         @SuppressWarnings("unchecked")
         Map<String, Long> collectionCandidates = (Map<String, Long>) context.get("collectionCandidates");

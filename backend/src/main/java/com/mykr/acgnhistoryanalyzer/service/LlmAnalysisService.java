@@ -152,6 +152,18 @@ public class LlmAnalysisService {
         ));
     }
 
+    public LlmAnalysisResponse generateFranchiseCompletion(String category) {
+        String normalizedCategory = normalizeBlankToNull(category);
+        String prompt = llmPromptService.buildFranchiseCompletionPrompt(normalizedCategory);
+        Map<String, Object> context = llmContextBuilder.buildFranchiseCompletionContext(normalizedCategory);
+
+        return llmClient.generate(new LlmGenerateRequest(
+                "FRANCHISE_COMPLETION",
+                prompt,
+                context
+        ));
+    }
+
     public LlmAnalysisResponse generateComprehensiveReport(Integer year, String category) {
         Integer effectiveYear = year == null ? LocalDate.now().getYear() : year;
         String normalizedCategory = normalizeBlankToNull(category);

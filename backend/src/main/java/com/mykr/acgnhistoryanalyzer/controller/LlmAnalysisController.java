@@ -103,6 +103,13 @@ public class LlmAnalysisController {
         return ApiResponse.success(llmAnalysisService.generatePreferenceContradictions(category));
     }
 
+    @GetMapping("/analysis/franchise-completion")
+    public ApiResponse<LlmAnalysisResponse> generateFranchiseCompletion(
+            @RequestParam(required = false) String category
+    ) {
+        return ApiResponse.success(llmAnalysisService.generateFranchiseCompletion(category));
+    }
+
     @GetMapping("/analysis/comprehensive-report")
     public ApiResponse<LlmAnalysisResponse> generateComprehensiveReport(
             @RequestParam(required = false) Integer year,

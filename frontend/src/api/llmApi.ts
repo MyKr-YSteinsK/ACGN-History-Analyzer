@@ -11,6 +11,7 @@ export type LlmAnalysisType =
     | 'COLLECTION_BACKLOG'
     | 'TASTE_PROFILE'
     | 'PREFERENCE_CONTRADICTION'
+    | 'FRANCHISE_COMPLETION'
     | 'COMPREHENSIVE_REPORT'
     | 'HOME_INSIGHT'
     | 'QUESTION_ANSWER'
@@ -105,6 +106,10 @@ export type PreferenceContradictionAnalysisParams = {
     category?: AcgnCategory
 }
 
+export type FranchiseCompletionAnalysisParams = {
+    category?: AcgnCategory
+}
+
 export type ComprehensiveReportAnalysisParams = {
     year?: number
     category?: AcgnCategory
@@ -158,6 +163,10 @@ export function getTasteProfileAnalysis(params: TasteProfileAnalysisParams) {
 
 export function getPreferenceContradictionAnalysis(params: PreferenceContradictionAnalysisParams) {
     return apiGet<LlmAnalysisResponse>('/llm/analysis/preference-contradictions', params)
+}
+
+export function getFranchiseCompletionAnalysis(params: FranchiseCompletionAnalysisParams) {
+    return apiGet<LlmAnalysisResponse>('/llm/analysis/franchise-completion', params)
 }
 
 export function getComprehensiveReportAnalysis(params: ComprehensiveReportAnalysisParams) {

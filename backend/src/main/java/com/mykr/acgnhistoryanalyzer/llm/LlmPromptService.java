@@ -80,6 +80,14 @@ public class LlmPromptService {
         return buildBasePrompt(scope);
     }
 
+    public String buildFranchiseCompletionPrompt(String category) {
+        String scope = category == null || category.isBlank()
+                ? "系列补完分析"
+                : category + " 系列补完分析";
+
+        return buildBasePrompt(scope);
+    }
+
     public String buildComprehensiveReportPrompt(Integer year, String category) {
         String scope = category == null || category.isBlank()
                 ? year + " 年个人 ACGN 一键智能分析报告"
