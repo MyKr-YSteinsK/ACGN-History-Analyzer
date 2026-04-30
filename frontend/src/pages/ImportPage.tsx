@@ -632,7 +632,6 @@ function ImportPage() {
         ],
     )
     const activeCanImportCount = activePreviewItems.filter(isImportablePreviewItem).length
-    const activeSkippedCount = activePreviewItems.length - activeCanImportCount
 
     const draftLineCount = useMemo(() => {
         return draftText.trim() ? draftText.trim().split(/\r?\n/).length : 0
@@ -1673,20 +1672,19 @@ function ImportItemList({ items, onExcludeItem, emptyText }: ImportItemListProps
     const successCount = items.filter((item) => getImportItemFilter(item) === 'SUCCESS').length
     const warningCount = items.filter((item) => getImportItemFilter(item) === 'WARNING').length
     const errorCount = items.filter((item) => getImportItemFilter(item) === 'ERROR').length
+
     const filterOptions: Array<{
         value: ImportItemFilter
         label: string
         count: number
     }> = [
         { value: 'ALL', label: '全部', count: items.length },
-        { value: 'SUCCESS', label: '可处理', count: successCount },
-        { value: 'WARNING', label: '跳过', count: warningCount },
+        { value: 'SUCCESS', label: '可导入', count: successCount },
+        { value: 'WARNING', label: '更新/跳过', count: warningCount },
         { value: 'ERROR', label: '错误', count: errorCount },
     ]
-    const visibleItems =
-        filter === 'ALL'
-            ? items
-            : items.filter((item) => getImportItemFilter(item) === filter)
+
+    const visibleItems = filter === 'ALL' ? items : items.filter((item) => getImportItemFilter(item) === filter)
 
     if (items.length === 0) {
         return (
@@ -1735,6 +1733,14 @@ function ImportItemList({ items, onExcludeItem, emptyText }: ImportItemListProps
                         : hasError
                           ? 'border-rose-100 bg-rose-50/75 text-rose-700'
                           : 'border-orange-100 bg-orange-50/70 text-orange-700'
+                    const statusText =
+                        item.result === 'CAN_IMPORT'
+                            ? '可导入'
+                            : item.result === 'UPDATED'
+                              ? '更新'
+                              : item.result === 'SKIPPED'
+                                ? '跳过'
+                                : item.result
 
                     return (
                         <div
@@ -1751,13 +1757,7 @@ function ImportItemList({ items, onExcludeItem, emptyText }: ImportItemListProps
                                         className,
                                     ].join(' ')}
                                 >
-                                    {item.result === 'CAN_IMPORT'
-                                        ? '可导入'
-                                        : item.result === 'UPDATED'
-                                          ? '更新'
-                                          : item.result === 'SKIPPED'
-                                            ? '跳过'
-                                            : item.result}
+                                    {statusText}
                                 </span>
                             </div>
                             <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
@@ -1786,7 +1786,13 @@ type TemplateFieldPanelProps = {
 }
 
 function TemplateFieldPanel({ template, bangumiMode = false }: TemplateFieldPanelProps) {
-    const bangumiFields = [
+    const bangumiFields: Array<{
+        fieldName: string
+        required: boolean
+        description: string
+        example: string
+        notes?: string
+    }> = [
         { fieldName: 'year', required: true, description: '选择要导入的新番年份。', example: '2026' },
         { fieldName: 'quarter', required: true, description: '选择一月、四月、七月、十月档期。', example: '一月' },
         { fieldName: 'includeWeb', required: false, description: '是否额外纳入 WEB 动画。', example: 'false' },
