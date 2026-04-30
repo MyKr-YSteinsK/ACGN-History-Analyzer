@@ -395,7 +395,7 @@ function parseDraftPayload(text: string, mode: ImportMode, target: ImportTarget)
     }
 
     if (mode !== 'JSON') {
-        throw new Error('当前方式暂未接入预览接口')
+        throw new Error('当前导入方式需要先使用 JSON 或 CSV 模板完成校验')
     }
 
     const parsed = JSON.parse(trimmedText) as unknown
@@ -896,7 +896,7 @@ function ImportPage() {
                             className="mt-4 min-h-[320px] w-full resize-y rounded-[26px] border border-white/75 bg-white/68 px-4 py-4 font-mono text-xs leading-6 text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-sky-200 focus:bg-white"
                             placeholder={
                                 selectedMode === 'CSV'
-                                    ? '第一行写字段名，后续每行一条数据'
+                                    ? '第一行写字段名，每行对应一条数据'
                                     : '粘贴后端模板 JSON'
                             }
                         />
@@ -1276,7 +1276,7 @@ function TemplateFieldPanel({ template }: TemplateFieldPanelProps) {
             <div className="bg-gradient-to-br from-white/62 via-white/45 to-slate-50/60 p-5">
                 <h3 className="text-xl font-black text-slate-800">模板字段说明</h3>
                 <p className="mt-1 text-sm text-slate-400">
-                    {template?.recommendedOrder ?? '等待模板加载'}
+                    {template?.recommendedOrder ?? '模板字段正在加载'}
                 </p>
 
                 <div className="mt-4 max-h-[420px] space-y-2 overflow-auto pr-1">
@@ -1323,7 +1323,7 @@ function EndpointPanel({ overview }: EndpointPanelProps) {
             <div className="bg-gradient-to-br from-white/62 via-white/45 to-violet-50/45 p-5">
                 <h3 className="text-xl font-black text-slate-800">导入接口链路</h3>
                 <p className="mt-1 text-sm text-slate-400">
-                    {overview?.moduleName ?? 'IMPORT_OVERVIEW'}
+                    {overview?.moduleName ?? '导入模块'}
                 </p>
 
                 <div className="mt-4 grid gap-2">

@@ -127,7 +127,7 @@ function SubjectDetailDrawer({
                     {category.letter}
                   </span>
                                     <p className="mt-2 text-xs font-semibold text-slate-400">
-                                        No Cover
+                                        暂无封面
                                     </p>
                                 </div>
                             </div>
@@ -414,7 +414,7 @@ function SubjectDetailDrawer({
 
                         <p className="mt-3 line-clamp-5 text-sm leading-7 text-slate-500">
                             {subject.summary ??
-                                '暂无简介。后续接入作品详情接口后，这里会展示来自作品库或 Bangumi 的作品简介。'}
+                                '暂无简介。可在作品库补充作品概述，用于详情展示、导入校验和偏好分析。'}
                         </p>
                     </section>
 

@@ -171,7 +171,7 @@ function AddRecordModalContent({
                   {category.letter}
                 </span>
                                 <p className="mt-2 text-xs font-semibold text-slate-400">
-                                    No Cover
+                                    暂无封面
                                 </p>
                             </div>
                         )}
@@ -195,7 +195,7 @@ function AddRecordModalContent({
                         <p className="text-xs font-bold text-slate-600">作品简介</p>
                         <p className="mt-2 line-clamp-7 text-xs leading-6 text-slate-500">
                             {subject.summary ??
-                                '暂无简介。后续接入作品详情接口后，这里会展示来自作品库或 Bangumi 的作品简介。'}
+                                '暂无简介。作品库可补充简介，用于详情展示、导入校验和后续偏好分析。'}
                         </p>
                     </div>
                 </aside>

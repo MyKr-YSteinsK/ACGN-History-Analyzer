@@ -64,7 +64,7 @@ function SubjectCard({ subject, onOpenDetail }: SubjectCardProps) {
                 {category.letter}
               </span>
                             <p className="mt-1.5 text-xs font-semibold text-slate-400">
-                                No Cover
+                                暂无封面
                             </p>
                         </div>
                     </div>

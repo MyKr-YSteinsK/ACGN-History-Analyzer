@@ -155,7 +155,7 @@ export const appTheme = {
     appName: 'ACGN History Analyzer',
     cnName: 'ACGN 个人历史数据分析系统',
     description:
-        '用于整理个人动画、漫画、游戏、小说历史记录，并在后续阶段接入 LLM 智能分析。',
+        '用于整理个人动画、漫画、游戏、小说历史记录，并生成统计、榜单、系列和智能分析视图。',
 }
 
 export const platformScoreTheme = {

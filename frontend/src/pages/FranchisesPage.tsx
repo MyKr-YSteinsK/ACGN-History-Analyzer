@@ -587,7 +587,7 @@ function FranchisesPage() {
                                         </h2>
                                         <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-500">
                                             {selectedFranchise.description ||
-                                                '暂无系列简介。后续可以在后端补充系列简介，用来说明正篇、外传、重制版或跨媒介关系。'}
+                                                '暂无系列简介。可补充正篇、外传、重制版或跨媒介关系说明，用于展示系列脉络。'}
                                         </p>
                                     </div>
 
@@ -922,7 +922,7 @@ function TimelineSubjectCard({ subject, onOpen, onRemove }: TimelineSubjectCardP
                                 {category.letter}
                             </span>
                             <p className="mt-1 text-xs font-semibold text-slate-400">
-                                No Cover
+                                暂无封面
                             </p>
                         </div>
                     </div>
