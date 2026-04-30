@@ -308,6 +308,7 @@ function CollectionsPage() {
 
         return `第 ${pageInfo.page + 1} / ${pageInfo.totalPages} 页`
     }, [pageInfo.page, pageInfo.totalPages])
+    const listLabel = selectedType === 'WANT' ? '想看清单' : '搁置清单'
 
     return (
         <>
@@ -315,7 +316,17 @@ function CollectionsPage() {
                 <PageHero
                     eyebrow="COLLECTIONS"
                     title="收藏夹"
-            description="收藏夹只管理想看和搁置，不按年份月份展示。"
+                    description="收藏夹只管理想看和搁置，不进入正式记录统计；当作品添加为正式记录后，会自动从收藏夹中移出。"
+                />
+
+                <CollectionOverviewStrip
+                    totalElements={pageInfo.totalElements}
+                    currentPageCount={collections.length}
+                    pageText={pageText}
+                    listLabel={listLabel}
+                    selectedType={selectedType}
+                    selectedCategory={selectedCategory}
+                    keyword={keyword}
                 />
 
                 <GlassCard className="overflow-hidden">
@@ -517,6 +528,111 @@ type CollectionTypeTabsProps = {
     onChange: (type: CollectionType) => void
 }
 
+type CollectionOverviewStripProps = {
+    totalElements: number
+    currentPageCount: number
+    pageText: string
+    listLabel: string
+    selectedType: CollectionType
+    selectedCategory: AcgnCategory
+    keyword: string
+}
+
+function CollectionOverviewStrip({
+    totalElements,
+    currentPageCount,
+    pageText,
+    listLabel,
+    selectedType,
+    selectedCategory,
+    keyword,
+}: CollectionOverviewStripProps) {
+    const category = categoryTheme[selectedCategory]
+    const typeTheme = libraryStatusTheme[selectedType]
+    const searchText = keyword.trim() || '无关键词'
+
+    return (
+        <GlassCard className="overflow-hidden">
+            <div
+                className={[
+                    'bg-gradient-to-br p-5 transition-all duration-300',
+                    category.softGradient,
+                ].join(' ')}
+            >
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                            collection overview
+                        </p>
+                        <h3 className="mt-1 text-xl font-black text-slate-800">
+                            {category.cnName} · {listLabel}
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-400">
+                            收藏夹不参与年份月份统计，只作为补完队列和暂存队列。
+                        </p>
+                    </div>
+
+                    <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
+                        <OverviewMetric label="总量" value={totalElements} />
+                        <OverviewMetric label="当前页" value={currentPageCount} />
+                        <OverviewMetric label="分页" value={pageText} />
+                        <OverviewMetric
+                            label="搜索"
+                            value={searchText}
+                            toneClassName={keyword.trim() ? 'text-sky-700' : 'text-slate-500'}
+                        />
+                    </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                    <span
+                        className={[
+                            'rounded-full border px-3 py-1.5 text-xs font-black',
+                            typeTheme.className,
+                        ].join(' ')}
+                    >
+                        {typeTheme.label}
+                    </span>
+                    <span
+                        className={[
+                            'rounded-full border px-3 py-1.5 text-xs font-black',
+                            category.border,
+                            category.bg,
+                            category.text,
+                        ].join(' ')}
+                    >
+                        {category.cnName}
+                    </span>
+                    <span className="rounded-full border border-white/75 bg-white/62 px-3 py-1.5 text-xs font-semibold text-slate-400">
+                        添加正式记录后自动离开收藏夹
+                    </span>
+                </div>
+            </div>
+        </GlassCard>
+    )
+}
+
+type OverviewMetricProps = {
+    label: string
+    value: string | number
+    toneClassName?: string
+}
+
+function OverviewMetric({
+    label,
+    value,
+    toneClassName = 'text-slate-800',
+}: OverviewMetricProps) {
+    return (
+        <div className="min-w-[112px] rounded-[22px] border border-white/75 bg-white/62 px-4 py-3 text-center shadow-sm backdrop-blur">
+            <p className={['truncate text-lg font-black', toneClassName].join(' ')}>
+                {value}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-slate-400">{label}</p>
+        </div>
+    )
+}
+
 function CollectionTypeTabs({ value, onChange }: CollectionTypeTabsProps) {
     return (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -710,6 +826,9 @@ function CollectionCard({
 
             {menuOpen ? (
                 <div className="absolute right-3 top-14 z-10 w-40 overflow-hidden rounded-[18px] border border-white/75 bg-white/92 p-1.5 shadow-[0_16px_45px_rgba(80,90,120,0.18)] backdrop-blur-xl">
+                    <MenuButton onClick={() => onAddRecord(collection)}>
+                        添加已看
+                    </MenuButton>
                     <MenuButton onClick={() => onMove(collection)}>
                         移至{moveTargetText}
                     </MenuButton>
