@@ -17,6 +17,7 @@ import com.mykr.acgnhistoryanalyzer.response.*;
 import com.mykr.acgnhistoryanalyzer.specification.SubjectSpecifications;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
+import jakarta.persistence.criteria.Expression;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -121,10 +122,18 @@ public class SubjectService {
 
         Specification<Subject> specification =
                 buildSubjectSpecification(year, quarter, category, keyword, subjectStatus, tagName);
+        Specification<Subject> querySpecification = usesPlatformScoreSort(effectiveSortType)
+                ? specification.and(buildPlatformScoreOrderSpecification(effectiveSortType))
+                : specification;
 
         if (libraryStatus != null) {
             List<SubjectResponse> filtered = subjectRepository
-                    .findAll(specification, buildSubjectPageSort(effectiveSortType))
+                    .findAll(
+                            querySpecification,
+                            usesPlatformScoreSort(effectiveSortType)
+                                    ? Sort.unsorted()
+                                    : buildSubjectPageSort(effectiveSortType)
+                    )
                     .stream()
                     .map(this::toResponse)
                     .filter(subject -> libraryStatus.name().equals(subject.getLibraryStatus()))
@@ -149,10 +158,12 @@ public class SubjectService {
         Pageable pageable = PageRequest.of(
                 effectivePage,
                 effectiveSize,
-                buildSubjectPageSort(effectiveSortType)
+                usesPlatformScoreSort(effectiveSortType)
+                        ? Sort.unsorted()
+                        : buildSubjectPageSort(effectiveSortType)
         );
 
-        Page<Subject> subjectPage = subjectRepository.findAll(specification, pageable);
+        Page<Subject> subjectPage = subjectRepository.findAll(querySpecification, pageable);
 
         List<SubjectResponse> content = subjectPage.getContent().stream()
                 .map(this::toResponse)
@@ -429,20 +440,6 @@ public class SubjectService {
             }
 
             String sourceUniqueKey = buildSourceUniqueKey(item);
-            Subject existingBySource = findExistingBySource(item);
-            if (sourceUniqueKey != null && existingBySource != null && !batchSourceKeys.add(sourceUniqueKey)) {
-                skippedCount++;
-                items.add(new SubjectImportPreviewItemResponse(
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "同一批次内来源作品重复，已跳过",
-                        item.getSourcePlatform(),
-                        item.getSourceId()
-                ));
-                rowNumber++;
-                continue;
-            }
-
             if (sourceUniqueKey != null && !batchSourceKeys.add(sourceUniqueKey)) {
                 skippedCount++;
                 items.add(new SubjectImportPreviewItemResponse(
@@ -903,13 +900,13 @@ public class SubjectService {
                     .and(Sort.by("partIndex").descending())
                     .and(Sort.by("displayTitle").descending())
                     .and(Sort.by("id").descending());
-            case PLATFORM_SCORE_DESC -> Sort.by(Sort.Order.desc("platformScore").nullsLast())
+            case PLATFORM_SCORE_DESC -> Sort.by("platformScore").descending()
                     .and(Sort.by("titleCn").ascending())
                     .and(Sort.by("seasonIndex").ascending())
                     .and(Sort.by("partIndex").ascending())
                     .and(Sort.by("displayTitle").ascending())
                     .and(Sort.by("id").ascending());
-            case PLATFORM_SCORE_ASC -> Sort.by(Sort.Order.asc("platformScore").nullsLast())
+            case PLATFORM_SCORE_ASC -> Sort.by("platformScore").ascending()
                     .and(Sort.by("titleCn").ascending())
                     .and(Sort.by("seasonIndex").ascending())
                     .and(Sort.by("partIndex").ascending())
@@ -921,6 +918,37 @@ public class SubjectService {
             case RELEASE_OLDEST -> Sort.by("releaseYear").ascending()
                     .and(Sort.by("releaseQuarter").ascending())
                     .and(Sort.by("displayTitle").ascending());
+        };
+    }
+
+    private boolean usesPlatformScoreSort(SubjectPageSortType sortType) {
+        return sortType == SubjectPageSortType.PLATFORM_SCORE_DESC
+                || sortType == SubjectPageSortType.PLATFORM_SCORE_ASC;
+    }
+
+    private Specification<Subject> buildPlatformScoreOrderSpecification(SubjectPageSortType sortType) {
+        return (root, query, criteriaBuilder) -> {
+            if (query.getResultType() == Long.class || query.getResultType() == long.class) {
+                return criteriaBuilder.conjunction();
+            }
+
+            Expression<Integer> nullRank = criteriaBuilder.<Integer>selectCase()
+                    .when(criteriaBuilder.isNull(root.get("platformScore")), 1)
+                    .otherwise(0);
+
+            query.orderBy(
+                    criteriaBuilder.asc(nullRank),
+                    sortType == SubjectPageSortType.PLATFORM_SCORE_DESC
+                            ? criteriaBuilder.desc(root.get("platformScore"))
+                            : criteriaBuilder.asc(root.get("platformScore")),
+                    criteriaBuilder.asc(root.get("titleCn")),
+                    criteriaBuilder.asc(root.get("seasonIndex")),
+                    criteriaBuilder.asc(root.get("partIndex")),
+                    criteriaBuilder.asc(root.get("displayTitle")),
+                    criteriaBuilder.asc(root.get("id"))
+            );
+
+            return criteriaBuilder.conjunction();
         };
     }
 

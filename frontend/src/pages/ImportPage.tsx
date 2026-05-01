@@ -266,7 +266,7 @@ function getPreviewItemKey(item: PreviewItem, index: number) {
 }
 
 function isImportablePreviewItem(item: PreviewItem) {
-    return item.result === 'CAN_IMPORT'
+    return item.result === 'CAN_IMPORT' || item.result === 'UPDATED'
 }
 
 function stringifyTemplate(template: ImportTemplateResponse | null) {
@@ -603,6 +603,7 @@ function ImportPage() {
     const activeResult =
         importResult && importResult.target === selectedTarget ? importResult.data : null
     const isBangumiMode = selectedMode === 'BANGUMI'
+    const showTemplateFields = selectedTarget !== 'SUBJECT' && !isBangumiMode
     const bangumiSelectedQuarter = bangumiQuarterOptions.find(
         (option) => option.value === bangumiQuarter,
     )
@@ -627,6 +628,7 @@ function ImportPage() {
         ],
     )
     const activeCanImportCount = activePreviewItems.filter(isImportablePreviewItem).length
+    const activeUpdatedCount = activePreviewItems.filter((item) => item.result === 'UPDATED').length
 
     const draftLineCount = useMemo(() => {
         return draftText.trim() ? draftText.trim().split(/\r?\n/).length : 0
@@ -692,9 +694,13 @@ function ImportPage() {
 
             if (status.status === 'SUCCESS') {
                 if (status.result) {
+                    setPreview(null)
+                    setExcludedPreviewKeys([])
                     setImportResult({ target: 'SUBJECT', data: status.result })
-                    setFeedbackMessage(`已从 Bangumi 导入 ${status.result.importedCount} 条作品`)
+                    setFeedbackMessage(`已从 Bangumi 写入 ${status.result.importedCount} 条作品，预览结果已刷新为写入结果`)
                 } else {
+                    setPreview(null)
+                    setExcludedPreviewKeys([])
                     setFeedbackMessage('Bangumi 导入完成')
                 }
                 return
@@ -832,7 +838,7 @@ function ImportPage() {
                 setBangumiPreviewProgress({
                     active: false,
                     percent: 100,
-                    message: `预览完成，可导入 ${response.canImportCount} 条作品`,
+                    message: `预览完成，可新增 ${response.canImportCount} 条，可更新 ${response.updatedCount} 条`,
                 })
                 setSelectedTarget('SUBJECT')
                 setPreview({ target: 'SUBJECT', data: response })
@@ -903,12 +909,16 @@ function ImportPage() {
                 const response = await importCollections(
                     payload as UserSubjectCollectionBatchImportRequest,
                 )
+                setPreview(null)
+                setExcludedPreviewKeys([])
                 setImportResult({ target: 'COLLECTION', data: response })
                 setFeedbackMessage(`已导入 ${response.importedCount} 条收藏`)
             } else {
                 const response = await importRecords(
                     payload as UserSubjectRecordBatchImportRequest,
                 )
+                setPreview(null)
+                setExcludedPreviewKeys([])
                 setImportResult({ target: 'RECORD', data: response })
                 setFeedbackMessage(`已导入 ${response.importedCount} 条记录`)
             }
@@ -1175,6 +1185,11 @@ function ImportPage() {
                                 <span className="rounded-full bg-white/65 px-3 py-1.5">
                                     {isBangumiMode ? '自动缓存封面' : '错误行不阻塞合法行'}
                                 </span>
+                                {activeUpdatedCount > 0 ? (
+                                    <span className="rounded-full bg-orange-50/80 px-3 py-1.5 text-orange-600">
+                                        本次可更新 {activeUpdatedCount} 条
+                                    </span>
+                                ) : null}
                             </div>
 
                             <div className="flex gap-2">
@@ -1201,7 +1216,9 @@ function ImportPage() {
                                     }
                                     className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
-                                    确认写入
+                                    {activeUpdatedCount > 0 && previewItemMetrics.canImport === 0
+                                        ? '确认更新'
+                                        : '确认写入'}
                                 </button>
                             </div>
                         </div>
@@ -1241,10 +1258,12 @@ function ImportPage() {
                 />
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-stretch">
-                <TemplateFieldPanel template={selectedTemplate} bangumiMode={isBangumiMode} />
-                <EndpointPanel overview={overview} />
-            </div>
+            {showTemplateFields ? (
+                <TemplateFieldPanel
+                    template={selectedTemplate}
+                    targetTitle={getTargetTitle(selectedTarget)}
+                />
+            ) : null}
         </div>
     )
 }
@@ -1764,7 +1783,7 @@ function ImportItemList({ items, onExcludeItem, emptyText }: ImportItemListProps
                                         </p>
                                     ) : null}
                                 </div>
-                                {onExcludeItem && item.result === 'CAN_IMPORT' ? (
+                                {onExcludeItem && isImportablePreviewItem(item) ? (
                                     <button
                                         type="button"
                                         onClick={() => onExcludeItem(item, index)}
@@ -1784,67 +1803,27 @@ function ImportItemList({ items, onExcludeItem, emptyText }: ImportItemListProps
 
 type TemplateFieldPanelProps = {
     template: ImportTemplateResponse | null
-    bangumiMode?: boolean
+    targetTitle: string
 }
 
-function TemplateFieldPanel({ template, bangumiMode = false }: TemplateFieldPanelProps) {
-    const bangumiFields: Array<{
-        fieldName: string
-        required: boolean
-        description: string
-        example: string
-        notes?: string
-    }> = [
-        {
-            fieldName: 'year',
-            required: true,
-            description: '选择要导入的新番年份。',
-            example: '2026',
-            notes: '用于决定拉取哪个年份的 Bangumi 番剧。',
-        },
-        {
-            fieldName: 'quarter',
-            required: true,
-            description: '选择一月、四月、七月、十月档期。',
-            example: '一月',
-            notes: '对应季度档期，系统会按档期抓取作品。',
-        },
-        {
-            fieldName: 'includeWeb',
-            required: false,
-            description: '是否额外纳入 WEB 动画。',
-            example: 'false',
-            notes: '开启后会把部分 WEB 播放作品一起纳入预览。',
-        },
-        {
-            fieldName: 'japaneseOnly',
-            required: false,
-            description: '是否只保留日本动画标签命中的作品。',
-            example: 'true',
-            notes: '用于过滤非日本动画或标签不匹配的条目。',
-        },
-    ]
-    const fields = bangumiMode ? bangumiFields : (template?.fields ?? [])
-
+function TemplateFieldPanel({ template, targetTitle }: TemplateFieldPanelProps) {
     return (
-        <GlassCard className="h-full overflow-hidden">
-            <div className="flex h-full flex-col bg-gradient-to-br from-white/62 via-white/45 to-slate-50/60 p-5">
-                <div className="flex items-start justify-between gap-4">
+        <GlassCard className="overflow-hidden">
+            <div className="bg-gradient-to-br from-white/62 via-white/45 to-slate-50/60 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h3 className="text-xl font-black text-slate-800">模板字段说明</h3>
                         <p className="mt-1 text-sm text-slate-400">
-                            {bangumiMode
-                                ? '作品库只通过 Bangumi 新番导入；手动模板仅用于收藏夹和个人记录。'
-                                : template?.recommendedOrder ?? '模板字段正在加载'}
+                            {template?.recommendedOrder ?? `${targetTitle}模板字段正在加载`}
                         </p>
                     </div>
                     <span className="shrink-0 rounded-full border border-white/75 bg-white/65 px-3 py-1 text-[11px] font-semibold text-slate-400">
-                        {bangumiMode ? 'Bangumi only' : '手动模板'}
+                        {targetTitle} · 手动模板
                     </span>
                 </div>
 
-                <div className="mt-4 grid flex-1 content-start gap-2 md:grid-cols-2">
-                    {fields.map((field) => (
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {(template?.fields ?? []).map((field) => (
                         <div
                             key={field.fieldName}
                             className="rounded-[20px] border border-white/70 bg-white/58 p-3"
@@ -1874,54 +1853,6 @@ function TemplateFieldPanel({ template, bangumiMode = false }: TemplateFieldPane
                                     {field.notes}
                                 </p>
                             ) : null}
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </GlassCard>
-    )
-}
-
-type EndpointPanelProps = {
-    overview: ImportOverviewResponse | null
-}
-
-function EndpointPanel({ overview }: EndpointPanelProps) {
-    return (
-        <GlassCard className="h-full overflow-hidden">
-            <div className="flex h-full flex-col bg-gradient-to-br from-white/62 via-white/45 to-violet-50/45 p-5">
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <h3 className="text-xl font-black text-slate-800">导入接口链路</h3>
-                        <p className="mt-1 text-sm text-slate-400">
-                            {overview?.moduleName ?? '导入模块'}
-                        </p>
-                    </div>
-                    <span className="shrink-0 rounded-full border border-white/75 bg-white/65 px-3 py-1 text-[11px] font-semibold text-slate-400">
-                        {overview?.endpoints?.length ?? 0} 项
-                    </span>
-                </div>
-
-                <div className="mt-4 grid flex-1 content-start gap-2 overflow-auto pr-1">
-                    {(overview?.endpoints ?? []).map((endpoint) => (
-                        <div
-                            key={`${endpoint.method}-${endpoint.path}`}
-                            className="rounded-[20px] border border-white/70 bg-white/58 p-3"
-                        >
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full border border-sky-100 bg-sky-50/80 px-2.5 py-0.5 text-[11px] font-black text-sky-600">
-                                    {endpoint.method}
-                                </span>
-                                <span className="text-sm font-bold text-slate-700">
-                                    {endpoint.name}
-                                </span>
-                            </div>
-                            <p className="mt-1 font-mono text-xs text-slate-400">
-                                {endpoint.path}
-                            </p>
-                            <p className="mt-1 text-xs leading-5 text-slate-500">
-                                {endpoint.description}
-                            </p>
                         </div>
                     ))}
                 </div>
