@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getRecordPage, type UserSubjectRecordResponse } from '../api/recordApi'
+import { getApiErrorMessage } from '../api/request'
 import { getSubjectById } from '../api/subjectApi'
 import CoverImage from '../components/common/CoverImage'
 import {
@@ -64,14 +65,6 @@ const scoreBandConfig: Array<Omit<ScoreBand, 'count'>> = [
         className: 'border-slate-200 bg-slate-50/90 text-slate-600',
     },
 ]
-
-function getErrorMessage(error: unknown) {
-    if (error instanceof Error) {
-        return error.message
-    }
-
-    return '请求失败，请稍后重试'
-}
 
 function sortRecordsByScore(records: UserSubjectRecordResponse[]) {
     return [...records].sort((first, second) => {
@@ -168,7 +161,7 @@ function TopPage() {
         } catch (loadError) {
             setRankingRecords([])
             setScoreBands(scoreBandConfig.map((band) => ({ ...band, count: 0 })))
-            setError(getErrorMessage(loadError))
+            setError(getApiErrorMessage(loadError))
         } finally {
             setLoading(false)
         }
@@ -188,7 +181,7 @@ function TopPage() {
             const detail = await getSubjectById(record.subjectId)
             setSelectedSubject(mapSubjectDetailToCardView(detail))
         } catch (detailError) {
-            setError(getErrorMessage(detailError))
+            setError(getApiErrorMessage(detailError))
         } finally {
             setDetailLoading(false)
         }

@@ -5,6 +5,7 @@ import {
     updateCollection,
     type UserSubjectCollectionResponse,
 } from '../api/collectionApi'
+import { getApiErrorMessage } from '../api/request'
 import { createRecord } from '../api/recordApi'
 import { getSubjectById } from '../api/subjectApi'
 import ConfirmDialog from '../components/common/ConfirmDialog'
@@ -68,14 +69,6 @@ const collectionTypeOptions: Array<{
         description: '暂时停下但还想保留的作品',
     },
 ]
-
-function getErrorMessage(error: unknown) {
-    if (error instanceof Error) {
-        return error.message
-    }
-
-    return '请求失败，请稍后重试'
-}
 
 function getReleaseText(collection: UserSubjectCollectionResponse) {
     if (!collection.subjectReleaseYear) {
@@ -170,7 +163,7 @@ function CollectionsPage() {
         } catch (error) {
             setCollections([])
             setPageInfo(initialPageState)
-            setListError(getErrorMessage(error))
+            setListError(getApiErrorMessage(error))
         } finally {
             setLoading(false)
         }
@@ -216,7 +209,7 @@ function CollectionsPage() {
         try {
             setSelectedSubject(await loadSubjectForAction(collection.subjectId))
         } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setDetailLoading(false)
         }
@@ -230,7 +223,7 @@ function CollectionsPage() {
         try {
             setAddRecordSubject(await loadSubjectForAction(collection.subjectId))
         } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setActionLoading(false)
         }
@@ -252,7 +245,7 @@ function CollectionsPage() {
             await loadCollections()
             setFeedbackMessage(targetType === 'WANT' ? '已移至想看' : '已移至搁置')
         } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setActionLoading(false)
         }
@@ -272,7 +265,7 @@ function CollectionsPage() {
             setPendingDelete(null)
             setFeedbackMessage('已删除收藏')
         } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setActionLoading(false)
         }
@@ -295,7 +288,7 @@ function CollectionsPage() {
             setSelectedSubject(await loadSubjectForAction(subject.id))
             setFeedbackMessage('已添加正式记录，作品已从收藏夹移出')
         } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setRecordSubmitting(false)
         }

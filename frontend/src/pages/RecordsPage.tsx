@@ -6,6 +6,7 @@ import {
     type RecordPageSort,
     type UserSubjectRecordResponse,
 } from '../api/recordApi'
+import { getApiErrorMessage } from '../api/request'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import { getSubjectById } from '../api/subjectApi'
 import CoverImage from '../components/common/CoverImage'
@@ -62,14 +63,6 @@ function getCurrentQuarter(): ReleaseQuarter {
     }
 
     return 4
-}
-
-function getErrorMessage(error: unknown) {
-    if (error instanceof Error) {
-        return error.message
-    }
-
-    return '请求失败，请稍后重试'
 }
 
 function compareRecordsBySort(
@@ -165,7 +158,7 @@ function RecordsPage() {
             }
         } catch (loadError) {
             setRecords([])
-            setListError(getErrorMessage(loadError))
+            setListError(getApiErrorMessage(loadError))
         } finally {
             setLoading(false)
         }
@@ -228,7 +221,7 @@ function RecordsPage() {
             const detail = await getSubjectById(record.subjectId)
             setSelectedSubject(mapSubjectDetailToCardView(detail))
         } catch (detailError) {
-            setFeedbackMessage(getErrorMessage(detailError))
+            setFeedbackMessage(getApiErrorMessage(detailError))
         } finally {
             setDetailLoading(false)
         }
@@ -279,7 +272,7 @@ function RecordsPage() {
             setAddRecordSubject(null)
             setFeedbackMessage('已保存记录修改')
         } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setRecordSubmitting(false)
         }
@@ -326,7 +319,7 @@ function RecordsPage() {
             setPendingRecordDelete(null)
             setFeedbackMessage(`已删除《${subjectToDelete.displayTitle}》的正式记录`)
         } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setRecordDeleting(false)
         }

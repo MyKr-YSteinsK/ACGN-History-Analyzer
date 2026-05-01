@@ -3,6 +3,7 @@ import {
     getHomeInsightAnalysis,
     type LlmAnalysisResponse,
 } from '../api/llmApi'
+import { getApiErrorMessage } from '../api/request'
 import {
     getRecords,
     type UserSubjectRecordResponse,
@@ -130,14 +131,6 @@ function formatHomeInsightTime(value: string) {
     }
 
     return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
-
-function getErrorMessage(error: unknown) {
-    if (error instanceof Error) {
-        return error.message
-    }
-
-    return '请求失败，请稍后重试'
 }
 
 function sortRecordsByScore(records: UserSubjectRecordResponse[]) {
@@ -283,7 +276,7 @@ function HomePage() {
             }
         } catch (loadError) {
             setRecords([])
-            setError(getErrorMessage(loadError))
+            setError(getApiErrorMessage(loadError))
         } finally {
             setLoading(false)
         }
@@ -331,11 +324,11 @@ function HomePage() {
                     source: 'cache',
                     cachedAt: fallback.cachedAt,
                 })
-                setInsightError(`${getErrorMessage(insightLoadError)}。已显示本地缓存解读。`)
+                setInsightError(`${getApiErrorMessage(insightLoadError)}。已显示本地缓存解读。`)
             } else {
                 setHomeInsight(null)
                 setInsightCacheInfo(null)
-                setInsightError(getErrorMessage(insightLoadError))
+                setInsightError(getApiErrorMessage(insightLoadError))
             }
         } finally {
             setInsightLoading(false)
@@ -484,7 +477,7 @@ function HomePage() {
             const detail = await getSubjectById(record.subjectId)
             setSelectedSubject(mapSubjectDetailToCardView(detail))
         } catch (detailError) {
-            setError(getErrorMessage(detailError))
+            setError(getApiErrorMessage(detailError))
         } finally {
             setDetailLoading(false)
         }
