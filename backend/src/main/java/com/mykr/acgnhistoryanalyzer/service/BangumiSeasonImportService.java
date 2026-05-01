@@ -2,6 +2,7 @@ package com.mykr.acgnhistoryanalyzer.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.mykr.acgnhistoryanalyzer.common.exception.BangumiImportException;
 import com.mykr.acgnhistoryanalyzer.request.BangumiSeasonImportRequest;
 import com.mykr.acgnhistoryanalyzer.request.SubjectBatchImportRequest;
@@ -37,6 +38,7 @@ public class BangumiSeasonImportService {
     private static final int ANIME_CATEGORY_WEB = 5;
     private static final int PAGE_SIZE = 50;
     private static final int MAX_PAGE_COUNT = 8;
+    private static final int MAX_FETCH_ATTEMPTS = 3;
 
     private final ObjectMapper objectMapper;
     private final SubjectService subjectService;
@@ -228,18 +230,73 @@ public class BangumiSeasonImportService {
                 .header("User-Agent", USER_AGENT)
                 .build();
 
-        try {
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new BangumiImportException("Bangumi 接口请求失败，HTTP " + response.statusCode());
+        IOException lastIoException = null;
+        for (int attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
+            try {
+                HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                    return objectMapper.readTree(response.body());
+                }
+
+                if (!shouldRetryStatus(response.statusCode()) || attempt == MAX_FETCH_ATTEMPTS) {
+                    throw new BangumiImportException(
+                            "Bangumi 接口请求失败，HTTP " + response.statusCode() + "：" + abbreviate(response.body())
+                    );
+                }
+            } catch (JsonProcessingException ex) {
+                throw new BangumiImportException("Bangumi 接口返回内容不是合法 JSON：" + ex.getOriginalMessage(), ex);
+            } catch (IOException ex) {
+                lastIoException = ex;
+                if (attempt == MAX_FETCH_ATTEMPTS) {
+                    break;
+                }
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new BangumiImportException("Bangumi 接口请求被中断", ex);
             }
-            return objectMapper.readTree(response.body());
-        } catch (IOException ex) {
-            throw new BangumiImportException("Bangumi 接口返回解析失败", ex);
+
+            waitBeforeRetry(attempt);
+        }
+
+        throw new BangumiImportException(
+                "Bangumi 接口暂时不可用，已重试 " + MAX_FETCH_ATTEMPTS + " 次仍失败：" + describeException(lastIoException),
+                lastIoException
+        );
+    }
+
+    private boolean shouldRetryStatus(int statusCode) {
+        return statusCode == 429 || statusCode >= 500;
+    }
+
+    private void waitBeforeRetry(int attempt) {
+        try {
+            Thread.sleep(400L * attempt);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new BangumiImportException("Bangumi 接口请求被中断", ex);
         }
+    }
+
+    private String describeException(Exception ex) {
+        if (ex == null) {
+            return "未知网络错误";
+        }
+
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            return ex.getClass().getSimpleName();
+        }
+
+        return message;
+    }
+
+    private String abbreviate(String value) {
+        if (value == null || value.isBlank()) {
+            return "响应体为空";
+        }
+
+        String compact = value.replaceAll("\\s+", " ").trim();
+        return compact.length() <= 160 ? compact : compact.substring(0, 160) + "...";
     }
 
     private SubjectCreateRequest toSubjectCreateRequest(JsonNode subject, BangumiSeasonImportRequest request) {

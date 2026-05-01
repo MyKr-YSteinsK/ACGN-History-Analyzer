@@ -15,6 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class BangumiImportJobService {
 
+    private static final int JOB_RETENTION_HOURS = 6;
+
     private final BangumiSeasonImportService bangumiSeasonImportService;
     private final Map<String, BangumiImportJob> jobs = new ConcurrentHashMap<>();
 
@@ -23,6 +25,7 @@ public class BangumiImportJobService {
     }
 
     public BangumiImportJobStartResponse startImportJob(BangumiSeasonImportRequest request) {
+        cleanupFinishedJobs();
         String jobId = UUID.randomUUID().toString();
         BangumiImportJob job = new BangumiImportJob(jobId);
         jobs.put(jobId, job);
@@ -33,6 +36,7 @@ public class BangumiImportJobService {
     }
 
     public BangumiImportJobStatusResponse getJobStatus(String jobId) {
+        cleanupFinishedJobs();
         BangumiImportJob job = jobs.get(jobId);
         if (job == null) {
             return null;
@@ -49,8 +53,21 @@ public class BangumiImportJobService {
             );
             job.markSucceeded(result);
         } catch (Exception ex) {
-            job.markFailed(ex.getMessage() == null ? "Bangumi 导入失败" : ex.getMessage());
+            job.markFailed(buildFailureMessage(ex));
         }
+    }
+
+    private void cleanupFinishedJobs() {
+        LocalDateTime expiredAt = LocalDateTime.now().minusHours(JOB_RETENTION_HOURS);
+        jobs.entrySet().removeIf(entry -> entry.getValue().isFinishedBefore(expiredAt));
+    }
+
+    private String buildFailureMessage(Exception ex) {
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            message = "未知错误";
+        }
+        return "Bangumi 导入失败：" + message + "。可以稍后重试；如果连续失败，请检查网络、Bangumi 可用性或先关闭 WEB 作品后再导入。";
     }
 
     private static class BangumiImportJob {
@@ -99,6 +116,12 @@ public class BangumiImportJobService {
             this.errorMessage = errorMessage;
             this.percent = Math.max(1, this.percent);
             this.updatedAt = LocalDateTime.now();
+        }
+
+        boolean isFinishedBefore(LocalDateTime expiredAt) {
+            return ("SUCCESS".equals(status) || "FAILED".equals(status))
+                    && updatedAt != null
+                    && updatedAt.isBefore(expiredAt);
         }
 
         BangumiImportJobStatusResponse toResponse() {
