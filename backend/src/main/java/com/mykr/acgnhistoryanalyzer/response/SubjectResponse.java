@@ -21,6 +21,7 @@ public class SubjectResponse {
     private String studioName;
     private String platformLink;
     private BigDecimal platformScore;
+    private Integer personalScore;
     private Integer episodeCount;
     private List<TagResponse> tagList;
     private String sourcePlatform;
@@ -35,7 +36,7 @@ public class SubjectResponse {
                            Integer seasonIndex, Integer partIndex, Long franchiseId,
                            String coverUrl, String summary, Integer releaseYear,
                            Integer releaseQuarter, String category, String studioName,
-                           String platformLink, BigDecimal platformScore, Integer episodeCount,
+                           String platformLink, BigDecimal platformScore, Integer personalScore, Integer episodeCount,
                            List<TagResponse> tagList, String sourcePlatform,
                            String sourceId, String status,
                            String libraryStatus, String libraryStatusLabel,
@@ -55,6 +56,7 @@ public class SubjectResponse {
         this.studioName = studioName;
         this.platformLink = platformLink;
         this.platformScore = platformScore;
+        this.personalScore = personalScore;
         this.episodeCount = episodeCount;
         this.tagList = tagList;
         this.sourcePlatform = sourcePlatform;
@@ -95,6 +97,8 @@ public class SubjectResponse {
     public String getPlatformLink() { return platformLink; }
 
     public BigDecimal getPlatformScore() { return platformScore; }
+
+    public Integer getPersonalScore() { return personalScore; }
 
     public Integer getEpisodeCount() { return episodeCount; }
 

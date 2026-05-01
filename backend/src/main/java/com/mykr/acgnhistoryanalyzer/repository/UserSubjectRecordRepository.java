@@ -19,6 +19,8 @@ public interface UserSubjectRecordRepository
 
     List<UserSubjectRecord> findBySubjectId(Long subjectId);
 
+    List<UserSubjectRecord> findAllBySubjectIdIn(List<Long> subjectIds);
+
     @Query(
             value = """
                 select r

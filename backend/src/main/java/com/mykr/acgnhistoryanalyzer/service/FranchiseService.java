@@ -191,6 +191,10 @@ public class FranchiseService {
 
     private SubjectResponse toSubjectResponse(Subject subject) {
         LibraryStatus libraryStatus = resolveLibraryStatus(subject.getId());
+        Integer personalScore = userSubjectRecordRepository.findBySubjectId(subject.getId()).stream()
+                .findFirst()
+                .map(record -> record.getScoreValue())
+                .orElse(null);
         return new SubjectResponse(
                 subject.getId(),
                 subject.getTitleCn(),
@@ -207,6 +211,7 @@ public class FranchiseService {
                 subject.getStudioName(),
                 subject.getPlatformLink(),
                 subject.getPlatformScore(),
+                personalScore,
                 subject.getEpisodeCount(),
                 tagService.toResponses(subject.getStructuredTags()),
                 subject.getSourcePlatform(),
