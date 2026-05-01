@@ -156,6 +156,7 @@ const defaultProgress: GenerationProgress = {
 
 const reportCachePrefix = 'acgn-llm-report-cache'
 const reportCacheVersion = 1
+const allAiCachePrefixes = [reportCachePrefix, 'acgn-home-insight-cache']
 
 function AnalysisPage() {
     const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('COMPREHENSIVE_REPORT')
@@ -442,6 +443,20 @@ function AnalysisPage() {
         }
     }, [configApiKey, configBaseUrl, configMode, configModel, llmStatus, syncConfigState])
 
+    const clearCurrentReportCache = useCallback(() => {
+        removeCacheItem(reportCacheKey)
+        setReport(null)
+        setCacheInfo(null)
+        setError(null)
+    }, [reportCacheKey])
+
+    const clearAllAiCaches = useCallback(() => {
+        removeCacheItemsByPrefixes(allAiCachePrefixes)
+        setReport(null)
+        setCacheInfo(null)
+        setError(null)
+    }, [])
+
     function handleModeChange(mode: AnalysisMode) {
         setAnalysisMode(mode)
         setError(null)
@@ -557,6 +572,8 @@ function AnalysisPage() {
                 <CacheStatusPanel
                     cacheInfo={cacheInfo}
                     onRegenerate={() => void generateReport()}
+                    onClearCurrent={clearCurrentReportCache}
+                    onClearAll={clearAllAiCaches}
                 />
             ) : null}
 
@@ -1138,9 +1155,16 @@ function ScopeSummary({ scopeText, modeLabel, category }: ScopeSummaryProps) {
 type CacheStatusPanelProps = {
     cacheInfo: CacheInfo
     onRegenerate: () => void
+    onClearCurrent: () => void
+    onClearAll: () => void
 }
 
-function CacheStatusPanel({ cacheInfo, onRegenerate }: CacheStatusPanelProps) {
+function CacheStatusPanel({
+    cacheInfo,
+    onRegenerate,
+    onClearCurrent,
+    onClearAll,
+}: CacheStatusPanelProps) {
     const isCache = cacheInfo.source === 'cache'
 
     return (
@@ -1158,13 +1182,29 @@ function CacheStatusPanel({ cacheInfo, onRegenerate }: CacheStatusPanelProps) {
                     </p>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={onRegenerate}
-                    className="rounded-full border border-emerald-200 bg-white/75 px-5 py-2.5 text-sm font-black text-emerald-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-50"
-                >
-                    重新生成并覆盖缓存
-                </button>
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={onRegenerate}
+                        className="rounded-full border border-emerald-200 bg-white/75 px-5 py-2.5 text-sm font-black text-emerald-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-50"
+                    >
+                        重新生成并覆盖缓存
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onClearCurrent}
+                        className="rounded-full border border-slate-200 bg-white/70 px-5 py-2.5 text-sm font-black text-slate-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
+                    >
+                        清除当前缓存
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onClearAll}
+                        className="rounded-full border border-rose-200 bg-white/70 px-5 py-2.5 text-sm font-black text-rose-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-rose-50"
+                    >
+                        清除全部 AI 缓存
+                    </button>
+                </div>
             </div>
         </GlassCard>
     )
@@ -1830,6 +1870,28 @@ function writeCachedReport(
         )
     } catch {
         // localStorage may be full or disabled; analysis can still render without cache.
+    }
+}
+
+function removeCacheItem(cacheKey: string) {
+    try {
+        window.localStorage.removeItem(cacheKey)
+    } catch {
+        // Ignore unavailable localStorage.
+    }
+}
+
+function removeCacheItemsByPrefixes(prefixes: string[]) {
+    try {
+        const keys = Array.from({ length: window.localStorage.length }, (_, index) => (
+            window.localStorage.key(index)
+        )).filter((key): key is string => Boolean(key))
+
+        keys
+            .filter((key) => prefixes.some((prefix) => key.startsWith(prefix)))
+            .forEach((key) => window.localStorage.removeItem(key))
+    } catch {
+        // Ignore unavailable localStorage.
     }
 }
 

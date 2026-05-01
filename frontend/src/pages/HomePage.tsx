@@ -123,6 +123,14 @@ function writeHomeInsightCache(
     }
 }
 
+function removeHomeInsightCache(cacheKey: string) {
+    try {
+        window.localStorage.removeItem(cacheKey)
+    } catch {
+        // Ignore unavailable localStorage.
+    }
+}
+
 function formatHomeInsightTime(value: string) {
     const date = new Date(value)
 
@@ -342,6 +350,13 @@ function HomePage() {
             setInsightLoading(false)
         }
     }, [homeInsightCacheKey, selectedCategory, selectedQuarter, selectedYear])
+
+    const clearHomeInsightCache = useCallback(() => {
+        removeHomeInsightCache(homeInsightCacheKey)
+        setHomeInsight(null)
+        setInsightCacheInfo(null)
+        setInsightError(null)
+    }, [homeInsightCacheKey])
 
     useEffect(() => {
         void loadHomeInsight(false)
@@ -670,6 +685,7 @@ function HomePage() {
                         year={selectedYear}
                         quarter={selectedQuarter}
                         onRefresh={() => void loadHomeInsight(true)}
+                        onClearCache={clearHomeInsightCache}
                     />
                 </div>
             </div>
@@ -719,6 +735,7 @@ type HomeInsightPanelProps = {
     year: number
     quarter: ReleaseQuarter
     onRefresh: () => void
+    onClearCache: () => void
 }
 
 function HomeInsightPanel({
@@ -730,6 +747,7 @@ function HomeInsightPanel({
                               year,
                               quarter,
                               onRefresh,
+                              onClearCache,
                           }: HomeInsightPanelProps) {
     const theme = categoryTheme[category]
     const visibleSections = report?.sections ?? []
@@ -752,19 +770,34 @@ function HomeInsightPanel({
                                 : `已更新 ${formatHomeInsightTime(cacheInfo.cachedAt)}`
                             : '未缓存'}
                     </span>
-                    <button
-                        type="button"
-                        onClick={onRefresh}
-                        disabled={loading}
-                        className={[
-                            'rounded-full border px-3 py-1.5 text-[11px] font-black transition-all duration-200',
-                            loading
-                                ? 'cursor-not-allowed border-white/60 bg-white/45 text-slate-300'
-                                : 'border-sky-200 bg-white/70 text-sky-700 hover:-translate-y-0.5 hover:bg-sky-50',
-                        ].join(' ')}
-                    >
-                        {loading ? '生成中' : '重新生成'}
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={onRefresh}
+                            disabled={loading}
+                            className={[
+                                'rounded-full border px-3 py-1.5 text-[11px] font-black transition-all duration-200',
+                                loading
+                                    ? 'cursor-not-allowed border-white/60 bg-white/45 text-slate-300'
+                                    : 'border-sky-200 bg-white/70 text-sky-700 hover:-translate-y-0.5 hover:bg-sky-50',
+                            ].join(' ')}
+                        >
+                            {loading ? '生成中' : '重新生成'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onClearCache}
+                            disabled={loading || !cacheInfo}
+                            className={[
+                                'rounded-full border px-3 py-1.5 text-[11px] font-black transition-all duration-200',
+                                loading || !cacheInfo
+                                    ? 'cursor-not-allowed border-white/60 bg-white/45 text-slate-300'
+                                    : 'border-slate-200 bg-white/70 text-slate-600 hover:-translate-y-0.5 hover:bg-white',
+                            ].join(' ')}
+                        >
+                            清除缓存
+                        </button>
+                    </div>
                 </div>
 
                 {loading ? (
