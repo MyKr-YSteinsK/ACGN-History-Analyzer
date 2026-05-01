@@ -1287,7 +1287,7 @@ function AnalysisReport({
 
     async function handleCopyMarkdown() {
         try {
-            await navigator.clipboard.writeText(formatAnalysisReportMarkdown(report))
+            await navigator.clipboard.writeText(formatAnalysisReportMarkdown(report, highScoreRecords))
             setCopyStatus('success')
         } catch {
             setCopyStatus('error')
@@ -1299,7 +1299,7 @@ function AnalysisReport({
     function handleDownloadMarkdown() {
         try {
             downloadTextFile(
-                formatAnalysisReportMarkdown(report),
+                formatAnalysisReportMarkdown(report, highScoreRecords),
                 `${sanitizeFilename(polishAnalysisText(report.title) || '智能分析报告')}.md`,
                 'text/markdown;charset=utf-8',
             )
@@ -2402,7 +2402,10 @@ function formatGeneratedAt(value: string) {
     return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
-function formatAnalysisReportMarkdown(report: LlmAnalysisResponse) {
+function formatAnalysisReportMarkdown(
+    report: LlmAnalysisResponse,
+    highScoreRecords: UserSubjectRecordResponse[],
+) {
     const lines: string[] = []
     const scopeParts = [
         report.scope.year ? `${report.scope.year} 年` : null,
@@ -2434,6 +2437,27 @@ function formatAnalysisReportMarkdown(report: LlmAnalysisResponse) {
             .map((keyword) => `#${keyword}`)
             .join(' ') || '#可读报告')
         lines.push('')
+    }
+
+    if (highScoreRecords.length > 0) {
+        lines.push('## 高分记录速览')
+        lines.push('')
+        highScoreRecords.slice(0, 6).forEach((record, index) => {
+            lines.push(`### ${index + 1}. ${record.subjectTitle}`)
+            lines.push('')
+            lines.push(`- 个人评分：${record.scoreValue ?? '未评分'}`)
+            lines.push(`- 记录时间：${record.recordYear} · ${getReleaseQuarterLabel(record.recordQuarter)}`)
+            if (record.subjectReleaseYear) {
+                lines.push(`- 发行时间：${record.subjectReleaseYear} · ${record.subjectReleaseQuarter ? getReleaseQuarterLabel(record.subjectReleaseQuarter) : '档期未知'}`)
+            }
+            if (record.tagList.length > 0) {
+                lines.push(`- 标签：${record.tagList.slice(0, 6).map((tag) => `#${tag.name}`).join(' ')}`)
+            }
+            if (record.note) {
+                lines.push(`- 备注：${record.note}`)
+            }
+            lines.push('')
+        })
     }
 
     if (report.sections.length > 0) {
