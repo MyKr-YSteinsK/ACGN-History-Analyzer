@@ -30,6 +30,7 @@ import {
     type UserSubjectRecordImportPreviewResponse,
     type UserSubjectRecordImportResponse,
 } from '../api/recordApi'
+import { getApiErrorMessage } from '../api/request'
 import {
     type SubjectImportItemResponse,
     type SubjectImportPreviewItemResponse,
@@ -209,14 +210,6 @@ const bangumiQuarterOptions: Array<{
     { value: 3, label: '七月', month: 7 },
     { value: 4, label: '十月', month: 10 },
 ]
-
-function getErrorMessage(error: unknown) {
-    if (error instanceof Error) {
-        return error.message
-    }
-
-    return '请求失败，请稍后重试'
-}
 
 function wait(milliseconds: number) {
     return new Promise((resolve) => {
@@ -670,7 +663,7 @@ function ImportPage() {
             setRecordTemplate(recordTemplateResponse)
             setDraftText('')
         } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setLoadingDocs(false)
         }
@@ -875,7 +868,7 @@ function ImportPage() {
                       }
                     : current,
             )
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setSubmitting(false)
         }
@@ -920,7 +913,7 @@ function ImportPage() {
                 setFeedbackMessage(`已导入 ${response.importedCount} 条记录`)
             }
         } catch (error) {
-            setFeedbackMessage(getErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setSubmitting(false)
         }
