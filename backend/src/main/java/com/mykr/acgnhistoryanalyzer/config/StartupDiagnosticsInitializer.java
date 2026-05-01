@@ -19,6 +19,10 @@ public class StartupDiagnosticsInitializer implements ApplicationContextInitiali
         String llmProvider = environment.getProperty("app.llm.provider", "mock");
         String llmModel = environment.getProperty("app.llm.model", "未配置");
         String llmApiKey = environment.getProperty("app.llm.api-key", "");
+        boolean jpaShowSql = environment.getProperty("spring.jpa.show-sql", Boolean.class, false);
+        boolean jpaFormatSql = environment.getProperty("spring.jpa.properties.hibernate.format_sql", Boolean.class, false);
+        String hibernateSqlLogLevel = environment.getProperty("logging.level.org.hibernate.SQL", "WARN");
+        String hibernateBindLogLevel = environment.getProperty("logging.level.org.hibernate.orm.jdbc.bind", "WARN");
 
         log.info("ACGN History Analyzer 正在启动：数据库 {}，用户 {}", datasourceUrl, datasourceUsername);
         if (datasourcePassword == null || datasourcePassword.isBlank()) {
@@ -26,6 +30,12 @@ public class StartupDiagnosticsInitializer implements ApplicationContextInitiali
         } else {
             log.info("数据库密码已配置（已隐藏）。如需换环境，请使用 DB_URL、DB_USERNAME、DB_PASSWORD 覆盖。");
         }
+        if (jpaShowSql) {
+            log.info("JPA SQL 控制台输出已开启，format_sql={}。如需减少启动和接口日志，可设置 JPA_SHOW_SQL=false。", jpaFormatSql);
+        } else {
+            log.info("JPA SQL 控制台输出默认关闭。需要排查 SQL 时可设置 JPA_SHOW_SQL=true，或设置 HIBERNATE_SQL_LOG_LEVEL=DEBUG。");
+        }
+        log.info("Hibernate 日志级别：SQL={}，bind={}。", hibernateSqlLogLevel, hibernateBindLogLevel);
 
         if ("deepseek".equalsIgnoreCase(llmProvider)) {
             if (llmApiKey == null || llmApiKey.isBlank()) {
