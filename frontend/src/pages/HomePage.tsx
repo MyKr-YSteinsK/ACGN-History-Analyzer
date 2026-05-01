@@ -13,6 +13,7 @@ import CoverImage from '../components/common/CoverImage'
 import { FeedbackBanner } from '../components/common/FeedbackState'
 import GlassCard from '../components/common/GlassCard'
 import SubjectDetailDrawer from '../components/subject/SubjectDetailDrawer'
+import { HOME_INSIGHT_CACHE_PREFIX } from '../constants/cacheKeys'
 import { mapSubjectDetailToCardView } from '../mappers/subjectMapper'
 import {
     categoryTheme,
@@ -22,7 +23,9 @@ import {
 } from '../theme/acgnTheme'
 import {
     categoryOrder,
+    getCurrentReleaseQuarter,
     getReleaseQuarterLabel,
+    releaseQuarters,
     type AcgnCategory,
     type ReleaseQuarter,
 } from '../types/common'
@@ -32,6 +35,7 @@ import {
     removeCacheItem,
     writeJsonCache,
 } from '../utils/localStorageCache'
+import { formatRecordRelease, sortRecordsByScoreDesc } from '../utils/recordDisplay'
 
 type CategoryCount = {
     category: AcgnCategory
@@ -50,27 +54,7 @@ type InsightCacheInfo = {
     cachedAt: string
 }
 
-const quarters: ReleaseQuarter[] = [1, 2, 3, 4]
-const homeInsightCachePrefix = 'acgn-home-insight-cache'
 const homeInsightCacheVersion = 1
-
-function getCurrentQuarter(): ReleaseQuarter {
-    const month = new Date().getMonth() + 1
-
-    if (month <= 3) {
-        return 1
-    }
-
-    if (month <= 6) {
-        return 2
-    }
-
-    if (month <= 9) {
-        return 3
-    }
-
-    return 4
-}
 
 function buildHomeInsightCacheKey(
     year: number,
@@ -78,7 +62,7 @@ function buildHomeInsightCacheKey(
     category: AcgnCategory,
 ) {
     return [
-        homeInsightCachePrefix,
+        HOME_INSIGHT_CACHE_PREFIX,
         `v${homeInsightCacheVersion}`,
         year,
         quarter,
@@ -133,32 +117,6 @@ function formatHomeInsightTime(value: string) {
     return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
-function sortRecordsByScore(records: UserSubjectRecordResponse[]) {
-    return [...records].sort((first, second) => {
-        const scoreCompare = (second.scoreValue ?? -1) - (first.scoreValue ?? -1)
-
-        if (scoreCompare !== 0) {
-            return scoreCompare
-        }
-
-        return second.id - first.id
-    })
-}
-
-function getReleaseText(record: UserSubjectRecordResponse) {
-    if (!record.subjectReleaseYear) {
-        return '发行未知'
-    }
-
-    const quarterLabel = record.subjectReleaseQuarter
-        ? getReleaseQuarterLabel(record.subjectReleaseQuarter)
-        : ''
-
-    return quarterLabel
-        ? `${record.subjectReleaseYear}${quarterLabel}`
-        : String(record.subjectReleaseYear)
-}
-
 function getLatestRecordPosition(records: UserSubjectRecordResponse[]) {
     const latestRecord = [...records].sort((first, second) => {
         const yearCompare = second.recordYear - first.recordYear
@@ -205,7 +163,7 @@ function getPreferredQuarter(
         return currentQuarter
     }
 
-    return [...quarters]
+    return [...releaseQuarters]
         .reverse()
         .find((quarter) => countRecords(records, year, category, quarter) > 0) ?? currentQuarter
 }
@@ -234,7 +192,7 @@ function getPreviousQuarterPosition(year: number, quarter: ReleaseQuarter) {
 
 function HomePage() {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-    const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(getCurrentQuarter())
+    const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(getCurrentReleaseQuarter())
     const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
     const [records, setRecords] = useState<UserSubjectRecordResponse[]>([])
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
@@ -382,7 +340,7 @@ function HomePage() {
     }, [records, selectedQuarter, selectedYear])
 
     const selectedCategoryQuarterCounts = useMemo(() => {
-        return quarters.map<QuarterCount>((quarter) => ({
+        return releaseQuarters.map<QuarterCount>((quarter) => ({
             quarter,
             count: countRecords(records, selectedYear, selectedCategory, quarter),
         }))
@@ -427,7 +385,7 @@ function HomePage() {
     }, [selectedQuarterRecords])
 
     const topRecords = useMemo(() => {
-        return sortRecordsByScore(
+        return sortRecordsByScoreDesc(
             selectedQuarterRecords.filter((record) => record.scoreValue !== null),
         ).slice(0, 3)
     }, [selectedQuarterRecords])
@@ -1185,7 +1143,7 @@ function TopScoreCard({ record, category, onOpenDetail }: TopScoreCardProps) {
             </h4>
 
             <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                {getReleaseText(record)}
+                {formatRecordRelease(record)}
             </p>
         </button>
     )

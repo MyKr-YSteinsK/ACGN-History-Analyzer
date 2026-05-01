@@ -8,6 +8,8 @@ export type CollectionType = 'WANT' | 'PAUSED'
 
 export const categoryOrder: AcgnCategory[] = ['ANIME', 'COMIC', 'GAME', 'NOVEL']
 
+export const releaseQuarters: ReleaseQuarter[] = [1, 2, 3, 4]
+
 export const releaseQuarterOptions: Array<{
     value: ReleaseQuarter
     label: string
@@ -51,4 +53,36 @@ export function getReleaseQuarterLabel(quarter?: ReleaseQuarter | null) {
     }
 
     return releaseQuarterOptions.find((item) => item.value === quarter)?.displayLabel ?? '未知'
+}
+
+export function getCurrentReleaseQuarter(): ReleaseQuarter {
+    const month = new Date().getMonth() + 1
+
+    if (month <= 3) {
+        return 1
+    }
+
+    if (month <= 6) {
+        return 2
+    }
+
+    if (month <= 9) {
+        return 3
+    }
+
+    return 4
+}
+
+export function formatReleaseYearQuarter(
+    year?: number | null,
+    quarter?: ReleaseQuarter | null,
+    fallback = '发行未知',
+) {
+    if (!year) {
+        return fallback
+    }
+
+    const quarterLabel = quarter ? getReleaseQuarterLabel(quarter) : ''
+
+    return quarterLabel ? `${year}${quarterLabel}` : String(year)
 }

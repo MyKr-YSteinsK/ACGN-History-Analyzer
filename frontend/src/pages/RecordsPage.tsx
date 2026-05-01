@@ -9,6 +9,7 @@ import {
 import { getApiErrorMessage } from '../api/request'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import { getSubjectById } from '../api/subjectApi'
+import CategorySwitch from '../components/common/CategorySwitch'
 import CoverImage from '../components/common/CoverImage'
 import {
     EmptyState,
@@ -30,7 +31,8 @@ import {
     quarterTheme,
 } from '../theme/acgnTheme'
 import {
-    categoryOrder,
+    getCurrentReleaseQuarter,
+    releaseQuarters,
     type AcgnCategory,
     type ReleaseQuarter,
 } from '../types/common'
@@ -46,24 +48,6 @@ const sortOptions: SortOption[] = [
     { value: 'SCORE_DESC', label: '评分降序' },
     { value: 'SCORE_ASC', label: '评分升序' },
 ]
-
-function getCurrentQuarter(): ReleaseQuarter {
-    const month = new Date().getMonth() + 1
-
-    if (month <= 3) {
-        return 1
-    }
-
-    if (month <= 6) {
-        return 2
-    }
-
-    if (month <= 9) {
-        return 3
-    }
-
-    return 4
-}
 
 function compareRecordsBySort(
     first: UserSubjectRecordResponse,
@@ -125,7 +109,7 @@ function RecordsPage() {
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-    const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(getCurrentQuarter())
+    const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(getCurrentReleaseQuarter())
     const [keyword, setKeyword] = useState('')
     const [sort, setSort] = useState<RecordPageSort>('TITLE_ASC')
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
@@ -367,7 +351,7 @@ function RecordsPage() {
                                     月份
                                 </span>
                                 <div className="grid grid-cols-4 gap-2">
-                                    {([1, 2, 3, 4] as ReleaseQuarter[]).map((quarter) => {
+                                    {releaseQuarters.map((quarter) => {
                                         const theme = quarterTheme[quarter]
                                         const selected = selectedQuarter === quarter
 
@@ -600,82 +584,6 @@ function YearTriplet({
                 </button>
             </div>
         </div>
-    )
-}
-
-type CategorySwitchProps = {
-    value: AcgnCategory
-    onChange: (category: AcgnCategory) => void
-}
-
-function CategorySwitch({ value, onChange }: CategorySwitchProps) {
-    const activeIndex = categoryOrder.indexOf(value)
-    const activeTheme = categoryTheme[value]
-
-    return (
-        <section
-            className={[
-                'relative overflow-hidden rounded-[30px] border border-white/70 bg-gradient-to-br p-2 shadow-sm backdrop-blur-xl transition-all duration-300',
-                activeTheme.softGradient,
-            ].join(' ')}
-        >
-            <div
-                className="absolute bottom-2 top-2 rounded-[24px] border border-white/85 bg-white/78 shadow-[0_16px_40px_rgba(120,135,160,0.14)] transition-transform duration-300 ease-out"
-                style={{
-                    width: '25%',
-                    transform: `translateX(${activeIndex * 100}%)`,
-                }}
-            />
-
-            <div className="relative grid grid-cols-4">
-                {categoryOrder.map((category) => {
-                    const theme = categoryTheme[category]
-                    const selected = value === category
-                    const upperName = theme.enName.toUpperCase()
-
-                    return (
-                        <button
-                            key={category}
-                            type="button"
-                            onClick={() => onChange(category)}
-                            className="relative flex h-24 items-center justify-center rounded-[24px] px-2 transition-all duration-200"
-                        >
-                            <span className="flex flex-col items-center gap-2">
-                                <span className="flex items-end gap-1 leading-none">
-                                    <span
-                                        className={[
-                                            'text-[36px] font-black leading-none transition-colors',
-                                            selected ? theme.text : 'text-slate-300',
-                                        ].join(' ')}
-                                    >
-                                        {upperName[0]}
-                                    </span>
-                                    <span
-                                        className={[
-                                            'pb-[4px] text-[15px] font-black leading-none transition-colors',
-                                            selected ? 'text-slate-800' : 'text-slate-400',
-                                        ].join(' ')}
-                                    >
-                                        {upperName.slice(1)}
-                                    </span>
-                                </span>
-
-                                <span
-                                    className={[
-                                        'rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors',
-                                        selected
-                                            ? `${theme.border} ${theme.bg} ${theme.text}`
-                                            : 'border-white/70 bg-white/45 text-slate-400',
-                                    ].join(' ')}
-                                >
-                                    {theme.cnName}
-                                </span>
-                            </span>
-                        </button>
-                    )
-                })}
-            </div>
-        </section>
     )
 }
 

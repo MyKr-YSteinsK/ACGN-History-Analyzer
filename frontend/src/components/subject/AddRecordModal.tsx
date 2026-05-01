@@ -5,7 +5,7 @@ import {
     quarterTheme,
     yearChipClassName,
 } from '../../theme/acgnTheme'
-import type { ReleaseQuarter } from '../../types/common'
+import { releaseQuarterOptions, type ReleaseQuarter } from '../../types/common'
 import type { SubjectCardView } from '../../types/subject'
 
 export type AddRecordPayload = {
@@ -22,16 +22,6 @@ type AddRecordModalProps = {
     onSubmit: (subject: SubjectCardView, payload: AddRecordPayload) => void | Promise<void>
     submitting?: boolean
 }
-
-const quarterOptions: Array<{
-    value: ReleaseQuarter
-    label: string
-}> = [
-    { value: 1, label: '一月' },
-    { value: 2, label: '四月' },
-    { value: 3, label: '七月' },
-    { value: 4, label: '十月' },
-]
 
 const visibleYearCount = 3
 
@@ -317,7 +307,7 @@ function AddRecordModalContent({
                   记录月份
                 </span>
                                 <div className="flex gap-2">
-                                    {quarterOptions.map((option) => {
+                                    {releaseQuarterOptions.map((option) => {
                                         const selected = recordQuarter === option.value
                                         const theme = quarterTheme[option.value]
 

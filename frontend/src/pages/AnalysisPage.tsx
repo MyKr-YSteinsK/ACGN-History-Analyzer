@@ -39,6 +39,7 @@ import {
 import { AnalysisWorkspacePanel, ScopeSummary } from '../components/analysis/AnalysisControls'
 import GenerationQueuePanel from '../components/analysis/GenerationQueuePanel'
 import PageHero from '../components/layout/PageHero'
+import { HOME_INSIGHT_CACHE_PREFIX } from '../constants/cacheKeys'
 import { categoryTheme, neutralPanelGradient } from '../theme/acgnTheme'
 import { categoryOrder, getReleaseQuarterLabel, type AcgnCategory, type ReleaseQuarter } from '../types/common'
 import type {
@@ -171,7 +172,7 @@ const reportCacheVersion = 1
 const reportHistoryStorageKey = 'acgn-llm-report-history'
 const maxReportHistoryCount = 20
 const reportCacheTtlMs = 7 * 24 * 60 * 60 * 1000
-const allAiCachePrefixes = [reportCachePrefix, 'acgn-home-insight-cache']
+const allAiCachePrefixes = [reportCachePrefix, HOME_INSIGHT_CACHE_PREFIX]
 
 function AnalysisPage() {
     const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('COMPREHENSIVE_REPORT')

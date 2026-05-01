@@ -26,6 +26,7 @@ import AddRecordModal, {
 } from '../components/subject/AddRecordModal'
 import SubjectCard from '../components/subject/SubjectCard'
 import SubjectDetailDrawer from '../components/subject/SubjectDetailDrawer'
+import { GRID_PAGE_SIZE } from '../constants/pagination'
 import {
     categoryTheme,
     neutralPanelGradient,
@@ -38,8 +39,6 @@ import {
 import type { PageResponse } from '../types/api'
 import type { AcgnCategory, LibraryStatus, ReleaseQuarter } from '../types/common'
 import type { SubjectCardView } from '../types/subject'
-
-const pageSize = 12
 
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019]
 
@@ -136,7 +135,7 @@ type PendingStatusChange = {
 
 const initialPageState: SubjectPageState = {
     page: 0,
-    size: pageSize,
+    size: GRID_PAGE_SIZE,
     totalElements: 0,
     totalPages: 0,
     first: true,
@@ -219,7 +218,7 @@ function LibraryPage() {
                 status: selectedStatus === 'ALL' ? 'NORMAL' : selectedStatus,
                 tagName: selectedTagName === 'ALL' ? undefined : selectedTagName,
                 page: currentPage,
-                size: pageSize,
+                size: GRID_PAGE_SIZE,
                 sort,
             })
 

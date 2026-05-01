@@ -1,6 +1,6 @@
 import GlassCard from '../common/GlassCard'
 import { categoryTheme } from '../../theme/acgnTheme'
-import { categoryOrder, getReleaseQuarterLabel, type AcgnCategory, type ReleaseQuarter } from '../../types/common'
+import { categoryOrder, getReleaseQuarterLabel, releaseQuarters, type AcgnCategory, type ReleaseQuarter } from '../../types/common'
 import type { AnalysisMode, AnalysisModeMeta, CategoryFilter } from '../../types/analysis'
 
 type AnalysisWorkspacePanelProps = {
@@ -26,7 +26,6 @@ type AnalysisWorkspacePanelProps = {
 }
 
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
-const quarterOptions: ReleaseQuarter[] = [1, 2, 3, 4]
 
 const questionExamples = [
     '像朋友一样吐槽一下我最近的 ACGN 口味',
@@ -239,7 +238,7 @@ function AnalysisControlBar({
                 <div>
                     <ControlLabel>月份</ControlLabel>
                     <div className="grid grid-cols-4 gap-2">
-                        {quarterOptions.map((quarter) => {
+                        {releaseQuarters.map((quarter) => {
                             const selected = selectedQuarter === quarter
 
                             return (
