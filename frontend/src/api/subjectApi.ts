@@ -37,6 +37,7 @@ export type SubjectResponse = {
     studioName: string | null
     platformLink: string | null
     platformScore: number | null
+    personalScore: number | null
     episodeCount: number | null
     tagList: TagResponse[]
     sourcePlatform: string | null

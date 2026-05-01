@@ -21,7 +21,7 @@ export function mapSubjectResponseToCardView(
         coverUrl: subject.coverUrl,
         studioName: subject.studioName,
         platformScore: subject.platformScore,
-        personalScore: null,
+        personalScore: subject.personalScore,
         personalRecordYear: null,
         personalRecordQuarter: null,
         personalRecordNote: null,
