@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { LlmAnalysisResponse } from '../../api/llmApi'
 import type { UserSubjectRecordResponse } from '../../api/recordApi'
 import { categoryTheme } from '../../theme/acgnTheme'
-import type { AcgnCategory } from '../../types/common'
+import type { CategoryFilter, ReportHistoryItem } from '../../types/analysis'
 import {
     downloadTextFile,
     formatAnalysisReportMarkdown,
@@ -12,12 +12,10 @@ import {
     sanitizeFilename,
 } from '../../utils/llmReportFormat'
 import GlassCard from '../common/GlassCard'
-import ReportHistoryPanel, { type ReportHistoryItem } from './ReportHistoryPanel'
+import ReportHistoryPanel from './ReportHistoryPanel'
 import { InsightSnapshot, ReportReadingHighlights } from './ReportHighlights'
 import RecommendationGrid from './ReportRecommendations'
 import SidePanel from './SidePanel'
-
-type CategoryFilter = AcgnCategory | 'ALL'
 
 type AnalysisReportProps = {
     report: LlmAnalysisResponse

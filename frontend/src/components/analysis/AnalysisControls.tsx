@@ -1,30 +1,7 @@
 import GlassCard from '../common/GlassCard'
 import { categoryTheme } from '../../theme/acgnTheme'
 import { categoryOrder, getReleaseQuarterLabel, type AcgnCategory, type ReleaseQuarter } from '../../types/common'
-
-type CategoryFilter = AcgnCategory | 'ALL'
-
-type AnalysisMode =
-    | 'YEARLY'
-    | 'QUARTERLY'
-    | 'TYPE_PREFERENCE'
-    | 'SCORE_STRUCTURE'
-    | 'TAG_PREFERENCE'
-    | 'RECOMMENDATION'
-    | 'COLLECTION_BACKLOG'
-    | 'TASTE_PROFILE'
-    | 'PREFERENCE_CONTRADICTION'
-    | 'INTEREST_TREND'
-    | 'FRANCHISE_COMPLETION'
-    | 'COMPREHENSIVE_REPORT'
-    | 'QUESTION_ANSWER'
-
-type AnalysisModeMeta = {
-    value: AnalysisMode
-    label: string
-    description: string
-    accent: string
-}
+import type { AnalysisMode, AnalysisModeMeta, CategoryFilter } from '../../types/analysis'
 
 type AnalysisWorkspacePanelProps = {
     panelGradient: string

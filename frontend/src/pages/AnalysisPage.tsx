@@ -41,6 +41,13 @@ import GenerationQueuePanel from '../components/analysis/GenerationQueuePanel'
 import PageHero from '../components/layout/PageHero'
 import { categoryTheme, neutralPanelGradient } from '../theme/acgnTheme'
 import { categoryOrder, getReleaseQuarterLabel, type AcgnCategory, type ReleaseQuarter } from '../types/common'
+import type {
+    AnalysisMode,
+    AnalysisModeMeta,
+    CategoryFilter,
+    GenerationJobStatus,
+    ReportHistoryItem,
+} from '../types/analysis'
 import {
     listCacheKeysByPrefixes,
     readJsonCache,
@@ -49,44 +56,6 @@ import {
     writeJsonCache,
 } from '../utils/localStorageCache'
 import { polishAnalysisText } from '../utils/llmReportFormat'
-
-type CategoryFilter = AcgnCategory | 'ALL'
-
-type AnalysisMode =
-    | 'YEARLY'
-    | 'QUARTERLY'
-    | 'TYPE_PREFERENCE'
-    | 'SCORE_STRUCTURE'
-    | 'TAG_PREFERENCE'
-    | 'RECOMMENDATION'
-    | 'COLLECTION_BACKLOG'
-    | 'TASTE_PROFILE'
-    | 'PREFERENCE_CONTRADICTION'
-    | 'INTEREST_TREND'
-    | 'FRANCHISE_COMPLETION'
-    | 'COMPREHENSIVE_REPORT'
-    | 'QUESTION_ANSWER'
-
-type AnalysisModeMeta = {
-    value: AnalysisMode
-    label: string
-    description: string
-    accent: string
-}
-
-type HistoryItem = {
-    id: string
-    cacheKey: string
-    analysisType: AnalysisMode
-    title: string
-    scope: string
-    mode: string
-    generatedAt: string
-    year: number
-    quarter: ReleaseQuarter
-    category: CategoryFilter
-    question: string
-}
 
 type GenerationProgress = {
     percent: number
@@ -99,8 +68,6 @@ type CacheInfo = {
     cachedAt: string
     expiresAt: string
 }
-
-type GenerationJobStatus = 'queued' | 'running' | 'completed' | 'failed'
 
 type GenerationJob = {
     id: string
@@ -213,7 +180,7 @@ function AnalysisPage() {
     const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('ALL')
     const [question, setQuestion] = useState('2025 年我有哪些高分动画？')
     const [report, setReport] = useState<LlmAnalysisResponse | null>(null)
-    const [reportHistory, setReportHistory] = useState<HistoryItem[]>(() => readReportHistory())
+    const [reportHistory, setReportHistory] = useState<ReportHistoryItem[]>(() => readReportHistory())
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null)
@@ -600,7 +567,7 @@ function AnalysisPage() {
         setError(null)
     }, [])
 
-    const restoreHistoryItem = useCallback((item: HistoryItem) => {
+    const restoreHistoryItem = useCallback((item: ReportHistoryItem) => {
         const cached = readCachedReport(item.cacheKey, item.analysisType)
         if (!cached) {
             setError('这条历史记录对应的本地缓存已经不存在，请重新生成。')
@@ -628,7 +595,7 @@ function AnalysisPage() {
         setReportHistory([])
     }, [])
 
-    const deleteReportHistoryItem = useCallback((item: HistoryItem) => {
+    const deleteReportHistoryItem = useCallback((item: ReportHistoryItem) => {
         setReportHistory((items) => {
             const nextItems = items.filter((historyItem) => historyItem.id !== item.id)
             writeReportHistory(nextItems)
@@ -1001,7 +968,7 @@ function readReportHistory() {
     return parsed?.slice(0, maxReportHistoryCount) ?? []
 }
 
-function writeReportHistory(items: HistoryItem[]) {
+function writeReportHistory(items: ReportHistoryItem[]) {
     writeJsonCache(reportHistoryStorageKey, items.slice(0, maxReportHistoryCount))
 }
 
@@ -1026,7 +993,7 @@ function isCachedReportPayload(value: unknown): value is {
         && (payload.expiresAt === undefined || typeof payload.expiresAt === 'string')
 }
 
-function upsertReportHistory(items: HistoryItem[], item: HistoryItem) {
+function upsertReportHistory(items: ReportHistoryItem[], item: ReportHistoryItem) {
     const nextItems = [
         item,
         ...items.filter((historyItem) => historyItem.cacheKey !== item.cacheKey),
@@ -1035,12 +1002,12 @@ function upsertReportHistory(items: HistoryItem[], item: HistoryItem) {
     return nextItems
 }
 
-function isHistoryItem(value: unknown): value is HistoryItem {
+function isHistoryItem(value: unknown): value is ReportHistoryItem {
     if (typeof value !== 'object' || value === null) {
         return false
     }
 
-    const item = value as Partial<HistoryItem>
+    const item = value as Partial<ReportHistoryItem>
     return (
         typeof item.id === 'string' &&
         typeof item.cacheKey === 'string' &&
@@ -1056,7 +1023,7 @@ function isHistoryItem(value: unknown): value is HistoryItem {
     )
 }
 
-function isHistoryItemArray(value: unknown): value is HistoryItem[] {
+function isHistoryItemArray(value: unknown): value is ReportHistoryItem[] {
     return Array.isArray(value) && value.every(isHistoryItem)
 }
 

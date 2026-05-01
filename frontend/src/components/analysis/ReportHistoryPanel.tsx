@@ -1,37 +1,6 @@
-import type { AcgnCategory, ReleaseQuarter } from '../../types/common'
+import type { ReportHistoryItem } from '../../types/analysis'
 import { formatGeneratedAt } from '../../utils/llmReportFormat'
 import SidePanel from './SidePanel'
-
-type CategoryFilter = AcgnCategory | 'ALL'
-
-type AnalysisMode =
-    | 'YEARLY'
-    | 'QUARTERLY'
-    | 'TYPE_PREFERENCE'
-    | 'SCORE_STRUCTURE'
-    | 'TAG_PREFERENCE'
-    | 'RECOMMENDATION'
-    | 'COLLECTION_BACKLOG'
-    | 'TASTE_PROFILE'
-    | 'PREFERENCE_CONTRADICTION'
-    | 'INTEREST_TREND'
-    | 'FRANCHISE_COMPLETION'
-    | 'COMPREHENSIVE_REPORT'
-    | 'QUESTION_ANSWER'
-
-export type ReportHistoryItem = {
-    id: string
-    cacheKey: string
-    analysisType: AnalysisMode
-    title: string
-    scope: string
-    mode: string
-    generatedAt: string
-    year: number
-    quarter: ReleaseQuarter
-    category: CategoryFilter
-    question: string
-}
 
 type ReportHistoryPanelProps = {
     items: ReportHistoryItem[]

@@ -1,6 +1,5 @@
 import GlassCard from '../common/GlassCard'
-
-type GenerationJobStatus = 'queued' | 'running' | 'completed' | 'failed'
+import type { GenerationJobStatus } from '../../types/analysis'
 
 export type GenerationQueueItem = {
     id: string
