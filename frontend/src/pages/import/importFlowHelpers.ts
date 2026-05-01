@@ -145,20 +145,19 @@ export function getImportItemFilter(item: PreviewItem): Exclude<ImportItemFilter
     if (item.result === 'CAN_IMPORT' || item.result === 'IMPORTED') {
         return 'SUCCESS'
     }
-
     if (item.result === 'UPDATED') {
-        return 'WARNING'
+        return 'UPDATED'
     }
-
     if (item.result === 'SKIPPED') {
-        return 'WARNING'
+        return 'SKIPPED'
     }
-
+    if (item.result === 'AMBIGUOUS') {
+        return 'AMBIGUOUS'
+    }
     if (item.result === 'ERROR') {
         return 'ERROR'
     }
-
-    return 'WARNING'
+    return 'SKIPPED'
 }
 
 export function getPreviewItemKey(item: PreviewItem, index: number) {
@@ -182,12 +181,24 @@ export function buildImportPayloadWithSelections(
     payload: ParsedPayload,
     items: PreviewItem[],
     selections: Record<number, number | 'SKIP'>,
+    excludedPreviewKeys: string[],
 ) {
+    const isExcluded = (index: number) => {
+        const previewItem = items[index]
+        if (!previewItem) {
+            return false
+        }
+        return excludedPreviewKeys.includes(getPreviewItemKey(previewItem, index))
+    }
+
     if (target === 'RECORD') {
         const records = [...(payload as UserSubjectRecordBatchImportRequest).records].map((item) => ({
             ...item,
         }))
         records.forEach((record, index) => {
+            if (isExcluded(index)) {
+                return
+            }
             const previewItem = items[index]
             if (!previewItem || !isAmbiguousPreviewItem(previewItem)) {
                 return
@@ -198,7 +209,9 @@ export function buildImportPayloadWithSelections(
             }
         })
         return {
-            records: records.filter((_, index) => selections[index] !== 'SKIP'),
+            records: records.filter(
+                (_, index) => !isExcluded(index) && selections[index] !== 'SKIP',
+            ),
         } as UserSubjectRecordBatchImportRequest
     }
 
@@ -207,6 +220,9 @@ export function buildImportPayloadWithSelections(
             (item) => ({ ...item }),
         )
         collections.forEach((collection, index) => {
+            if (isExcluded(index)) {
+                return
+            }
             const previewItem = items[index]
             if (!previewItem || !isAmbiguousPreviewItem(previewItem)) {
                 return
@@ -217,7 +233,9 @@ export function buildImportPayloadWithSelections(
             }
         })
         return {
-            collections: collections.filter((_, index) => selections[index] !== 'SKIP'),
+            collections: collections.filter(
+                (_, index) => !isExcluded(index) && selections[index] !== 'SKIP',
+            ),
         } as UserSubjectCollectionBatchImportRequest
     }
 

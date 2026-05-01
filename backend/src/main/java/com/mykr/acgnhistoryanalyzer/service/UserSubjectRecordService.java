@@ -113,7 +113,7 @@ public class UserSubjectRecordService {
                 items.add(new UserSubjectRecordImportItemResponse(
                         null,
                         buildSubjectLabel(item),
-                        "SKIPPED",
+                        "AMBIGUOUS",
                         "匹配到多个作品，请先在预览中选择一个候选作品后再导入"
                 ));
                 rowNumber++;
@@ -125,7 +125,7 @@ public class UserSubjectRecordService {
                 items.add(new UserSubjectRecordImportItemResponse(
                         null,
                         buildSubjectLabel(item),
-                        "SKIPPED",
+                        "ERROR",
                         resolveResult.getErrorMessage()
                 ));
                 rowNumber++;
@@ -135,12 +135,13 @@ public class UserSubjectRecordService {
             Subject subject = resolveResult.getSubject();
 
             if (userSubjectRecordRepository.existsBySubjectId(subject.getId())) {
-                skippedCount++;
+                UserSubjectRecordResponse updatedRecord = updateExistingRecordFromImport(subject, item);
+                importedCount++;
                 items.add(new UserSubjectRecordImportItemResponse(
-                        null,
+                        updatedRecord.getId(),
                         subject.getDisplayTitle(),
-                        "SKIPPED",
-                        "该作品已有正式记录，已跳过"
+                        "UPDATED",
+                        "该作品已有正式记录，已覆盖更新"
                 ));
                 rowNumber++;
                 continue;
@@ -211,7 +212,7 @@ public class UserSubjectRecordService {
                 skippedCount++;
                 items.add(new UserSubjectRecordImportPreviewItemResponse(
                         buildSubjectLabel(item),
-                        "SKIPPED",
+                        "ERROR",
                         resolveResult.getErrorMessage()
                 ));
                 rowNumber++;
@@ -221,11 +222,11 @@ public class UserSubjectRecordService {
             Subject subject = resolveResult.getSubject();
 
             if (userSubjectRecordRepository.existsBySubjectId(subject.getId())) {
-                skippedCount++;
+                canImportCount++;
                 items.add(new UserSubjectRecordImportPreviewItemResponse(
                         subject.getDisplayTitle(),
-                        "SKIPPED",
-                        "该作品已有正式记录，正式导入时会跳过"
+                        "UPDATED",
+                        "该作品已有正式记录，正式导入时会覆盖更新"
                 ));
                 rowNumber++;
                 continue;
@@ -595,6 +596,22 @@ public class UserSubjectRecordService {
                         .compareTo(right.getPropertyPath().toString()))
                 .map(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                 .collect(Collectors.joining("；"));
+    }
+
+    private UserSubjectRecordResponse updateExistingRecordFromImport(Subject subject,
+                                                                     UserSubjectRecordImportItemRequest item) {
+        UserSubjectRecord existingRecord = userSubjectRecordRepository.findBySubjectId(subject.getId())
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("记录存在性与查询结果不一致"));
+        existingRecord.setSubjectTitle(subject.getDisplayTitle());
+        existingRecord.setScoreValue(item.getScoreValue());
+        existingRecord.setRecordYear(item.getRecordYear());
+        existingRecord.setRecordQuarter(item.getRecordQuarter());
+        existingRecord.setNote(item.getNote());
+        UserSubjectRecord savedRecord = userSubjectRecordRepository.save(existingRecord);
+        franchiseAutoLinkService.detectAndLinkForRecordedSubject(subject.getId());
+        return toResponse(savedRecord);
     }
 
     private String buildSubjectLabel(UserSubjectRecordImportItemRequest item, int rowNumber) {

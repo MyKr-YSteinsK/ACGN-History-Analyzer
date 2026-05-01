@@ -169,12 +169,17 @@ function RecordsPage() {
 
     const filteredRecords = useMemo(() => {
         const normalizedKeyword = keyword.trim().toLowerCase()
+        const useGlobalKeywordSearch = normalizedKeyword.length > 0
 
         return records
             .filter((record) => {
-                const matchCategory = record.subjectCategory === selectedCategory
-                const matchYear = record.recordYear === selectedYear
-                const matchQuarter = record.recordQuarter === selectedQuarter
+                const matchCategory = useGlobalKeywordSearch
+                    ? true
+                    : record.subjectCategory === selectedCategory
+                const matchYear = useGlobalKeywordSearch ? true : record.recordYear === selectedYear
+                const matchQuarter = useGlobalKeywordSearch
+                    ? true
+                    : record.recordQuarter === selectedQuarter
                 const matchKeyword =
                     normalizedKeyword.length === 0 ||
                     record.subjectTitle.toLowerCase().includes(normalizedKeyword)

@@ -74,4 +74,10 @@ export type BangumiPreviewProgress = {
     message: string
 }
 
-export type ImportItemFilter = 'ALL' | 'SUCCESS' | 'WARNING' | 'ERROR'
+export type ImportItemFilter =
+    | 'ALL'
+    | 'SUCCESS'
+    | 'UPDATED'
+    | 'SKIPPED'
+    | 'AMBIGUOUS'
+    | 'ERROR'

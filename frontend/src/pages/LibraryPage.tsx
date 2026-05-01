@@ -122,13 +122,21 @@ function LibraryPage() {
     const loadSubjects = useCallback(async () => {
         setListLoading(true)
         setListError(null)
+        const normalizedKeyword = keyword.trim()
+        const useGlobalKeywordSearch = normalizedKeyword.length > 0
 
         try {
             const response = await getSubjectPage({
-                category: selectedCategory,
-                keyword: keyword.trim() || undefined,
-                year: selectedYear === 'ALL' ? undefined : selectedYear,
-                quarter: selectedQuarter === 'ALL' ? undefined : selectedQuarter,
+                category: useGlobalKeywordSearch ? undefined : selectedCategory,
+                keyword: normalizedKeyword || undefined,
+                year:
+                    useGlobalKeywordSearch || selectedYear === 'ALL'
+                        ? undefined
+                        : selectedYear,
+                quarter:
+                    useGlobalKeywordSearch || selectedQuarter === 'ALL'
+                        ? undefined
+                        : selectedQuarter,
                 status: selectedStatus === 'ALL' ? 'NORMAL' : selectedStatus,
                 tagName: selectedTagName === 'ALL' ? undefined : selectedTagName,
                 page: currentPage,

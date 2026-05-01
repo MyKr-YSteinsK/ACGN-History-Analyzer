@@ -51,7 +51,6 @@ import {
 } from './import/importFlowHelpers'
 import type {
     BangumiPreviewProgress,
-    ImportItemFilter,
     ImportMode,
     ImportResultState,
     ImportTarget,
@@ -98,32 +97,46 @@ function ImportPage() {
     )
     const selectedRootKey = getTargetRootKey(selectedTarget)
     const previewItems = useMemo(() => getPreviewItems(preview), [preview])
-    const activePreviewItems = useMemo(
+    const activePreviewEntries = useMemo(
         () =>
-            previewItems.filter(
-                (item, index) =>
-                    !excludedPreviewKeys.includes(getPreviewItemKey(item, index)),
-            ),
+            previewItems
+                .map((item, index) => ({ item, index }))
+                .filter(
+                    ({ item, index }) =>
+                        !excludedPreviewKeys.includes(getPreviewItemKey(item, index)),
+                ),
         [excludedPreviewKeys, previewItems],
+    )
+    const activePreviewItems = useMemo(
+        () => activePreviewEntries.map((entry) => entry.item),
+        [activePreviewEntries],
+    )
+    const activePreviewItemIndexes = useMemo(
+        () => activePreviewEntries.map((entry) => entry.index),
+        [activePreviewEntries],
     )
     const resultItems = useMemo(() => getImportResultItems(importResult), [importResult])
     const previewItemMetrics = useMemo(() => {
-        return previewItems.reduce(
+        return activePreviewItems.reduce(
             (accumulator, item) => {
-                if (item.result === 'ERROR') {
+                if (item.result === 'CAN_IMPORT') {
+                    accumulator.canImport += 1
+                } else if (item.result === 'ERROR') {
                     accumulator.error += 1
                 } else if (item.result === 'UPDATED') {
                     accumulator.updated += 1
                 } else if (item.result === 'SKIPPED') {
                     accumulator.skipped += 1
+                } else if (item.result === 'AMBIGUOUS') {
+                    accumulator.ambiguous += 1
                 } else {
-                    accumulator.canImport += 1
+                    accumulator.skipped += 1
                 }
                 return accumulator
             },
-            { canImport: 0, updated: 0, skipped: 0, error: 0 },
+            { canImport: 0, updated: 0, skipped: 0, ambiguous: 0, error: 0 },
         )
-    }, [previewItems])
+    }, [activePreviewItems])
 
     const activePreview =
         preview && preview.target === selectedTarget ? preview.data : null
@@ -154,7 +167,7 @@ function ImportPage() {
             previewItems,
         ],
     )
-    const activeCanImportCount = activePreviewItems.filter((item, index) => {
+    const activeCanImportCount = activePreviewEntries.filter(({ item, index }) => {
         if (isImportablePreviewItem(item)) {
             return true
         }
@@ -463,8 +476,9 @@ function ImportPage() {
             const payload = buildImportPayloadWithSelections(
                 selectedTarget,
                 rawPayload,
-                activePreviewItems,
+                previewItems,
                 previewSelections,
+                excludedPreviewKeys,
             )
 
             if (selectedTarget === 'COLLECTION') {
@@ -764,7 +778,7 @@ function ImportPage() {
                                     }
                                     className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
-                                    {activeUpdatedCount > 0 && previewItemMetrics.canImport === 0
+                                    {activeUpdatedCount > 0 && activeCanImportCount === activeUpdatedCount
                                         ? '确认更新'
                                         : '确认写入'}
                                 </button>
@@ -782,11 +796,13 @@ function ImportPage() {
                 <PreviewPanel
                     title="预览校验"
                     totalCount={activePreviewItems.length}
-                    canImportCount={previewItemMetrics.canImport}
+                    canImportCount={activeCanImportCount}
                     updatedCount={previewItemMetrics.updated}
                     skippedCount={previewItemMetrics.skipped}
+                    ambiguousCount={previewItemMetrics.ambiguous}
                     errorCount={previewItemMetrics.error}
                     items={activePreviewItems}
+                    itemIndexes={activePreviewItemIndexes}
                     selections={previewSelections}
                     onSelectCandidate={(index, value) => {
                         setPreviewSelections((current) => ({
@@ -1126,8 +1142,10 @@ type PreviewPanelProps = {
     canImportCount: number
     updatedCount: number
     skippedCount: number
+    ambiguousCount: number
     errorCount: number
     items: PreviewItem[]
+    itemIndexes?: number[]
     selections: Record<number, number | 'SKIP'>
     onSelectCandidate: (index: number, value: number | 'SKIP') => void
     onExcludeItem?: (item: PreviewItem, index: number) => void
@@ -1140,30 +1158,32 @@ function PreviewPanel({
                           canImportCount,
                           updatedCount,
                           skippedCount,
+                          ambiguousCount,
                           errorCount,
                           items,
+                          itemIndexes,
                           selections,
                           onSelectCandidate,
                           onExcludeItem,
                           emptyText,
                       }: PreviewPanelProps) {
-    const warningCount = Math.max(0, skippedCount)
-
     return (
         <GlassCard className="overflow-hidden">
             <div className="bg-gradient-to-br from-white/62 via-white/45 to-emerald-50/45 p-5">
                 <h3 className="text-xl font-black text-slate-800">{title}</h3>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
+                <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
                     <StatCard label="总数" value={totalCount} />
                     <StatCard label="可导入" value={canImportCount} tone="good" />
                     <StatCard label="更新" value={updatedCount} tone="warn" />
-                    <StatCard label="跳过" value={warningCount} tone="normal" />
+                    <StatCard label="歧义" value={ambiguousCount} tone="normal" />
+                    <StatCard label="跳过" value={skippedCount} tone="normal" />
                     <StatCard label="错误" value={errorCount} tone="danger" />
                 </div>
 
                 <ImportItemList
                     items={items}
+                    itemIndexes={itemIndexes}
                     selections={selections}
                     onSelectCandidate={onSelectCandidate}
                     onExcludeItem={onExcludeItem}
@@ -1238,34 +1258,59 @@ function StatCard({ label, value, tone = 'normal' }: StatCardProps) {
 
 type ImportItemListProps = {
     items: PreviewItem[]
+    itemIndexes?: number[]
     selections?: Record<number, number | 'SKIP'>
     onSelectCandidate?: (index: number, value: number | 'SKIP') => void
     onExcludeItem?: (item: PreviewItem, index: number) => void
     emptyText: string
 }
 
-function ImportItemList({ items, selections, onSelectCandidate, onExcludeItem, emptyText }: ImportItemListProps) {
-    const [filter, setFilter] = useState<ImportItemFilter>('ALL')
+function ImportItemList({
+                            items,
+                            itemIndexes,
+                            selections,
+                            onSelectCandidate,
+                            onExcludeItem,
+                            emptyText,
+                        }: ImportItemListProps) {
     const successCount = items.filter((item) => getImportItemFilter(item) === 'SUCCESS').length
-    const warningCount = items.filter((item) => getImportItemFilter(item) === 'WARNING').length
+    const updatedCount = items.filter((item) => getImportItemFilter(item) === 'UPDATED').length
+    const skippedCount = items.filter((item) => getImportItemFilter(item) === 'SKIPPED').length
+    const ambiguousCount = items.filter((item) => getImportItemFilter(item) === 'AMBIGUOUS').length
     const errorCount = items.filter((item) => getImportItemFilter(item) === 'ERROR').length
-
-    const filterOptions: Array<{
-        value: ImportItemFilter
-        label: string
-        count: number
-    }> = [
-        { value: 'ALL', label: '全部', count: items.length },
-        { value: 'SUCCESS', label: '可导入', count: successCount },
-        { value: 'WARNING', label: '更新/跳过', count: warningCount },
-        { value: 'ERROR', label: '错误', count: errorCount },
-    ]
-
-    const visibleItems = (filter === 'ALL'
-        ? items.map((item, index) => ({ item, index }))
-        : items
-            .map((item, index) => ({ item, index }))
-            .filter((entry) => getImportItemFilter(entry.item) === filter))
+    const entries = items.map((item, index) => ({ item, index }))
+    const groupedEntries = [
+        {
+            key: 'SUCCESS',
+            title: '可导入/已导入',
+            emptyText: '没有可直接写入的条目',
+            entries: entries.filter((entry) => getImportItemFilter(entry.item) === 'SUCCESS'),
+        },
+        {
+            key: 'UPDATED',
+            title: '覆盖更新',
+            emptyText: '没有需要覆盖更新的条目',
+            entries: entries.filter((entry) => getImportItemFilter(entry.item) === 'UPDATED'),
+        },
+        {
+            key: 'AMBIGUOUS',
+            title: '歧义待选',
+            emptyText: '没有需要人工选择候选作品的条目',
+            entries: entries.filter((entry) => getImportItemFilter(entry.item) === 'AMBIGUOUS'),
+        },
+        {
+            key: 'SKIPPED',
+            title: '跳过',
+            emptyText: '没有跳过条目',
+            entries: entries.filter((entry) => getImportItemFilter(entry.item) === 'SKIPPED'),
+        },
+        {
+            key: 'ERROR',
+            title: '错误',
+            emptyText: '没有错误条目',
+            entries: entries.filter((entry) => getImportItemFilter(entry.item) === 'ERROR'),
+        },
+    ] as const
 
     if (items.length === 0) {
         return (
@@ -1278,133 +1323,151 @@ function ImportItemList({ items, selections, onSelectCandidate, onExcludeItem, e
     return (
         <div className="mt-4">
             <div className="mb-3 flex flex-wrap gap-2">
-                {filterOptions.map((option) => {
-                    const selected = filter === option.value
-
-                    return (
-                        <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setFilter(option.value)}
-                            className={[
-                                'rounded-full border px-3 py-1.5 text-xs font-semibold transition',
-                                selected
-                                    ? 'border-slate-200 bg-slate-900 text-white shadow-sm'
-                                    : 'border-white/75 bg-white/62 text-slate-400 hover:bg-white hover:text-slate-600',
-                            ].join(' ')}
-                        >
-                            {option.label} {option.count}
-                        </button>
-                    )
-                })}
+                <span className="rounded-full border border-white/75 bg-white/62 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                    可导入/已导入 {successCount}
+                </span>
+                <span className="rounded-full border border-white/75 bg-white/62 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                    覆盖更新 {updatedCount}
+                </span>
+                <span className="rounded-full border border-white/75 bg-white/62 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                    歧义待选 {ambiguousCount}
+                </span>
+                <span className="rounded-full border border-white/75 bg-white/62 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                    跳过 {skippedCount}
+                </span>
+                <span className="rounded-full border border-white/75 bg-white/62 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                    错误 {errorCount}
+                </span>
             </div>
 
-            {visibleItems.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-slate-200 bg-white/45 p-8 text-center text-sm font-semibold text-slate-400">
-                    当前筛选下没有结果
-                </div>
-            ) : null}
-
-            <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
-                {visibleItems.map(({ item, index }) => {
-                    const canImport = item.result === 'CAN_IMPORT' || item.result === 'IMPORTED'
-                    const hasError = item.result === 'ERROR'
-                    const className = canImport
-                        ? 'border-emerald-100 bg-emerald-50/70 text-emerald-700'
-                        : hasError
-                          ? 'border-rose-100 bg-rose-50/75 text-rose-700'
-                          : 'border-orange-100 bg-orange-50/70 text-orange-700'
-                    const statusText =
-                        item.result === 'CAN_IMPORT'
-                            ? '可导入'
-                            : item.result === 'UPDATED'
-                              ? '更新'
-                              : item.result === 'SKIPPED'
-                                ? '跳过'
-                                : item.result
-
-                    return (
-                        <div
-                            key={`${item.title}-${index}`}
-                            className="rounded-[20px] border border-white/70 bg-white/58 p-3 shadow-sm"
-                        >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="line-clamp-1 text-sm font-bold text-slate-700">
-                                    {item.title}
-                                </p>
-                                <span
-                                    className={[
-                                        'rounded-full border px-2.5 py-0.5 text-[11px] font-black',
-                                        className,
-                                    ].join(' ')}
-                                >
-                                    {statusText}
-                                </span>
-                            </div>
-                            <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                                <div className="space-y-1">
-                                    <p className="text-xs leading-5 text-slate-400">{item.message}</p>
-                                    {item.changeSummary ? (
-                                        <p className="text-[11px] leading-5 text-slate-500">
-                                            变化摘要：{item.changeSummary}
-                                        </p>
-                                    ) : null}
-                                    {isAmbiguousPreviewItem(item) && onSelectCandidate ? (
-                                        <div className="mt-2 space-y-2 rounded-2xl border border-violet-100 bg-violet-50/50 p-2">
-                                            <p className="text-[11px] font-semibold text-violet-500">
-                                                匹配到多个作品，请点击选择其一（或跳过）
-                                            </p>
-                                            {(item.candidates ?? []).map((candidate) => {
-                                                const selected = selections?.[index] === candidate.subjectId
-                                                return (
-                                                    <button
-                                                        key={candidate.subjectId}
-                                                        type="button"
-                                                        onClick={() => onSelectCandidate(index, candidate.subjectId)}
-                                                        className={[
-                                                            'w-full rounded-xl border px-2.5 py-2 text-left transition',
-                                                            selected
-                                                                ? 'border-violet-200 bg-violet-100 text-violet-700 shadow-sm'
-                                                                : 'border-white bg-white/90 text-slate-500 hover:border-violet-100 hover:bg-violet-50/70',
-                                                        ].join(' ')}
-                                                    >
-                                                        <p className="text-[12px] font-semibold">
-                                                            {candidate.displayTitle}
-                                                        </p>
-                                                        <p className="mt-0.5 text-[11px] opacity-80">
-                                                            ID {candidate.subjectId} · S{candidate.seasonIndex ?? '-'} · P{candidate.partIndex ?? '-'} · {candidate.releaseYear ?? '-'}年{candidate.releaseQuarter ?? '-'}档 · {candidate.category ?? '-'}
-                                                        </p>
-                                                    </button>
-                                                )
-                                            })}
-                                            <button
-                                                type="button"
-                                                onClick={() => onSelectCandidate(index, 'SKIP')}
-                                                className={[
-                                                    'w-full rounded-xl border px-2.5 py-2 text-left text-[12px] font-semibold transition',
-                                                    selections?.[index] === 'SKIP'
-                                                        ? 'border-rose-200 bg-rose-100 text-rose-600 shadow-sm'
-                                                        : 'border-white bg-white/90 text-slate-500 hover:border-rose-100 hover:bg-rose-50/70',
-                                                ].join(' ')}
-                                            >
-                                                跳过该行
-                                            </button>
-                                        </div>
-                                    ) : null}
-                                </div>
-                                {onExcludeItem && isImportablePreviewItem(item) ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => onExcludeItem(item, index)}
-                                        className="rounded-full border border-rose-100 bg-rose-50/80 px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-100"
-                                    >
-                                        排除
-                                    </button>
-                                ) : null}
-                            </div>
+            <div className="max-h-[480px] space-y-3 overflow-auto pr-1">
+                {groupedEntries.map((group) => (
+                    <div
+                        key={group.key}
+                        className="rounded-[20px] border border-white/70 bg-white/50 p-3"
+                    >
+                        <div className="mb-2 flex items-center justify-between">
+                            <h4 className="text-sm font-black text-slate-700">{group.title}</h4>
+                            <span className="rounded-full border border-white/80 bg-white/70 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500">
+                                {group.entries.length}
+                            </span>
                         </div>
-                    )
-                })}
+
+                        {group.entries.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-slate-200 bg-white/45 p-4 text-center text-xs font-semibold text-slate-400">
+                                {group.emptyText}
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {group.entries.map(({ item, index }) => {
+                                    const sourceIndex = itemIndexes?.[index] ?? index
+                                    const canImport = item.result === 'CAN_IMPORT' || item.result === 'IMPORTED'
+                                    const hasError = item.result === 'ERROR'
+                                    const isAmbiguous = item.result === 'AMBIGUOUS'
+                                    const className = canImport
+                                        ? 'border-emerald-100 bg-emerald-50/70 text-emerald-700'
+                                        : hasError
+                                          ? 'border-rose-100 bg-rose-50/75 text-rose-700'
+                                          : isAmbiguous
+                                            ? 'border-violet-100 bg-violet-50/75 text-violet-700'
+                                            : 'border-orange-100 bg-orange-50/70 text-orange-700'
+                                    const statusText =
+                                        item.result === 'CAN_IMPORT'
+                                            ? '可导入'
+                                            : item.result === 'UPDATED'
+                                              ? '更新'
+                                              : item.result === 'SKIPPED'
+                                                ? '跳过'
+                                                : item.result === 'AMBIGUOUS'
+                                                  ? '歧义待选'
+                                                  : item.result
+
+                                    return (
+                                        <div
+                                            key={`${item.title}-${index}`}
+                                            className="rounded-[20px] border border-white/70 bg-white/58 p-3 shadow-sm"
+                                        >
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <p className="line-clamp-1 text-sm font-bold text-slate-700">
+                                                    {item.title}
+                                                </p>
+                                                <span
+                                                    className={[
+                                                        'rounded-full border px-2.5 py-0.5 text-[11px] font-black',
+                                                        className,
+                                                    ].join(' ')}
+                                                >
+                                                    {statusText}
+                                                </span>
+                                            </div>
+                                            <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                                                <div className="space-y-1">
+                                                    <p className="text-xs leading-5 text-slate-400">{item.message}</p>
+                                                    {item.changeSummary ? (
+                                                        <p className="text-[11px] leading-5 text-slate-500">
+                                                            变化摘要：{item.changeSummary}
+                                                        </p>
+                                                    ) : null}
+                                                    {isAmbiguousPreviewItem(item) && onSelectCandidate ? (
+                                                        <div className="mt-2 space-y-2 rounded-2xl border border-violet-100 bg-violet-50/50 p-2">
+                                                            <p className="text-[11px] font-semibold text-violet-500">
+                                                                匹配到多个作品，请点击选择其一（或跳过）
+                                                            </p>
+                                                            {(item.candidates ?? []).map((candidate) => {
+                                                                const selected = selections?.[sourceIndex] === candidate.subjectId
+                                                                return (
+                                                                    <button
+                                                                        key={candidate.subjectId}
+                                                                        type="button"
+                                                                        onClick={() => onSelectCandidate(sourceIndex, candidate.subjectId)}
+                                                                        className={[
+                                                                            'w-full rounded-xl border px-2.5 py-2 text-left transition',
+                                                                            selected
+                                                                                ? 'border-violet-200 bg-violet-100 text-violet-700 shadow-sm'
+                                                                                : 'border-white bg-white/90 text-slate-500 hover:border-violet-100 hover:bg-violet-50/70',
+                                                                        ].join(' ')}
+                                                                    >
+                                                                        <p className="text-[12px] font-semibold">
+                                                                            {candidate.displayTitle}
+                                                                        </p>
+                                                                        <p className="mt-0.5 text-[11px] opacity-80">
+                                                                            ID {candidate.subjectId} · S{candidate.seasonIndex ?? '-'} · P{candidate.partIndex ?? '-'} · {candidate.releaseYear ?? '-'}年{candidate.releaseQuarter ?? '-'}档 · {candidate.category ?? '-'}
+                                                                        </p>
+                                                                    </button>
+                                                                )
+                                                            })}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => onSelectCandidate(sourceIndex, 'SKIP')}
+                                                                className={[
+                                                                    'w-full rounded-xl border px-2.5 py-2 text-left text-[12px] font-semibold transition',
+                                                                    selections?.[sourceIndex] === 'SKIP'
+                                                                        ? 'border-rose-200 bg-rose-100 text-rose-600 shadow-sm'
+                                                                        : 'border-white bg-white/90 text-slate-500 hover:border-rose-100 hover:bg-rose-50/70',
+                                                                ].join(' ')}
+                                                            >
+                                                                跳过该行
+                                                            </button>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                                {onExcludeItem && isImportablePreviewItem(item) ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onExcludeItem(item, sourceIndex)}
+                                                        className="rounded-full border border-rose-100 bg-rose-50/80 px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-100"
+                                                    >
+                                                        排除
+                                                    </button>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
+                ))}
             </div>
         </div>
     )
