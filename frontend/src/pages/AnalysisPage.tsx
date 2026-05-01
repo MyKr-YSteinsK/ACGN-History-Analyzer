@@ -30,6 +30,12 @@ import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
 import { categoryTheme, neutralPanelGradient } from '../theme/acgnTheme'
 import { categoryOrder, getReleaseQuarterLabel, type AcgnCategory, type ReleaseQuarter } from '../types/common'
+import {
+    readJsonCache,
+    removeCacheItem,
+    removeCacheItemsByPrefixes,
+    writeJsonCache,
+} from '../utils/localStorageCache'
 
 type CategoryFilter = AcgnCategory | 'ALL'
 
@@ -1907,27 +1913,14 @@ function buildReportCacheKey(
 }
 
 function readCachedReport(cacheKey: string, fallbackType: AnalysisMode) {
-    try {
-        const raw = window.localStorage.getItem(cacheKey)
-        if (!raw) {
-            return null
-        }
-
-        const parsed = JSON.parse(raw) as {
-            report?: LlmAnalysisResponse
-            cachedAt?: string
-        }
-
-        if (!parsed.report || !parsed.cachedAt) {
-            return null
-        }
-
-        return {
-            report: normalizeAnalysisReport(parsed.report, fallbackType),
-            cachedAt: parsed.cachedAt,
-        }
-    } catch {
+    const parsed = readJsonCache(cacheKey, isCachedReportPayload)
+    if (!parsed) {
         return null
+    }
+
+    return {
+        report: normalizeAnalysisReport(parsed.report, fallbackType),
+        cachedAt: parsed.cachedAt,
     }
 }
 
@@ -1936,48 +1929,37 @@ function writeCachedReport(
     report: LlmAnalysisResponse,
     cachedAt: string,
 ) {
-    try {
-        window.localStorage.setItem(
-            cacheKey,
-            JSON.stringify({
-                report,
-                cachedAt,
-            }),
-        )
-    } catch {
-        // localStorage may be full or disabled; analysis can still render without cache.
-    }
+    writeJsonCache(cacheKey, {
+        report,
+        cachedAt,
+    })
 }
 
 function readReportHistory() {
-    try {
-        const raw = window.localStorage.getItem(reportHistoryStorageKey)
-        if (!raw) {
-            return []
-        }
-
-        const parsed = JSON.parse(raw)
-        if (!Array.isArray(parsed)) {
-            return []
-        }
-
-        return parsed
-            .filter(isHistoryItem)
-            .slice(0, maxReportHistoryCount)
-    } catch {
-        return []
-    }
+    const parsed = readJsonCache(reportHistoryStorageKey, isHistoryItemArray)
+    return parsed?.slice(0, maxReportHistoryCount) ?? []
 }
 
 function writeReportHistory(items: HistoryItem[]) {
-    try {
-        window.localStorage.setItem(
-            reportHistoryStorageKey,
-            JSON.stringify(items.slice(0, maxReportHistoryCount)),
-        )
-    } catch {
-        // History is optional; report generation should not depend on localStorage.
+    writeJsonCache(reportHistoryStorageKey, items.slice(0, maxReportHistoryCount))
+}
+
+function isCachedReportPayload(value: unknown): value is {
+    report: LlmAnalysisResponse
+    cachedAt: string
+} {
+    if (typeof value !== 'object' || value === null) {
+        return false
     }
+
+    const payload = value as {
+        report?: unknown
+        cachedAt?: unknown
+    }
+
+    return typeof payload.report === 'object'
+        && payload.report !== null
+        && typeof payload.cachedAt === 'string'
 }
 
 function upsertReportHistory(items: HistoryItem[], item: HistoryItem) {
@@ -2010,26 +1992,8 @@ function isHistoryItem(value: unknown): value is HistoryItem {
     )
 }
 
-function removeCacheItem(cacheKey: string) {
-    try {
-        window.localStorage.removeItem(cacheKey)
-    } catch {
-        // Ignore unavailable localStorage.
-    }
-}
-
-function removeCacheItemsByPrefixes(prefixes: string[]) {
-    try {
-        const keys = Array.from({ length: window.localStorage.length }, (_, index) => (
-            window.localStorage.key(index)
-        )).filter((key): key is string => Boolean(key))
-
-        keys
-            .filter((key) => prefixes.some((prefix) => key.startsWith(prefix)))
-            .forEach((key) => window.localStorage.removeItem(key))
-    } catch {
-        // Ignore unavailable localStorage.
-    }
+function isHistoryItemArray(value: unknown): value is HistoryItem[] {
+    return Array.isArray(value) && value.every(isHistoryItem)
 }
 
 function normalizeAnalysisReport(

@@ -26,6 +26,11 @@ import {
     type ReleaseQuarter,
 } from '../types/common'
 import type { SubjectCardView } from '../types/subject'
+import {
+    readJsonCache,
+    removeCacheItem,
+    writeJsonCache,
+} from '../utils/localStorageCache'
 
 type CategoryCount = {
     category: AcgnCategory
@@ -81,28 +86,7 @@ function buildHomeInsightCacheKey(
 }
 
 function readHomeInsightCache(cacheKey: string) {
-    try {
-        const raw = window.localStorage.getItem(cacheKey)
-        if (!raw) {
-            return null
-        }
-
-        const parsed = JSON.parse(raw) as {
-            report?: LlmAnalysisResponse
-            cachedAt?: string
-        }
-
-        if (!parsed.report || !parsed.cachedAt) {
-            return null
-        }
-
-        return {
-            report: parsed.report,
-            cachedAt: parsed.cachedAt,
-        }
-    } catch {
-        return null
-    }
+    return readJsonCache(cacheKey, isHomeInsightCachePayload)
 }
 
 function writeHomeInsightCache(
@@ -110,25 +94,32 @@ function writeHomeInsightCache(
     report: LlmAnalysisResponse,
     cachedAt: string,
 ) {
-    try {
-        window.localStorage.setItem(
-            cacheKey,
-            JSON.stringify({
-                report,
-                cachedAt,
-            }),
-        )
-    } catch {
-        // The insight can still render if localStorage is unavailable.
-    }
+    writeJsonCache(cacheKey, {
+        report,
+        cachedAt,
+    })
 }
 
 function removeHomeInsightCache(cacheKey: string) {
-    try {
-        window.localStorage.removeItem(cacheKey)
-    } catch {
-        // Ignore unavailable localStorage.
+    removeCacheItem(cacheKey)
+}
+
+function isHomeInsightCachePayload(value: unknown): value is {
+    report: LlmAnalysisResponse
+    cachedAt: string
+} {
+    if (typeof value !== 'object' || value === null) {
+        return false
     }
+
+    const payload = value as {
+        report?: unknown
+        cachedAt?: unknown
+    }
+
+    return typeof payload.report === 'object'
+        && payload.report !== null
+        && typeof payload.cachedAt === 'string'
 }
 
 function formatHomeInsightTime(value: string) {
