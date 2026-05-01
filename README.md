@@ -241,7 +241,7 @@ TOP 页按 ACGN 类型切换，不提供“全部”混排。
 Bangumi 作品库 -> collections -> records
 ```
 
-作品库不再开放手动 JSON/CSV 导入，避免脏数据污染作品本体。手动整理历史数据时，只需要先用 Bangumi 把对应年份和月份档期的新番导入作品库，再把自己的想看、搁置、正式记录导入进来。
+**产品流程上**作品库应通过导入中心的 Bangumi 新番写入，避免脏数据污染作品本体。后端仍保留 `POST /api/subjects/import*` 供脚本或紧急修复使用，日常请勿手工拼作品批量。手动整理历史数据时，请先用 Bangumi 把对应年份和月份档期的新番导入作品库，再导入想看、搁置与正式记录。
 
 完整导入字段说明见：
 
@@ -331,7 +331,7 @@ docs/import-guide.md
 TOP 榜单       -> /api/top/*、/api/records/stats/*
 收藏夹         -> /api/collections/*
 系列管理       -> /api/franchises/*
-导入中心       -> /api/import/*、/api/import/bangumi/*、/api/subjects/import、/api/records/import、/api/collections/import
+导入中心       -> /api/import/*、/api/import/bangumi/*（含 import-jobs）、/api/subjects/import*（可选）、/api/records/import、/api/collections/import
 智能分析       -> /api/llm/*
 选项数据       -> /api/options/*
 ```
@@ -351,6 +351,8 @@ sourceId（Bangumi subject id）
 ```
 
 同一个 `sourceId` 视为同一个作品。
+
+若通过 `POST /api/subjects/import` 再次导入相同 `sourceId`，**只会更新** `tagNames`、`platformScore`、`episodeCount` 三项，其余作品字段不会被覆盖。
 
 ### UserSubjectRecord：正式记录
 

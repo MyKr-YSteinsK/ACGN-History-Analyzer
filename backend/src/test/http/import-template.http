@@ -9,3 +9,6 @@ GET {{baseUrl}}/api/import/templates/subject
 
 ### 2. 查看 record 导入模板
 GET {{baseUrl}}/api/import/templates/record
+
+### 3. 查看 collection 导入模板
+GET {{baseUrl}}/api/import/templates/collection

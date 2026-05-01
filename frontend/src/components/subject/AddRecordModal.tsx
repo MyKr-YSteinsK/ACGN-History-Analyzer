@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import StatusBadge from '../common/StatusBadge'
 import {
     categoryTheme,
@@ -6,6 +6,8 @@ import {
     yearChipClassName,
 } from '../../theme/acgnTheme'
 import { releaseQuarterOptions, type ReleaseQuarter } from '../../types/common'
+import { useEscapeToClose } from '../../hooks/useEscapeToClose'
+import { buildSeasonPartDisplay } from '../../utils/subjectDisplay'
 import type { SubjectCardView } from '../../types/subject'
 
 export type AddRecordPayload = {
@@ -84,19 +86,7 @@ function AddRecordModalContent({
     const [scoreValue, setScoreValue] = useState(subject?.personalScore ?? 40)
     const [note, setNote] = useState(subject?.personalRecordNote ?? '')
 
-    useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                onClose()
-            }
-        }
-
-        window.addEventListener('keydown', handleKeyDown)
-
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown)
-        }
-    }, [onClose])
+    useEscapeToClose(true, onClose)
 
     const category = categoryTheme[subject.category]
     const quarter = subject.releaseQuarter ? quarterTheme[subject.releaseQuarter] : null
@@ -231,7 +221,7 @@ function AddRecordModalContent({
                             />
                             <ReadonlyField
                                 label="季 / Part"
-                                value={buildSeasonPartText(subject)}
+                                value={buildSeasonPartDisplay(subject)}
                             />
                             <ReadonlyField
                                 label="总集数"
@@ -421,20 +411,6 @@ function ReadonlyField({ label, value, valueClassName = '' }: ReadonlyFieldProps
             </p>
         </div>
     )
-}
-
-function buildSeasonPartText(subject: SubjectCardView) {
-    const parts: string[] = []
-
-    if (subject.seasonIndex) {
-        parts.push(`S${subject.seasonIndex}`)
-    }
-
-    if (subject.partIndex) {
-        parts.push(`Part ${subject.partIndex}`)
-    }
-
-    return parts.length > 0 ? parts.join(' · ') : '无'
 }
 
 export default AddRecordModal

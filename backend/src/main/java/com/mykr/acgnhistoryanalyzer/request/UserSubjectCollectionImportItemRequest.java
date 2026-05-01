@@ -1,5 +1,6 @@
 package com.mykr.acgnhistoryanalyzer.request;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -12,8 +13,10 @@ public class UserSubjectCollectionImportItemRequest {
     @Size(max = 255, message = "subjectTitle 不能超过255个字符")
     private String subjectTitle;
 
+    @Min(value = 1, message = "subjectSeasonIndex 必须大于等于1")
     private Integer subjectSeasonIndex;
 
+    @Min(value = 1, message = "subjectPartIndex 必须大于等于1")
     private Integer subjectPartIndex;
 
     @Size(max = 255, message = "sourceId 不能超过255个字符")

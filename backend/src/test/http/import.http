@@ -3,9 +3,10 @@
 ### 使用说明
 # 1. 建议先运行 00-seed-data.http
 # 2. 先预览，再正式导入
-# 3. 当前 subject 导入唯一性规则：
-#    sourceId 相同则视为同一作品
-# 4. 当前支持 franchiseName 自动匹配已有系列；匹配不到会按无系列作品导入
+# 3. 当前 subject 导入唯一性规则：sourceId 相同则视为同一作品
+# 4. 已存在相同 sourceId 时，重复导入只会同步 tagNames、platformScore、episodeCount；
+#    本请求里其它字段（标题、年份、franchiseName 等）不会覆盖库中已有值
+# 5. franchiseName 仅在新插入作品时参与解析；重复导入不修改系列等字段
 
 ### 1. 预览导入
 POST {{baseUrl}}/api/subjects/import/preview

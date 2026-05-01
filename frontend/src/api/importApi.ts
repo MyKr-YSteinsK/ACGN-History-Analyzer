@@ -88,15 +88,6 @@ export function previewBangumiSeasonImport(payload: BangumiSeasonImportRequest) 
     })
 }
 
-export function importBangumiSeason(payload: BangumiSeasonImportRequest) {
-    return apiRequest<SubjectImportResponse>({
-        method: 'POST',
-        url: '/import/bangumi/season/import',
-        data: payload,
-        timeout: 180000,
-    })
-}
-
 export function startBangumiSeasonImportJob(payload: BangumiSeasonImportRequest) {
     return apiPost<BangumiImportJobStartResponse, BangumiSeasonImportRequest>(
         '/import/bangumi/season/import-jobs',

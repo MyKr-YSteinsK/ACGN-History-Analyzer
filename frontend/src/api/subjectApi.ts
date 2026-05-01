@@ -153,17 +153,3 @@ export function updateSubject(id: number, payload: SubjectCreateRequest) {
 export function deleteSubject(id: number) {
     return apiDelete<string>(`/subjects/${id}`)
 }
-
-export function previewImportSubjects(payload: SubjectBatchImportRequest) {
-    return apiPost<SubjectImportPreviewResponse, SubjectBatchImportRequest>(
-        '/subjects/import/preview',
-        payload,
-    )
-}
-
-export function importSubjects(payload: SubjectBatchImportRequest) {
-    return apiPost<SubjectImportResponse, SubjectBatchImportRequest>(
-        '/subjects/import',
-        payload,
-    )
-}

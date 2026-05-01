@@ -12,3 +12,20 @@ GET {{baseUrl}}/api/import/templates/subject
 
 ### 3. 查看 record 导入模板
 GET {{baseUrl}}/api/import/templates/record
+
+### 4. 查看 collection 导入模板
+GET {{baseUrl}}/api/import/templates/collection
+
+### 5. 启动 Bangumi 新番导入任务（异步，与导入中心一致）
+POST {{baseUrl}}/api/import/bangumi/season/import-jobs
+Content-Type: application/json
+
+{
+  "year": 2024,
+  "quarter": 1,
+  "includeWeb": false,
+  "japaneseOnly": true
+}
+
+### 6. 查询任务状态（将上一步返回的 jobId 填入路径）
+# GET {{baseUrl}}/api/import/bangumi/season/import-jobs/{{jobId}}

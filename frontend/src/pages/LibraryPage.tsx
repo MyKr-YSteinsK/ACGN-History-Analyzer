@@ -36,102 +36,16 @@ import {
     mapSubjectDetailToCardView,
     mapSubjectResponseToCardView,
 } from '../mappers/subjectMapper'
-import type { PageResponse } from '../types/api'
 import type { AcgnCategory, LibraryStatus, ReleaseQuarter } from '../types/common'
 import type { SubjectCardView } from '../types/subject'
-
-const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019]
-
-type SortOption = {
-    value: SubjectPageSort
-    label: string
-}
-
-const sortOptions: SortOption[] = [
-    { value: 'TITLE_ASC', label: '默认' },
-    { value: 'PLATFORM_SCORE_DESC', label: '评分降序' },
-    { value: 'PLATFORM_SCORE_ASC', label: '评分升序' },
-]
-
-const quarterOptions: Array<{
-    value: ReleaseQuarter | 'ALL'
-    label: string
-    className?: string
-}> = [
-    { value: 'ALL', label: '全部月份' },
-    {
-        value: 1,
-        label: '一月',
-        className: 'border-blue-200 bg-blue-100/80 text-blue-700 shadow-sm',
-    },
-    {
-        value: 2,
-        label: '四月',
-        className: 'border-green-200 bg-green-100/85 text-green-700 shadow-sm',
-    },
-    {
-        value: 3,
-        label: '七月',
-        className: 'border-cyan-200 bg-cyan-100/85 text-cyan-700 shadow-sm',
-    },
-    {
-        value: 4,
-        label: '十月',
-        className: 'border-orange-200 bg-orange-100/85 text-orange-700 shadow-sm',
-    },
-]
-
-const statusOptions: Array<{
-    value: LibraryStatus | 'ALL'
-    label: string
-    className?: string
-}> = [
-    { value: 'ALL', label: '全部状态' },
-    {
-        value: 'WATCHED',
-        label: '看过',
-        className: 'border-sky-200 bg-sky-100/85 text-sky-700 shadow-sm',
-    },
-    {
-        value: 'WANT',
-        label: '想看',
-        className: 'border-emerald-200 bg-emerald-100/85 text-emerald-700 shadow-sm',
-    },
-    {
-        value: 'PAUSED',
-        label: '搁置',
-        className: 'border-orange-200 bg-orange-100/85 text-orange-700 shadow-sm',
-    },
-    {
-        value: 'NONE',
-        label: '未记录',
-        className: 'border-slate-200 bg-slate-100/85 text-slate-600 shadow-sm',
-    },
-]
-
-const tagChipClassNames: Record<string, string> = {
-    sky: 'border-sky-200 bg-sky-100/80 text-sky-700',
-    blue: 'border-blue-200 bg-blue-100/80 text-blue-700',
-    cyan: 'border-cyan-200 bg-cyan-100/80 text-cyan-700',
-    emerald: 'border-emerald-200 bg-emerald-100/80 text-emerald-700',
-    amber: 'border-amber-200 bg-amber-100/80 text-amber-700',
-    rose: 'border-rose-200 bg-rose-100/80 text-rose-700',
-    pink: 'border-pink-200 bg-pink-100/80 text-pink-700',
-    violet: 'border-violet-200 bg-violet-100/80 text-violet-700',
-    slate: 'border-slate-200 bg-slate-100/80 text-slate-600',
-}
-
-type SubjectPageState = Pick<
-    PageResponse<unknown>,
-    'page' | 'size' | 'totalElements' | 'totalPages' | 'first' | 'last'
->
-
-type StatusTarget = 'WANT' | 'PAUSED' | 'NONE'
-
-type PendingStatusChange = {
-    subject: SubjectCardView
-    target: StatusTarget
-}
+import {
+    quarterOptions,
+    sortOptions,
+    statusOptions,
+    yearOptions,
+} from './library/libraryConstants'
+import type { PendingStatusChange, SubjectPageState, StatusTarget } from './library/libraryTypes'
+import TagFilterBar from './library/TagFilterBar'
 
 const initialPageState: SubjectPageState = {
     page: 0,
@@ -830,73 +744,3 @@ function LibraryPage() {
 }
 
 export default LibraryPage
-
-type TagFilterBarProps = {
-    tags: TagResponse[]
-    value: string | 'ALL'
-    onChange: (tagName: string | 'ALL') => void
-}
-
-function TagFilterBar({ tags, value, onChange }: TagFilterBarProps) {
-    const visibleTags = tags.slice(0, 48)
-
-    return (
-        <div>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <p className="text-xs font-semibold text-slate-400">作品标签</p>
-                    <p className="mt-1 text-xs text-slate-300">
-                        用 #奇幻 #战斗 这类标签做细分类，也会作为后续 AI 兴趣分析的数据基础。
-                    </p>
-                </div>
-
-                {value !== 'ALL' ? (
-                    <button
-                        type="button"
-                        onClick={() => onChange('ALL')}
-                        className="rounded-full border border-white/80 bg-white/65 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white"
-                    >
-                        清除标签
-                    </button>
-                ) : null}
-            </div>
-
-            <div className="flex max-h-[116px] flex-wrap gap-2 overflow-y-auto pr-1">
-                <button
-                    type="button"
-                    onClick={() => onChange('ALL')}
-                    className={[
-                        'rounded-full border px-3.5 py-2 text-xs font-semibold transition-all duration-200',
-                        value === 'ALL'
-                            ? 'border-slate-200 bg-white/90 text-slate-700 shadow-sm'
-                            : 'border-white/75 bg-white/50 text-slate-400 hover:-translate-y-0.5 hover:bg-white/80 hover:text-slate-600',
-                    ].join(' ')}
-                >
-                    全部标签
-                </button>
-
-                {visibleTags.map((tag) => {
-                    const selected = value === tag.name
-                    const colorClassName =
-                        tagChipClassNames[tag.colorKey] ?? tagChipClassNames.slate
-
-                    return (
-                        <button
-                            key={tag.id}
-                            type="button"
-                            onClick={() => onChange(tag.name)}
-                            className={[
-                                'rounded-full border px-3.5 py-2 text-xs font-semibold transition-all duration-200',
-                                selected
-                                    ? `${colorClassName} shadow-sm ring-2 ring-white/70`
-                                    : 'border-white/75 bg-white/50 text-slate-400 hover:-translate-y-0.5 hover:bg-white/80 hover:text-slate-600',
-                            ].join(' ')}
-                        >
-                            #{tag.name}
-                        </button>
-                    )
-                })}
-            </div>
-        </div>
-    )
-}
