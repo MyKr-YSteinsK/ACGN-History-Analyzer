@@ -24,6 +24,8 @@ import java.util.Map;
 
 public class RealLlmClient implements LlmClient {
 
+    private static final int MAX_ATTEMPTS = 2;
+
     private final LlmProperties properties;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
@@ -50,21 +52,7 @@ public class RealLlmClient implements LlmClient {
                     "response_format", Map.of("type", "json_object")
             ));
 
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(resolveEndpoint()))
-                    .timeout(Duration.ofSeconds(Math.max(5, properties.getTimeoutSeconds())))
-                    .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                    .header("Authorization", "Bearer " + properties.getApiKey())
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException("LLM 请求失败，状态码：" + response.statusCode()
-                        + "，响应：" + abbreviate(response.body()));
-            }
-
-            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode root = sendChatCompletion(body, "LLM 请求");
             String content = extractContent(root);
             JsonNode data = parseAnalysisPayload(content);
             return mapResponse(request, data);
@@ -72,7 +60,7 @@ public class RealLlmClient implements LlmClient {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("LLM 调用被中断", error);
         } catch (IOException error) {
-            throw new IllegalStateException("LLM 调用失败", error);
+            throw new IllegalStateException("LLM 调用失败：" + describeException(error), error);
         }
     }
 
@@ -142,21 +130,7 @@ public class RealLlmClient implements LlmClient {
                     )
             ));
 
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(resolveEndpoint()))
-                    .timeout(Duration.ofSeconds(Math.max(5, properties.getTimeoutSeconds())))
-                    .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                    .header("Authorization", "Bearer " + properties.getApiKey())
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException("LLM 问答请求失败，状态码：" + response.statusCode()
-                        + "，响应：" + abbreviate(response.body()));
-            }
-
-            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode root = sendChatCompletion(body, "LLM 问答请求");
             String answer = extractContent(root).trim();
             return new LlmQuestionAnswerResponse(
                     textFromContext(request.context(), "question", ""),
@@ -169,7 +143,7 @@ public class RealLlmClient implements LlmClient {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("LLM 问答调用被中断", error);
         } catch (IOException error) {
-            throw new IllegalStateException("LLM 问答调用失败", error);
+            throw new IllegalStateException("LLM 问答调用失败：" + describeException(error), error);
         }
     }
 
@@ -186,29 +160,76 @@ public class RealLlmClient implements LlmClient {
                     )
             ));
 
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(resolveEndpoint()))
-                    .timeout(Duration.ofSeconds(Math.max(5, properties.getTimeoutSeconds())))
-                    .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                    .header("Authorization", "Bearer " + properties.getApiKey())
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException("LLM 连接测试失败，状态码：" + response.statusCode()
-                        + "，响应：" + abbreviate(response.body()));
-            }
-
-            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode root = sendChatCompletion(body, "LLM 连接测试");
             String answer = extractContent(root).trim();
             return answer.isBlank() ? "连接正常" : answer;
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("LLM 连接测试被中断", error);
         } catch (IOException error) {
-            throw new IllegalStateException("LLM 连接测试失败", error);
+            throw new IllegalStateException("LLM 连接测试失败：" + describeException(error), error);
         }
+    }
+
+    private JsonNode sendChatCompletion(String body, String operation) throws IOException, InterruptedException {
+        IOException lastIoError = null;
+        IllegalStateException lastHttpError = null;
+
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                HttpResponse<String> response = httpClient.send(
+                        buildHttpRequest(body),
+                        HttpResponse.BodyHandlers.ofString()
+                );
+
+                if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                    return objectMapper.readTree(response.body());
+                }
+
+                IllegalStateException httpError = new IllegalStateException(
+                        operation + "失败，状态码：" + response.statusCode()
+                                + "，响应：" + abbreviate(response.body())
+                );
+                if (!shouldRetryStatus(response.statusCode()) || attempt == MAX_ATTEMPTS) {
+                    throw httpError;
+                }
+                lastHttpError = httpError;
+            } catch (IOException error) {
+                if (attempt == MAX_ATTEMPTS) {
+                    throw error;
+                }
+                lastIoError = error;
+            }
+
+            sleepBeforeRetry();
+        }
+
+        if (lastHttpError != null) {
+            throw lastHttpError;
+        }
+        if (lastIoError != null) {
+            throw lastIoError;
+        }
+
+        throw new IllegalStateException(operation + "失败：未知错误");
+    }
+
+    private HttpRequest buildHttpRequest(String body) {
+        return HttpRequest.newBuilder()
+                .uri(URI.create(resolveEndpoint()))
+                .timeout(Duration.ofSeconds(Math.max(5, properties.getTimeoutSeconds())))
+                .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                .header("Authorization", "Bearer " + properties.getApiKey())
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+    }
+
+    private boolean shouldRetryStatus(int statusCode) {
+        return statusCode == 429 || statusCode >= 500;
+    }
+
+    private void sleepBeforeRetry() throws InterruptedException {
+        Thread.sleep(450);
     }
 
     private LlmAnalysisResponse mapResponse(LlmGenerateRequest request, JsonNode data) {
@@ -353,5 +374,14 @@ public class RealLlmClient implements LlmClient {
         }
 
         return compact.substring(0, 300) + "...";
+    }
+
+    private String describeException(Exception error) {
+        String message = error.getMessage();
+        if (message == null || message.isBlank()) {
+            return error.getClass().getSimpleName();
+        }
+
+        return message;
     }
 }
