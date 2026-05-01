@@ -159,15 +159,15 @@ function SubjectCard({ subject, onOpenDetail }: SubjectCardProps) {
                     ))}
                 </div>
 
-                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-                    <p className="line-clamp-1 text-[11px] text-slate-400">
+                <div className="mt-3 flex min-w-0 items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                    <p className="min-w-0 flex-1 truncate text-[11px] text-slate-400">
                         {subject.studioName ?? '制作方未知'}
                     </p>
 
                     <button
                         type="button"
                         onClick={() => onOpenDetail?.(subject)}
-                        className="rounded-full border border-slate-200/70 bg-white/75 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-900 hover:text-white"
+                        className="shrink-0 whitespace-nowrap rounded-full border border-slate-200/70 bg-white/75 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-900 hover:text-white"
                     >
                         详情
                     </button>

@@ -796,12 +796,12 @@ function RecordCard({ record, category, onOpenDetail }: RecordCardProps) {
                     {record.note ?? '暂无备注'}
                 </p>
 
-                <div className="mt-auto flex items-center justify-between border-t border-white/70 pt-3">
-                    <span className="line-clamp-1 text-[11px] text-slate-400">
+                <div className="mt-auto flex min-w-0 items-center justify-between gap-3 border-t border-white/70 pt-3">
+                    <span className="min-w-0 flex-1 truncate text-[11px] text-slate-400">
                         {record.updatedAt ? '已同步记录' : '正式记录'}
                     </span>
 
-                    <span className="rounded-full border border-slate-200/70 bg-white/75 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:bg-slate-900 group-hover:text-white">
+                    <span className="shrink-0 whitespace-nowrap rounded-full border border-slate-200/70 bg-white/75 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:bg-slate-900 group-hover:text-white">
                         详情
                     </span>
                 </div>
