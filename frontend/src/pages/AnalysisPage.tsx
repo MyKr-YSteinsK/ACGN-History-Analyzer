@@ -70,6 +70,11 @@ type GenerationProgress = {
     detail: string
 }
 
+type CacheInfo = {
+    source: 'cache' | 'fresh'
+    cachedAt: string
+}
+
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
 const quarterOptions: ReleaseQuarter[] = [1, 2, 3, 4]
 
@@ -117,12 +122,6 @@ const analysisModes: AnalysisModeMeta[] = [
         accent: 'from-cyan-100/90 via-white/70 to-blue-50/70',
     },
     {
-        value: 'TYPE_PREFERENCE',
-        label: '类型偏好',
-        description: '长期分析动画、漫画、游戏或小说偏好',
-        accent: 'from-teal-100/90 via-white/70 to-sky-50/70',
-    },
-    {
         value: 'SCORE_STRUCTURE',
         label: '评分结构',
         description: '观察高分段、中分段和低分段分布',
@@ -133,18 +132,6 @@ const analysisModes: AnalysisModeMeta[] = [
         label: '补坑建议',
         description: '优先整理想看和搁置作品',
         accent: 'from-orange-100/90 via-white/70 to-emerald-50/70',
-    },
-    {
-        value: 'PREFERENCE_CONTRADICTION',
-        label: '偏好矛盾',
-        description: '发现看得多但不稳、低频但高命中的方向',
-        accent: 'from-slate-100/90 via-white/70 to-rose-50/70',
-    },
-    {
-        value: 'INTEREST_TREND',
-        label: '兴趣趋势',
-        description: '观察多年记录中的类型、评分和标签变化',
-        accent: 'from-cyan-100/90 via-white/70 to-violet-50/70',
     },
     {
         value: 'FRANCHISE_COMPLETION',
@@ -167,6 +154,9 @@ const defaultProgress: GenerationProgress = {
     detail: '正在确认分析范围、模型配置和请求参数。',
 }
 
+const reportCachePrefix = 'acgn-llm-report-cache'
+const reportCacheVersion = 1
+
 function AnalysisPage() {
     const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('COMPREHENSIVE_REPORT')
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
@@ -176,6 +166,7 @@ function AnalysisPage() {
     const [report, setReport] = useState<LlmAnalysisResponse | null>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null)
     const [llmStatus, setLlmStatus] = useState<LlmStatusResponse | null>(null)
     const [configOpen, setConfigOpen] = useState(false)
     const [configMode, setConfigMode] = useState<LlmConfigMode>('deepseek')
@@ -203,6 +194,10 @@ function AnalysisPage() {
     const scopeText = useMemo(
         () => buildScopeText(analysisMode, selectedYear, selectedQuarter, selectedCategory),
         [analysisMode, selectedCategory, selectedQuarter, selectedYear],
+    )
+    const reportCacheKey = useMemo(
+        () => buildReportCacheKey(analysisMode, selectedYear, selectedQuarter, selectedCategory, question),
+        [analysisMode, question, selectedCategory, selectedQuarter, selectedYear],
     )
     const reportHistory = useMemo(() => {
         if (!report) {
@@ -255,6 +250,28 @@ function AnalysisPage() {
 
         return () => window.clearInterval(timer)
     }, [analysisMode, llmStatus, loading])
+
+    useEffect(() => {
+        if (analysisMode === 'QUESTION_ANSWER' && !question.trim()) {
+            setReport(null)
+            setCacheInfo(null)
+            return
+        }
+
+        const cached = readCachedReport(reportCacheKey, analysisMode)
+        if (cached) {
+            setReport(cached.report)
+            setCacheInfo({
+                source: 'cache',
+                cachedAt: cached.cachedAt,
+            })
+            setError(null)
+            return
+        }
+
+        setReport(null)
+        setCacheInfo(null)
+    }, [analysisMode, question, reportCacheKey])
 
     const generateReport = useCallback(async () => {
         if (analysisMode === 'QUESTION_ANSWER' && !question.trim()) {
@@ -333,16 +350,34 @@ function AnalysisPage() {
                                                   year: selectedYear,
                                                   category,
                                               })
+            const normalizedReport = normalizeAnalysisReport(response, analysisMode)
+            const cachedAt = new Date().toISOString()
+            writeCachedReport(reportCacheKey, normalizedReport, cachedAt)
             setProgress(buildGenerationProgress(100, analysisMode, llmStatus))
-            setReport(normalizeAnalysisReport(response, analysisMode))
+            setReport(normalizedReport)
+            setCacheInfo({
+                source: 'fresh',
+                cachedAt,
+            })
         } catch (generateError) {
-            setReport(null)
-            setError(getApiErrorMessage(generateError, '智能分析生成失败'))
+            const cached = readCachedReport(reportCacheKey, analysisMode)
+            if (cached) {
+                setReport(cached.report)
+                setCacheInfo({
+                    source: 'cache',
+                    cachedAt: cached.cachedAt,
+                })
+                setError(`${getApiErrorMessage(generateError, '智能分析生成失败')}。已回退到本地缓存结果。`)
+            } else {
+                setReport(null)
+                setCacheInfo(null)
+                setError(getApiErrorMessage(generateError, '智能分析生成失败'))
+            }
             setProgress(defaultProgress)
         } finally {
             setLoading(false)
         }
-    }, [analysisMode, llmStatus, question, selectedCategory, selectedQuarter, selectedYear])
+    }, [analysisMode, llmStatus, question, reportCacheKey, selectedCategory, selectedQuarter, selectedYear])
 
     const saveLlmConfig = useCallback(async () => {
         setConfigSaving(true)
@@ -377,6 +412,23 @@ function AnalysisPage() {
         setConfigMessage(null)
 
         try {
+            if (configMode === 'deepseek' && !configApiKey.trim() && !llmStatus?.apiKeyConfigured) {
+                setConfigMessage('请先填写 DeepSeek API Key，或在后端环境变量中配置 DEEPSEEK_API_KEY')
+                return
+            }
+
+            const status = await updateLlmConfig({
+                previewMode: configMode === 'preview',
+                baseUrl: configBaseUrl,
+                apiKey: configApiKey.trim() || undefined,
+                model: configModel,
+                timeoutSeconds: 30,
+                temperature: 0.4,
+                maxTokens: 1200,
+            })
+            syncConfigState(status)
+            setConfigApiKey('')
+
             const response = await testLlmConnection()
             setConfigMessage(
                 response.previewMode
@@ -388,7 +440,7 @@ function AnalysisPage() {
         } finally {
             setConfigTesting(false)
         }
-    }, [])
+    }, [configApiKey, configBaseUrl, configMode, configModel, llmStatus, syncConfigState])
 
     function handleModeChange(mode: AnalysisMode) {
         setAnalysisMode(mode)
@@ -402,15 +454,6 @@ function AnalysisPage() {
             setSelectedCategory('ANIME')
         }
     }
-
-    useEffect(() => {
-        if (usesQuestionInput) {
-            return
-        }
-
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        void generateReport()
-    }, [generateReport, usesQuestionInput])
 
     return (
         <div className="space-y-6 content-enter">
@@ -481,6 +524,7 @@ function AnalysisPage() {
                         <QuestionAnswerControl
                             question={question}
                             loading={loading}
+                            buttonLabel={report ? '重新生成回答' : '生成回答'}
                             onQuestionChange={setQuestion}
                             onSubmit={() => void generateReport()}
                         />
@@ -493,6 +537,7 @@ function AnalysisPage() {
                             usesYearFilter={usesYearFilter}
                             usesQuarterFilter={usesQuarterFilter}
                             analysisMode={analysisMode}
+                            buttonLabel={report ? '重新生成' : '生成分析'}
                             onYearChange={setSelectedYear}
                             onQuarterChange={setSelectedQuarter}
                             onCategoryChange={setSelectedCategory}
@@ -507,6 +552,13 @@ function AnalysisPage() {
                 modeLabel={activeMode.label}
                 category={selectedCategory}
             />
+
+            {cacheInfo ? (
+                <CacheStatusPanel
+                    cacheInfo={cacheInfo}
+                    onRegenerate={() => void generateReport()}
+                />
+            ) : null}
 
             {error ? (
                 <GenerationErrorPanel
@@ -532,7 +584,7 @@ function AnalysisPage() {
             ) : (
                 <EmptyState
                     title="等待生成分析结果"
-                    description="选择分析主题后，系统会在这里呈现结论、依据、推荐候选和边界说明。"
+                    description="当前筛选还没有本地缓存。点击生成分析后，结果会写入本地缓存；之后切回同一条件会优先展示缓存，只有重新生成才会覆盖。"
                 />
             )}
         </div>
@@ -659,7 +711,7 @@ function LlmConfigPanel({
 
                         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
                             <p className="text-xs leading-5 text-slate-400">
-                                页面保存的是后端运行时配置，不会把 Key 写入仓库配置文件。修改配置后请先保存，再测试连接。
+                                页面保存的是后端运行时配置，不会把 Key 写入仓库配置文件；“保存并测试”会先应用当前表单再发起连接测试。
                             </p>
                             <div className="flex flex-wrap gap-2">
                                 <button
@@ -673,7 +725,7 @@ function LlmConfigPanel({
                                             : 'border-sky-200 bg-sky-100/90 text-sky-700 hover:-translate-y-0.5 hover:bg-sky-50',
                                     ].join(' ')}
                                 >
-                                    {testing ? '测试中' : '测试连接'}
+                                    {testing ? '测试中' : '保存并测试'}
                                 </button>
                                 <button
                                     type="button"
@@ -807,6 +859,7 @@ type AnalysisControlBarProps = {
     usesYearFilter: boolean
     usesQuarterFilter: boolean
     analysisMode: AnalysisMode
+    buttonLabel: string
     onYearChange: (year: number) => void
     onQuarterChange: (quarter: ReleaseQuarter) => void
     onCategoryChange: (category: CategoryFilter) => void
@@ -821,6 +874,7 @@ function AnalysisControlBar({
     usesYearFilter,
     usesQuarterFilter,
     analysisMode,
+    buttonLabel,
     onYearChange,
     onQuarterChange,
     onCategoryChange,
@@ -914,7 +968,7 @@ function AnalysisControlBar({
                 <GenerateButton
                     loading={loading}
                     disabled={loading}
-                    label="生成分析"
+                    label={buttonLabel}
                     onClick={onSubmit}
                 />
             </div>
@@ -965,6 +1019,7 @@ function CategoryButton({ label, active, category, onClick }: CategoryButtonProp
 type QuestionAnswerControlProps = {
     question: string
     loading: boolean
+    buttonLabel: string
     onQuestionChange: (value: string) => void
     onSubmit: () => void
 }
@@ -972,6 +1027,7 @@ type QuestionAnswerControlProps = {
 function QuestionAnswerControl({
     question,
     loading,
+    buttonLabel,
     onQuestionChange,
     onSubmit,
 }: QuestionAnswerControlProps) {
@@ -993,7 +1049,7 @@ function QuestionAnswerControl({
                     <GenerateButton
                         loading={loading}
                         disabled={loading || !question.trim()}
-                        label="生成回答"
+                        label={buttonLabel}
                         onClick={onSubmit}
                     />
                 </div>
@@ -1074,6 +1130,41 @@ function ScopeSummary({ scopeText, modeLabel, category }: ScopeSummaryProps) {
                         {category === 'ALL' ? '全部类型' : categoryTheme[category].cnName}
                     </span>
                 </div>
+            </div>
+        </GlassCard>
+    )
+}
+
+type CacheStatusPanelProps = {
+    cacheInfo: CacheInfo
+    onRegenerate: () => void
+}
+
+function CacheStatusPanel({ cacheInfo, onRegenerate }: CacheStatusPanelProps) {
+    const isCache = cacheInfo.source === 'cache'
+
+    return (
+        <GlassCard className="overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-gradient-to-br from-white/72 via-emerald-50/45 to-sky-50/45 p-4">
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        local cache
+                    </p>
+                    <h3 className="mt-1 text-base font-black text-slate-800">
+                        {isCache ? '当前显示本地缓存结果' : '当前结果已写入本地缓存'}
+                    </h3>
+                    <p className="mt-1 text-sm leading-6 text-slate-500">
+                        缓存时间：{formatGeneratedAt(cacheInfo.cachedAt)}。切换回同一分析条件时会优先使用这份结果。
+                    </p>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={onRegenerate}
+                    className="rounded-full border border-emerald-200 bg-white/75 px-5 py-2.5 text-sm font-black text-emerald-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-50"
+                >
+                    重新生成并覆盖缓存
+                </button>
             </div>
         </GlassCard>
     )
@@ -1675,6 +1766,71 @@ function getProgressSteps(percent: number) {
             active: percent >= 78,
         },
     ]
+}
+
+function buildReportCacheKey(
+    mode: AnalysisMode,
+    year: number,
+    quarter: ReleaseQuarter,
+    category: CategoryFilter,
+    question: string,
+) {
+    const normalizedQuestion = mode === 'QUESTION_ANSWER'
+        ? question.trim().replace(/\s+/g, ' ')
+        : ''
+
+    return [
+        reportCachePrefix,
+        `v${reportCacheVersion}`,
+        mode,
+        year,
+        quarter,
+        category,
+        normalizedQuestion,
+    ].join('::')
+}
+
+function readCachedReport(cacheKey: string, fallbackType: AnalysisMode) {
+    try {
+        const raw = window.localStorage.getItem(cacheKey)
+        if (!raw) {
+            return null
+        }
+
+        const parsed = JSON.parse(raw) as {
+            report?: LlmAnalysisResponse
+            cachedAt?: string
+        }
+
+        if (!parsed.report || !parsed.cachedAt) {
+            return null
+        }
+
+        return {
+            report: normalizeAnalysisReport(parsed.report, fallbackType),
+            cachedAt: parsed.cachedAt,
+        }
+    } catch {
+        return null
+    }
+}
+
+function writeCachedReport(
+    cacheKey: string,
+    report: LlmAnalysisResponse,
+    cachedAt: string,
+) {
+    try {
+        window.localStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+                report,
+                cachedAt,
+            }),
+        )
+    } catch {
+        // localStorage may be full or disabled; analysis can still render without cache.
+    }
 }
 
 function normalizeAnalysisReport(
