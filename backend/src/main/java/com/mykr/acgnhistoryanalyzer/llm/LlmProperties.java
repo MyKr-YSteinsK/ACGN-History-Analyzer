@@ -90,4 +90,58 @@ public class LlmProperties {
     public boolean isMockMode() {
         return !enabled || provider == null || provider.isBlank() || "mock".equalsIgnoreCase(provider);
     }
+
+    public boolean isApiKeyConfigured() {
+        return apiKey != null && !apiKey.isBlank();
+    }
+
+    public synchronized void switchToMockPreview() {
+        this.enabled = true;
+        this.provider = "mock";
+        this.model = "mock-acgn-analyst";
+    }
+
+    public synchronized void switchToDeepSeek(
+            String baseUrl,
+            String apiKey,
+            String model,
+            Integer timeoutSeconds,
+            Double temperature,
+            Integer maxTokens
+    ) {
+        this.enabled = true;
+        this.provider = "deepseek";
+        this.baseUrl = normalizeOrDefault(baseUrl, "https://api.deepseek.com");
+        if (apiKey != null && !apiKey.isBlank()) {
+            this.apiKey = apiKey.trim();
+        }
+        this.model = normalizeOrDefault(model, "deepseek-v4-flash");
+        this.timeoutSeconds = timeoutSeconds == null ? 30 : timeoutSeconds;
+        this.temperature = temperature == null ? 0.4 : temperature;
+        this.maxTokens = maxTokens == null ? 1200 : maxTokens;
+
+        validateForRealClient();
+    }
+
+    public void validateForRealClient() {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            throw new IllegalStateException("app.llm.base-url 不能为空");
+        }
+
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("app.llm.api-key 不能为空");
+        }
+
+        if (model == null || model.isBlank()) {
+            throw new IllegalStateException("app.llm.model 不能为空");
+        }
+    }
+
+    private String normalizeOrDefault(String value, String defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+
+        return value.trim();
+    }
 }

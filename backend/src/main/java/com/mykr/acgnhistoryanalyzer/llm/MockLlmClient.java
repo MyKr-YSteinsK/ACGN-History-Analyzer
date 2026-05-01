@@ -3,6 +3,7 @@ package com.mykr.acgnhistoryanalyzer.llm;
 import com.mykr.acgnhistoryanalyzer.response.LlmAnalysisResponse;
 import com.mykr.acgnhistoryanalyzer.response.LlmAnalysisScopeResponse;
 import com.mykr.acgnhistoryanalyzer.response.LlmAnalysisSectionResponse;
+import com.mykr.acgnhistoryanalyzer.response.LlmQuestionAnswerResponse;
 import com.mykr.acgnhistoryanalyzer.response.LlmRecommendationResponse;
 
 import java.math.BigDecimal;
@@ -882,6 +883,33 @@ public class MockLlmClient implements LlmClient {
                     + " / 50。类型分布为：" + formatMap(readLongMap(context, "categoryDistribution"))
                     + "。月份分布为：" + formatMap(readLongMap(context, "quarterDistribution")) + "。";
         };
+    }
+
+    @Override
+    public LlmQuestionAnswerResponse answer(LlmGenerateRequest request) {
+        Map<String, Object> context = request.context();
+        String question = readStringValue(context, "question", "");
+        String intent = readStringValue(context, "questionIntent", "OVERVIEW");
+        Integer totalRecords = readInteger(context, "totalRecords");
+        String averageScore = readStringValue(context, "averageScore", "0.0");
+        Integer highScoreCount = readInteger(context, "highScoreCount");
+        Integer lowScoreCount = readInteger(context, "lowScoreCount");
+        String answer = buildQuestionAnswerContent(context, totalRecords, averageScore, highScoreCount, lowScoreCount);
+        if ("OVERVIEW".equals(intent) && question.isBlank()) {
+            answer = "请先输入一个具体问题。";
+        }
+        return new LlmQuestionAnswerResponse(
+                question,
+                answer,
+                true,
+                properties.getModel(),
+                LocalDateTime.now()
+        );
+    }
+
+    @Override
+    public String testConnection() {
+        return "预览模式可用：当前不会调用外部大模型接口。";
     }
 
     private String buildQuestionTagAnswerContent(

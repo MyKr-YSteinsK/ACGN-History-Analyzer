@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
     getCollectionBacklogAnalysis,
     getComprehensiveReportAnalysis,
+    getLlmStatus,
     getFranchiseCompletionAnalysis,
     getInterestTrendAnalysis,
     getPreferenceContradictionAnalysis,
@@ -11,15 +12,18 @@ import {
     getScoreStructureAnalysis,
     getTagPreferenceAnalysis,
     getTasteProfileAnalysis,
+    testLlmConnection,
     getTypePreferenceAnalysis,
     getYearlyAnalysis,
+    updateLlmConfig,
     type LlmAnalysisResponse,
+    type LlmQuestionAnswerResponse,
     type LlmRecommendationResponse,
+    type LlmStatusResponse,
 } from '../api/llmApi'
 import { getApiErrorMessage } from '../api/request'
 import {
     EmptyState,
-    FeedbackBanner,
 } from '../components/common/FeedbackState'
 import CoverImage from '../components/common/CoverImage'
 import GlassCard from '../components/common/GlassCard'
@@ -56,6 +60,14 @@ type HistoryItem = {
     scope: string
     mode: string
     time: string
+}
+
+type LlmConfigMode = 'deepseek' | 'preview'
+
+type GenerationProgress = {
+    percent: number
+    title: string
+    detail: string
 }
 
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
@@ -149,26 +161,11 @@ const questionExamples = [
     '哪些标签看得多但评分不稳定？',
 ]
 
-const seededHistory: HistoryItem[] = [
-    {
-        title: '年度 ACGN 偏好概览',
-        scope: '年度 / 全部类型',
-        mode: '一键报告',
-        time: '最近生成',
-    },
-    {
-        title: '标签偏好与高分题材',
-        scope: '长期 / 标签',
-        mode: '标签偏好',
-        time: '今日',
-    },
-    {
-        title: '收藏夹补完优先级',
-        scope: '想看 / 搁置',
-        mode: '补坑建议',
-        time: '今日',
-    },
-]
+const defaultProgress: GenerationProgress = {
+    percent: 8,
+    title: '正在准备分析任务',
+    detail: '正在确认分析范围、模型配置和请求参数。',
+}
 
 function AnalysisPage() {
     const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('COMPREHENSIVE_REPORT')
@@ -179,6 +176,17 @@ function AnalysisPage() {
     const [report, setReport] = useState<LlmAnalysisResponse | null>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [llmStatus, setLlmStatus] = useState<LlmStatusResponse | null>(null)
+    const [configOpen, setConfigOpen] = useState(false)
+    const [configMode, setConfigMode] = useState<LlmConfigMode>('deepseek')
+    const [configBaseUrl, setConfigBaseUrl] = useState('https://api.deepseek.com')
+    const [configModel, setConfigModel] = useState('deepseek-v4-flash')
+    const [configApiKey, setConfigApiKey] = useState('')
+    const [configSaving, setConfigSaving] = useState(false)
+    const [configTesting, setConfigTesting] = useState(false)
+    const [configMessage, setConfigMessage] = useState<string | null>(null)
+    const [progress, setProgress] = useState<GenerationProgress>(defaultProgress)
+    const progressStartedAt = useRef<number | null>(null)
 
     const activeMode = analysisModes.find((item) => item.value === analysisMode) ?? analysisModes[0]
     const activeTheme =
@@ -198,7 +206,7 @@ function AnalysisPage() {
     )
     const reportHistory = useMemo(() => {
         if (!report) {
-            return seededHistory
+            return []
         }
 
         return [
@@ -208,9 +216,45 @@ function AnalysisPage() {
                 mode: activeMode.label,
                 time: formatGeneratedAt(report.generatedAt),
             },
-            ...seededHistory,
         ]
     }, [activeMode.label, report, scopeText])
+
+    const syncConfigState = useCallback((status: LlmStatusResponse) => {
+        setLlmStatus(status)
+        setConfigMode(status.mockMode ? 'preview' : 'deepseek')
+        setConfigBaseUrl(status.baseUrl || 'https://api.deepseek.com')
+        setConfigModel(status.model || 'deepseek-v4-flash')
+    }, [])
+
+    useEffect(() => {
+        async function loadStatus() {
+            try {
+                const status = await getLlmStatus()
+                syncConfigState(status)
+            } catch (statusError) {
+                setConfigMessage(getApiErrorMessage(statusError, 'LLM 配置状态读取失败'))
+            }
+        }
+
+        void loadStatus()
+    }, [syncConfigState])
+
+    useEffect(() => {
+        if (!loading) {
+            progressStartedAt.current = null
+            return
+        }
+
+        progressStartedAt.current = Date.now()
+        const timer = window.setInterval(() => {
+            const startedAt = progressStartedAt.current ?? Date.now()
+            const elapsedSeconds = (Date.now() - startedAt) / 1000
+            const nextPercent = Math.min(94, Math.round(12 + elapsedSeconds * 2.4))
+            setProgress(buildGenerationProgress(nextPercent, analysisMode, llmStatus))
+        }, 650)
+
+        return () => window.clearInterval(timer)
+    }, [analysisMode, llmStatus, loading])
 
     const generateReport = useCallback(async () => {
         if (analysisMode === 'QUESTION_ANSWER' && !question.trim()) {
@@ -219,17 +263,25 @@ function AnalysisPage() {
             return
         }
 
+        if (llmStatus && !llmStatus.mockMode && !llmStatus.apiKeyConfigured) {
+            setReport(null)
+            setError('请先配置 DeepSeek API Key，或切换到预览模式')
+            setConfigOpen(true)
+            return
+        }
+
         setLoading(true)
         setError(null)
+        setProgress(buildGenerationProgress(8, analysisMode, llmStatus))
 
         try {
             const category =
                 selectedCategory === 'ALL' ? undefined : selectedCategory
             const response =
                 analysisMode === 'QUESTION_ANSWER'
-                    ? await getQuestionAnswerAnalysis({
+                    ? toQuestionAnswerReport(await getQuestionAnswerAnalysis({
                           question: question.trim(),
-                      })
+                      }))
                     : analysisMode === 'QUARTERLY'
                       ? await getQuarterlyAnalysis({
                             year: selectedYear,
@@ -281,14 +333,62 @@ function AnalysisPage() {
                                                   year: selectedYear,
                                                   category,
                                               })
-            setReport(response)
+            setProgress(buildGenerationProgress(100, analysisMode, llmStatus))
+            setReport(normalizeAnalysisReport(response, analysisMode))
         } catch (generateError) {
             setReport(null)
             setError(getApiErrorMessage(generateError, '智能分析生成失败'))
+            setProgress(defaultProgress)
         } finally {
             setLoading(false)
         }
-    }, [analysisMode, question, selectedCategory, selectedQuarter, selectedYear])
+    }, [analysisMode, llmStatus, question, selectedCategory, selectedQuarter, selectedYear])
+
+    const saveLlmConfig = useCallback(async () => {
+        setConfigSaving(true)
+        setConfigMessage(null)
+
+        try {
+            const status = await updateLlmConfig({
+                previewMode: configMode === 'preview',
+                baseUrl: configBaseUrl,
+                apiKey: configApiKey.trim() || undefined,
+                model: configModel,
+                timeoutSeconds: 30,
+                temperature: 0.4,
+                maxTokens: 1200,
+            })
+            syncConfigState(status)
+            setConfigApiKey('')
+            setConfigMessage(
+                status.mockMode
+                    ? '已切换到预览模式'
+                    : 'DeepSeek API 配置已生效',
+            )
+        } catch (configError) {
+            setConfigMessage(getApiErrorMessage(configError, 'LLM 配置保存失败'))
+        } finally {
+            setConfigSaving(false)
+        }
+    }, [configApiKey, configBaseUrl, configMode, configModel, syncConfigState])
+
+    const testCurrentLlmConfig = useCallback(async () => {
+        setConfigTesting(true)
+        setConfigMessage(null)
+
+        try {
+            const response = await testLlmConnection()
+            setConfigMessage(
+                response.previewMode
+                    ? '预览模式测试通过：本地分析链路可用'
+                    : `DeepSeek 连接测试通过：${response.message || '连接正常'}`,
+            )
+        } catch (testError) {
+            setConfigMessage(getApiErrorMessage(testError, '大模型连接测试失败'))
+        } finally {
+            setConfigTesting(false)
+        }
+    }, [])
 
     function handleModeChange(mode: AnalysisMode) {
         setAnalysisMode(mode)
@@ -318,6 +418,25 @@ function AnalysisPage() {
                 eyebrow="AI ANALYSIS"
                 title="智能分析工作台"
                 description="围绕个人 ACGN 历史记录生成偏好画像、年度报告、补完建议和自然语言问答，适合论文展示与答辩说明。"
+            />
+
+            <LlmConfigPanel
+                open={configOpen}
+                status={llmStatus}
+                mode={configMode}
+                baseUrl={configBaseUrl}
+                model={configModel}
+                apiKey={configApiKey}
+                saving={configSaving}
+                testing={configTesting}
+                message={configMessage}
+                onToggle={() => setConfigOpen((value) => !value)}
+                onModeChange={setConfigMode}
+                onBaseUrlChange={setConfigBaseUrl}
+                onModelChange={setConfigModel}
+                onApiKeyChange={setConfigApiKey}
+                onSave={() => void saveLlmConfig()}
+                onTest={() => void testCurrentLlmConfig()}
             />
 
             <GlassCard className="overflow-hidden">
@@ -389,10 +508,21 @@ function AnalysisPage() {
                 category={selectedCategory}
             />
 
-            {error ? <FeedbackBanner tone="error">{error}</FeedbackBanner> : null}
+            {error ? (
+                <GenerationErrorPanel
+                    message={error}
+                    canOpenConfig={Boolean(llmStatus && !llmStatus.mockMode)}
+                    onRetry={() => void generateReport()}
+                    onOpenConfig={() => setConfigOpen(true)}
+                />
+            ) : null}
 
             {loading ? (
-                <ReportSkeleton />
+                <GenerationProgressPanel
+                    progress={progress}
+                    modeLabel={activeMode.label}
+                    modelLabel={llmStatus?.mockMode ? '预览模式' : (llmStatus?.model ?? 'DeepSeek API')}
+                />
             ) : report ? (
                 <AnalysisReport
                     report={report}
@@ -412,6 +542,219 @@ function AnalysisPage() {
 type CapabilityPillProps = {
     label: string
     value: string
+}
+
+type LlmConfigPanelProps = {
+    open: boolean
+    status: LlmStatusResponse | null
+    mode: LlmConfigMode
+    baseUrl: string
+    model: string
+    apiKey: string
+    saving: boolean
+    testing: boolean
+    message: string | null
+    onToggle: () => void
+    onModeChange: (mode: LlmConfigMode) => void
+    onBaseUrlChange: (value: string) => void
+    onModelChange: (value: string) => void
+    onApiKeyChange: (value: string) => void
+    onSave: () => void
+    onTest: () => void
+}
+
+function LlmConfigPanel({
+    open,
+    status,
+    mode,
+    baseUrl,
+    model,
+    apiKey,
+    saving,
+    testing,
+    message,
+    onToggle,
+    onModeChange,
+    onBaseUrlChange,
+    onModelChange,
+    onApiKeyChange,
+    onSave,
+    onTest,
+}: LlmConfigPanelProps) {
+    const currentModeLabel = status
+        ? status.mockMode ? '预览模式' : 'DeepSeek API'
+        : '读取中'
+
+    return (
+        <GlassCard className="overflow-hidden">
+            <div className="bg-gradient-to-br from-white/75 via-sky-50/45 to-violet-50/55 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                            llm settings
+                        </p>
+                        <h3 className="mt-1 text-lg font-black text-slate-800">
+                            大模型配置
+                        </h3>
+                        <p className="mt-1 text-sm leading-6 text-slate-500">
+                            当前：{currentModeLabel}
+                            {status && !status.mockMode ? ` · ${status.model}` : ''}
+                            {status && !status.mockMode
+                                ? status.apiKeyConfigured
+                                    ? ' · API Key 已配置'
+                                    : ' · API Key 未配置'
+                                : ''}
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={onToggle}
+                        className="rounded-full border border-sky-200 bg-white/75 px-5 py-2.5 text-sm font-black text-sky-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-50"
+                    >
+                        {open ? '收起设置' : '设置 API'}
+                    </button>
+                </div>
+
+                {open ? (
+                    <div className="mt-5 rounded-[28px] border border-white/75 bg-white/58 p-5 shadow-sm backdrop-blur">
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <ConfigModeButton
+                                active={mode === 'deepseek'}
+                                title="DeepSeek API"
+                                description="使用 deepseek-v4-flash 生成真实分析结果"
+                                onClick={() => onModeChange('deepseek')}
+                            />
+                            <ConfigModeButton
+                                active={mode === 'preview'}
+                                title="预览模式"
+                                description="不调用外部接口，使用本地统计生成演示结果"
+                                onClick={() => onModeChange('preview')}
+                            />
+                        </div>
+
+                        {mode === 'deepseek' ? (
+                            <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_1fr_1.4fr]">
+                                <ConfigField
+                                    label="Base URL"
+                                    value={baseUrl}
+                                    placeholder="https://api.deepseek.com"
+                                    onChange={onBaseUrlChange}
+                                />
+                                <ConfigField
+                                    label="模型"
+                                    value={model}
+                                    placeholder="deepseek-v4-flash"
+                                    onChange={onModelChange}
+                                />
+                                <ConfigField
+                                    label="API Key"
+                                    value={apiKey}
+                                    placeholder="留空表示沿用后端已配置的 Key"
+                                    type="password"
+                                    onChange={onApiKeyChange}
+                                />
+                            </div>
+                        ) : null}
+
+                        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-xs leading-5 text-slate-400">
+                                页面保存的是后端运行时配置，不会把 Key 写入仓库配置文件。修改配置后请先保存，再测试连接。
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={onTest}
+                                    disabled={saving || testing}
+                                    className={[
+                                        'rounded-full border px-5 py-2.5 text-sm font-black shadow-sm transition-all duration-200',
+                                        saving || testing
+                                            ? 'cursor-not-allowed border-white/60 bg-white/50 text-slate-300'
+                                            : 'border-sky-200 bg-sky-100/90 text-sky-700 hover:-translate-y-0.5 hover:bg-sky-50',
+                                    ].join(' ')}
+                                >
+                                    {testing ? '测试中' : '测试连接'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onSave}
+                                    disabled={saving || testing}
+                                    className={[
+                                        'rounded-full border px-5 py-2.5 text-sm font-black shadow-sm transition-all duration-200',
+                                        saving || testing
+                                            ? 'cursor-not-allowed border-white/60 bg-white/50 text-slate-300'
+                                            : 'border-emerald-200 bg-emerald-100/90 text-emerald-700 hover:-translate-y-0.5 hover:bg-emerald-50',
+                                    ].join(' ')}
+                                >
+                                    {saving ? '保存中' : '保存配置'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {message ? (
+                            <p className="mt-3 rounded-2xl border border-white/75 bg-white/65 px-4 py-3 text-sm leading-6 text-slate-500">
+                                {message}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : null}
+            </div>
+        </GlassCard>
+    )
+}
+
+type ConfigModeButtonProps = {
+    active: boolean
+    title: string
+    description: string
+    onClick: () => void
+}
+
+function ConfigModeButton({ active, title, description, onClick }: ConfigModeButtonProps) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={[
+                'rounded-[24px] border p-4 text-left transition-all duration-200',
+                active
+                    ? 'border-sky-200 bg-sky-50/90 text-sky-700 shadow-sm'
+                    : 'border-white/75 bg-white/55 text-slate-500 hover:-translate-y-0.5 hover:bg-white',
+            ].join(' ')}
+        >
+            <p className="text-sm font-black">{title}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">{description}</p>
+        </button>
+    )
+}
+
+type ConfigFieldProps = {
+    label: string
+    value: string
+    placeholder: string
+    type?: 'text' | 'password'
+    onChange: (value: string) => void
+}
+
+function ConfigField({
+    label,
+    value,
+    placeholder,
+    type = 'text',
+    onChange,
+}: ConfigFieldProps) {
+    return (
+        <label className="block">
+            <ControlLabel>{label}</ControlLabel>
+            <input
+                type={type}
+                value={value}
+                placeholder={placeholder}
+                onChange={(event) => onChange(event.target.value)}
+                className="h-12 w-full rounded-2xl border border-white/80 bg-white/72 px-4 text-sm font-semibold text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-300 focus:border-sky-200 focus:bg-white focus:ring-4 focus:ring-sky-100/70"
+            />
+        </label>
+    )
 }
 
 function CapabilityPill({ label, value }: CapabilityPillProps) {
@@ -965,29 +1308,35 @@ function ReportHistoryPanel({ items }: ReportHistoryPanelProps) {
             gradient="from-white/75 to-violet-50/65"
         >
             <div className="space-y-2.5">
-                {items.slice(0, 4).map((item, index) => (
-                    <article
-                        key={`${item.title}-${index}`}
-                        className="rounded-[22px] border border-white/75 bg-white/58 p-4 shadow-sm"
-                    >
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                                <h4 className="line-clamp-1 text-sm font-black text-slate-800">
-                                    {item.title}
-                                </h4>
-                                <p className="mt-1 line-clamp-1 text-xs text-slate-400">
-                                    {item.scope}
-                                </p>
+                {items.length > 0 ? (
+                    items.slice(0, 4).map((item, index) => (
+                        <article
+                            key={`${item.title}-${index}`}
+                            className="rounded-[22px] border border-white/75 bg-white/58 p-4 shadow-sm"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h4 className="line-clamp-1 text-sm font-black text-slate-800">
+                                        {item.title}
+                                    </h4>
+                                    <p className="mt-1 line-clamp-1 text-xs text-slate-400">
+                                        {item.scope}
+                                    </p>
+                                </div>
+                                <span className="shrink-0 rounded-full border border-white/80 bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                                    {item.mode}
+                                </span>
                             </div>
-                            <span className="shrink-0 rounded-full border border-white/80 bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                                {item.mode}
-                            </span>
-                        </div>
-                        <p className="mt-3 text-[11px] font-semibold text-slate-300">
-                            {item.time}
-                        </p>
-                    </article>
-                ))}
+                            <p className="mt-3 text-[11px] font-semibold text-slate-300">
+                                {item.time}
+                            </p>
+                        </article>
+                    ))
+                ) : (
+                    <p className="rounded-[22px] border border-white/75 bg-white/58 p-4 text-sm leading-6 text-slate-400">
+                        生成第一份报告后，这里会显示本次页面会话中的分析记录。
+                    </p>
+                )}
             </div>
         </SidePanel>
     )
@@ -1015,8 +1364,11 @@ function RecommendationGrid({ recommendations }: RecommendationGridProps) {
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-                {recommendations.map((item) => (
-                    <RecommendationCard key={item.subjectId} item={item} />
+                {recommendations.map((item, index) => (
+                    <RecommendationCard
+                        key={`${item.subjectId ?? item.title}-${index}`}
+                        item={item}
+                    />
                 ))}
             </div>
         </section>
@@ -1028,7 +1380,8 @@ type RecommendationCardProps = {
 }
 
 function RecommendationCard({ item }: RecommendationCardProps) {
-    const theme = categoryTheme[item.category]
+    const category = isAcgnCategory(item.category) ? item.category : 'ANIME'
+    const theme = categoryTheme[category]
 
     return (
         <article
@@ -1090,7 +1443,7 @@ function RecommendationCard({ item }: RecommendationCardProps) {
                                 theme.text,
                             ].join(' ')}
                         >
-                            {categoryTheme[item.category].cnName}
+                            {categoryTheme[category].cnName}
                         </span>
                         <span className="rounded-full border border-emerald-200 bg-emerald-50/85 px-2.5 py-1 text-xs font-black text-emerald-700">
                             {getSourceLabel(item.source)}
@@ -1132,23 +1485,329 @@ function RecommendationCard({ item }: RecommendationCardProps) {
     )
 }
 
-function ReportSkeleton() {
+type GenerationProgressPanelProps = {
+    progress: GenerationProgress
+    modeLabel: string
+    modelLabel: string
+}
+
+function GenerationProgressPanel({
+    progress,
+    modeLabel,
+    modelLabel,
+}: GenerationProgressPanelProps) {
     return (
         <GlassCard className="overflow-hidden">
-            <div className="space-y-4 bg-white/55 p-6">
-                <div className="h-7 w-72 animate-pulse rounded-full bg-slate-200/70" />
-                <div className="h-20 animate-pulse rounded-[24px] bg-slate-200/60" />
-                <div className="grid gap-4 md:grid-cols-3">
-                    {Array.from({ length: 3 }, (_, index) => (
+            <div className="bg-gradient-to-br from-white/75 via-sky-50/55 to-violet-50/55 p-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                            generating
+                        </p>
+                        <h3 className="mt-2 text-2xl font-black text-slate-800">
+                            {progress.title}
+                        </h3>
+                        <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-500">
+                            {progress.detail}
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full border border-white/75 bg-white/70 px-4 py-2 text-xs font-black text-slate-500">
+                            {modeLabel}
+                        </span>
+                        <span className="rounded-full border border-white/75 bg-white/70 px-4 py-2 text-xs font-black text-slate-500">
+                            {modelLabel}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="mt-6 overflow-hidden rounded-full border border-white/80 bg-white/60 p-1 shadow-inner">
+                    <div
+                        className="h-3 rounded-full bg-gradient-to-r from-sky-300 via-violet-300 to-emerald-300 transition-all duration-500"
+                        style={{ width: `${progress.percent}%` }}
+                    />
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
+                    {getProgressSteps(progress.percent).map((step) => (
                         <div
-                            key={index}
-                            className="h-36 animate-pulse rounded-[24px] bg-slate-200/55"
-                        />
+                            key={step.label}
+                            className={[
+                                'rounded-[22px] border px-4 py-3 shadow-sm transition-all duration-200',
+                                step.active
+                                    ? 'border-sky-200 bg-white/78 text-sky-700'
+                                    : 'border-white/70 bg-white/45 text-slate-400',
+                            ].join(' ')}
+                        >
+                            <p className="text-xs font-black">{step.label}</p>
+                            <p className="mt-1 text-[11px] leading-5">{step.description}</p>
+                        </div>
                     ))}
+                </div>
+
+                <p className="mt-4 text-xs leading-5 text-slate-400">
+                    真实模型调用无法逐字返回内部思考过程，这里展示的是前端根据请求阶段整理的可解释进度。
+                </p>
+            </div>
+        </GlassCard>
+    )
+}
+
+type GenerationErrorPanelProps = {
+    message: string
+    canOpenConfig: boolean
+    onRetry: () => void
+    onOpenConfig: () => void
+}
+
+function GenerationErrorPanel({
+    message,
+    canOpenConfig,
+    onRetry,
+    onOpenConfig,
+}: GenerationErrorPanelProps) {
+    return (
+        <GlassCard className="overflow-hidden">
+            <div className="bg-gradient-to-br from-white/80 to-rose-50/75 p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-300">
+                    generation failed
+                </p>
+                <h3 className="mt-2 text-lg font-black text-rose-700">
+                    智能分析生成失败
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-rose-600">
+                    {message}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                        type="button"
+                        onClick={onRetry}
+                        className="rounded-full border border-rose-200 bg-white/75 px-5 py-2.5 text-sm font-black text-rose-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-rose-50"
+                    >
+                        重试生成
+                    </button>
+                    {canOpenConfig ? (
+                        <button
+                            type="button"
+                            onClick={onOpenConfig}
+                            className="rounded-full border border-sky-200 bg-white/75 px-5 py-2.5 text-sm font-black text-sky-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-50"
+                        >
+                            检查 API 设置
+                        </button>
+                    ) : null}
                 </div>
             </div>
         </GlassCard>
     )
+}
+
+function buildGenerationProgress(
+    percent: number,
+    mode: AnalysisMode,
+    status: LlmStatusResponse | null,
+): GenerationProgress {
+    const boundedPercent = Math.max(0, Math.min(100, percent))
+    const usingPreview = status?.mockMode ?? false
+    const modeLabel = analysisModes.find((item) => item.value === mode)?.label ?? '智能分析'
+
+    if (boundedPercent >= 100) {
+        return {
+            percent: 100,
+            title: '报告生成完成',
+            detail: '结果已经解析完成，正在渲染报告正文、引用依据和推荐候选。',
+        }
+    }
+
+    if (boundedPercent >= 78) {
+        return {
+            percent: boundedPercent,
+            title: '正在整理输出格式',
+            detail: '正在校验标题、摘要、段落、推荐候选、引用依据和安全边界字段。',
+        }
+    }
+
+    if (boundedPercent >= 44) {
+        return {
+            percent: boundedPercent,
+            title: usingPreview ? '正在生成预览结果' : '正在等待 DeepSeek 返回',
+            detail: usingPreview
+                ? '预览模式会直接使用本地统计上下文生成可演示结果。'
+                : `DeepSeek 正在根据 ${modeLabel} 的结构化上下文生成中文分析，耗时会受网络和模型排队影响。`,
+        }
+    }
+
+    if (boundedPercent >= 22) {
+        return {
+            percent: boundedPercent,
+            title: '正在构建分析上下文',
+            detail: '后端正在读取作品、正式记录、标签、收藏夹和系列关系，并压缩成模型可理解的数据。',
+        }
+    }
+
+    return {
+        percent: boundedPercent,
+        title: '正在准备分析任务',
+        detail: '正在确认分析范围、模型配置和请求参数。',
+    }
+}
+
+function getProgressSteps(percent: number) {
+    return [
+        {
+            label: '参数校验',
+            description: '确认年份、月份、类型和问题内容。',
+            active: percent >= 8,
+        },
+        {
+            label: '上下文构建',
+            description: '整理记录、标签、收藏和系列关系。',
+            active: percent >= 22,
+        },
+        {
+            label: '模型生成',
+            description: '调用 DeepSeek 或生成本地预览。',
+            active: percent >= 44,
+        },
+        {
+            label: '格式渲染',
+            description: '校验 JSON 字段并渲染报告。',
+            active: percent >= 78,
+        },
+    ]
+}
+
+function normalizeAnalysisReport(
+    report: LlmAnalysisResponse,
+    fallbackType: AnalysisMode,
+): LlmAnalysisResponse {
+    const title = polishAnalysisText(report.title) || analysisModes.find((item) => item.value === fallbackType)?.label || '智能分析报告'
+    const summary = polishAnalysisText(report.summary) || '模型没有返回摘要，系统已保留可用字段并提示重新生成。'
+    const scope = report.scope ?? {
+        year: null,
+        quarter: null,
+        category: null,
+    }
+
+    return {
+        analysisType: report.analysisType || fallbackType,
+        title,
+        summary,
+        keywords: normalizeTextArray(report.keywords, ['智能分析']),
+        sections: normalizeSections(report.sections, summary),
+        recommendations: normalizeRecommendations(report.recommendations),
+        evidence: normalizeTextArray(report.evidence, ['本结果基于系统内结构化数据生成']),
+        warnings: normalizeTextArray(report.warnings, ['模型输出已做前端格式兜底，若结果不完整可重试生成']),
+        scope: {
+            year: scope.year ?? null,
+            quarter: scope.quarter ?? null,
+            category: isAcgnCategory(scope.category) ? scope.category : null,
+        },
+        mockMode: Boolean(report.mockMode),
+        modelName: report.modelName || 'deepseek-v4-flash',
+        generatedAt: report.generatedAt || new Date().toISOString(),
+    }
+}
+
+function normalizeTextArray(value: unknown, fallback: string[]) {
+    if (!Array.isArray(value)) {
+        return fallback
+    }
+
+    const normalized = value
+        .map((item) => polishAnalysisText(String(item ?? '')))
+        .filter(Boolean)
+
+    return normalized.length > 0 ? normalized : fallback
+}
+
+function normalizeSections(value: unknown, summary: string) {
+    if (!Array.isArray(value)) {
+        return [
+            {
+                title: '分析摘要',
+                content: summary,
+            },
+        ]
+    }
+
+    const sections = value
+        .map((item, index) => {
+            const section = item as Partial<LlmAnalysisResponse['sections'][number]>
+            return {
+                title: polishAnalysisText(section.title) || `分析段落 ${index + 1}`,
+                content: polishAnalysisText(section.content) || summary,
+            }
+        })
+        .filter((item) => item.title || item.content)
+
+    return sections.length > 0
+        ? sections
+        : [
+              {
+                  title: '分析摘要',
+                  content: summary,
+              },
+          ]
+}
+
+function normalizeRecommendations(value: unknown): LlmRecommendationResponse[] {
+    if (!Array.isArray(value)) {
+        return []
+    }
+
+    return value
+        .map((item) => item as Partial<LlmRecommendationResponse>)
+        .filter((item) => Boolean(item.title))
+        .map((item) => ({
+            subjectId: item.subjectId ?? null,
+            title: polishAnalysisText(item.title) || '未命名候选',
+            coverUrl: item.coverUrl ?? null,
+            category: isAcgnCategory(item.category) ? item.category : 'ANIME',
+            tags: normalizeTextArray(item.tags, []),
+            franchiseName: polishAnalysisText(item.franchiseName) || null,
+            source: item.source === 'WANT' || item.source === 'PAUSED' ? item.source : 'LIBRARY',
+            reason: polishAnalysisText(item.reason) || '模型未返回推荐理由。',
+            risk: polishAnalysisText(item.risk) || '暂无额外风险提示。',
+            evidence: polishAnalysisText(item.evidence) || '暂无引用依据。',
+            priority: item.priority === 'HIGH' || item.priority === 'MEDIUM' ? item.priority : 'LOW',
+            matchScore: item.matchScore ?? null,
+            platformScore: item.platformScore ?? null,
+        }))
+}
+
+function isAcgnCategory(value: unknown): value is AcgnCategory {
+    return typeof value === 'string' && categoryOrder.includes(value as AcgnCategory)
+}
+
+function toQuestionAnswerReport(response: LlmQuestionAnswerResponse): LlmAnalysisResponse {
+    return {
+        analysisType: 'QUESTION_ANSWER',
+        title: '自然语言问答',
+        summary: response.answer,
+        keywords: ['自然问答', '结构化依据'],
+        sections: [
+            {
+                title: '问题',
+                content: response.question,
+            },
+            {
+                title: '回答',
+                content: response.answer,
+            },
+        ],
+        recommendations: [],
+        evidence: ['回答基于系统内作品、记录、标签、收藏和系列上下文生成'],
+        warnings: ['自然问答不会修改任何作品、记录或收藏数据'],
+        scope: {
+            year: null,
+            quarter: null,
+            category: null,
+        },
+        mockMode: response.mockMode,
+        modelName: response.modelName,
+        generatedAt: response.generatedAt,
+    }
 }
 
 function buildScopeText(

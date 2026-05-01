@@ -1,5 +1,7 @@
-import { apiGet } from './request'
+import { apiGet, apiPost, apiPostWithConfig } from './request'
 import type { AcgnCategory, ReleaseQuarter } from '../types/common'
+
+const LLM_GENERATION_TIMEOUT_MS = 60000
 
 export type LlmAnalysisType =
     | 'YEARLY'
@@ -33,7 +35,7 @@ export type LlmRecommendationSource = 'WANT' | 'PAUSED' | 'LIBRARY'
 export type LlmRecommendationPriority = 'HIGH' | 'MEDIUM' | 'LOW'
 
 export type LlmRecommendationResponse = {
-    subjectId: number
+    subjectId: number | null
     title: string
     coverUrl: string | null
     category: AcgnCategory
@@ -44,7 +46,7 @@ export type LlmRecommendationResponse = {
     risk: string
     evidence: string
     priority: LlmRecommendationPriority
-    matchScore: number
+    matchScore: number | null
     platformScore: number | null
 }
 
@@ -66,8 +68,29 @@ export type LlmAnalysisResponse = {
 export type LlmStatusResponse = {
     enabled: boolean
     provider: string
+    baseUrl: string
     model: string
     mockMode: boolean
+    apiKeyConfigured: boolean
+}
+
+export type LlmConfigUpdateRequest = {
+    previewMode: boolean
+    baseUrl?: string
+    apiKey?: string
+    model?: string
+    timeoutSeconds?: number
+    temperature?: number
+    maxTokens?: number
+}
+
+export type LlmConnectionTestResponse = {
+    available: boolean
+    previewMode: boolean
+    provider: string
+    model: string
+    message: string
+    checkedAt: string
 }
 
 export type YearlyAnalysisParams = {
@@ -130,62 +153,84 @@ export type QuestionAnswerAnalysisParams = {
     question: string
 }
 
+export type LlmQuestionAnswerResponse = {
+    question: string
+    answer: string
+    mockMode: boolean
+    modelName: string
+    generatedAt: string
+}
+
 export function getLlmStatus() {
     return apiGet<LlmStatusResponse>('/llm/status')
 }
 
+export function updateLlmConfig(data: LlmConfigUpdateRequest) {
+    return apiPost<LlmStatusResponse, LlmConfigUpdateRequest>('/llm/config', data)
+}
+
+export function testLlmConnection() {
+    return llmPost<LlmConnectionTestResponse>('/llm/test-connection')
+}
+
 export function getYearlyAnalysis(params: YearlyAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/yearly', params)
+    return llmPost<LlmAnalysisResponse, YearlyAnalysisParams>('/llm/analysis/yearly', params)
 }
 
 export function getQuarterlyAnalysis(params: QuarterlyAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/quarterly', params)
+    return llmPost<LlmAnalysisResponse, QuarterlyAnalysisParams>('/llm/analysis/quarterly', params)
 }
 
 export function getTypePreferenceAnalysis(params: TypePreferenceAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/type-preference', params)
+    return llmPost<LlmAnalysisResponse, TypePreferenceAnalysisParams>('/llm/analysis/type-preference', params)
 }
 
 export function getScoreStructureAnalysis(params: ScoreStructureAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/score-structure', params)
+    return llmPost<LlmAnalysisResponse, ScoreStructureAnalysisParams>('/llm/analysis/score-structure', params)
 }
 
 export function getTagPreferenceAnalysis(params: TagPreferenceAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/tag-preference', params)
+    return llmPost<LlmAnalysisResponse, TagPreferenceAnalysisParams>('/llm/analysis/tag-preference', params)
 }
 
 export function getRecommendationAnalysis(params: RecommendationAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/recommendations', params)
+    return llmPost<LlmAnalysisResponse, RecommendationAnalysisParams>('/llm/analysis/recommendations', params)
 }
 
 export function getCollectionBacklogAnalysis(params: CollectionBacklogAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/collection-backlog', params)
+    return llmPost<LlmAnalysisResponse, CollectionBacklogAnalysisParams>('/llm/analysis/collection-backlog', params)
 }
 
 export function getTasteProfileAnalysis(params: TasteProfileAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/taste-profile', params)
+    return llmPost<LlmAnalysisResponse, TasteProfileAnalysisParams>('/llm/analysis/taste-profile', params)
 }
 
 export function getPreferenceContradictionAnalysis(params: PreferenceContradictionAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/preference-contradictions', params)
+    return llmPost<LlmAnalysisResponse, PreferenceContradictionAnalysisParams>('/llm/analysis/preference-contradictions', params)
 }
 
 export function getInterestTrendAnalysis(params: InterestTrendAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/interest-trend', params)
+    return llmPost<LlmAnalysisResponse, InterestTrendAnalysisParams>('/llm/analysis/interest-trend', params)
 }
 
 export function getFranchiseCompletionAnalysis(params: FranchiseCompletionAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/franchise-completion', params)
+    return llmPost<LlmAnalysisResponse, FranchiseCompletionAnalysisParams>('/llm/analysis/franchise-completion', params)
 }
 
 export function getComprehensiveReportAnalysis(params: ComprehensiveReportAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/comprehensive-report', params)
+    return llmPost<LlmAnalysisResponse, ComprehensiveReportAnalysisParams>('/llm/analysis/comprehensive-report', params)
 }
 
 export function getHomeInsightAnalysis(params: HomeInsightAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/analysis/home-insight', params)
+    return llmPost<LlmAnalysisResponse, HomeInsightAnalysisParams>('/llm/analysis/home-insight', params)
 }
 
 export function getQuestionAnswerAnalysis(params: QuestionAnswerAnalysisParams) {
-    return apiGet<LlmAnalysisResponse>('/llm/qa', params)
+    return llmPost<LlmQuestionAnswerResponse, QuestionAnswerAnalysisParams>('/llm/qa', params)
+}
+
+function llmPost<T, B = unknown>(url: string, data?: B) {
+    return apiPostWithConfig<T, B>(url, data, {
+        timeout: LLM_GENERATION_TIMEOUT_MS,
+    })
 }

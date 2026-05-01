@@ -3,26 +3,33 @@ package com.mykr.acgnhistoryanalyzer.service;
 import com.mykr.acgnhistoryanalyzer.llm.LlmClient;
 import com.mykr.acgnhistoryanalyzer.llm.LlmContextBuilder;
 import com.mykr.acgnhistoryanalyzer.llm.LlmGenerateRequest;
+import com.mykr.acgnhistoryanalyzer.llm.LlmProperties;
 import com.mykr.acgnhistoryanalyzer.llm.LlmPromptService;
 import com.mykr.acgnhistoryanalyzer.response.LlmAnalysisResponse;
+import com.mykr.acgnhistoryanalyzer.response.LlmConnectionTestResponse;
+import com.mykr.acgnhistoryanalyzer.response.LlmQuestionAnswerResponse;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @Service
 public class LlmAnalysisService {
 
     private final LlmClient llmClient;
+    private final LlmProperties llmProperties;
     private final LlmPromptService llmPromptService;
     private final LlmContextBuilder llmContextBuilder;
 
     public LlmAnalysisService(
             LlmClient llmClient,
+            LlmProperties llmProperties,
             LlmPromptService llmPromptService,
             LlmContextBuilder llmContextBuilder
     ) {
         this.llmClient = llmClient;
+        this.llmProperties = llmProperties;
         this.llmPromptService = llmPromptService;
         this.llmContextBuilder = llmContextBuilder;
     }
@@ -192,16 +199,28 @@ public class LlmAnalysisService {
         ));
     }
 
-    public LlmAnalysisResponse answerQuestion(String question) {
+    public LlmQuestionAnswerResponse answerQuestion(String question) {
         String normalizedQuestion = question == null ? "" : question.trim();
         String prompt = llmPromptService.buildQuestionAnswerPrompt(normalizedQuestion);
         Map<String, Object> context = llmContextBuilder.buildQuestionAnswerContext(normalizedQuestion);
 
-        return llmClient.generate(new LlmGenerateRequest(
+        return llmClient.answer(new LlmGenerateRequest(
                 "QUESTION_ANSWER",
                 prompt,
                 context
         ));
+    }
+
+    public LlmConnectionTestResponse testConnection() {
+        String message = llmClient.testConnection();
+        return new LlmConnectionTestResponse(
+                true,
+                llmProperties.isMockMode(),
+                llmProperties.getProvider(),
+                llmProperties.getModel(),
+                message,
+                LocalDateTime.now()
+        );
     }
 
     public LlmAnalysisResponse generateHomeInsight(Integer year, Integer quarter, String category) {

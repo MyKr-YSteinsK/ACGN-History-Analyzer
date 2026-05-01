@@ -120,7 +120,15 @@ public class LlmPromptService {
     }
 
     public String buildQuestionAnswerPrompt(String question) {
-        return buildBasePrompt("自然语言问答：" + question);
+        return """
+                你是一个个人 ACGN 历史数据分析助手。
+                你只需要输出自然语言回答，不要输出 JSON，不要输出 markdown，不要输出代码块。
+                请只根据后端提供的结构化上下文回答用户问题，不要编造作品、标签或评分。
+                用户评分满分 50，平台评分满分 10。
+                如果上下文中没有足够信息，请直接说明“不足以判断”，并给出基于现有数据的谨慎解释。
+                回答要像真实 AI 助手，语气自然、简洁、具体。
+                问题：%s
+                """.formatted(question);
     }
 
     private String buildBasePrompt(String scope) {
@@ -131,6 +139,36 @@ public class LlmPromptService {
                 月份档期规则：1=一月，2=四月，3=七月，4=十月。
                 当前分析范围：%s。
                 输出应克制、具体、有判断，并且必须带引用依据。
+                你必须只输出一个合法 JSON 对象，不要输出 markdown，不要输出代码块，不要在 JSON 前后添加解释文字。
+                JSON 字段必须符合：
+                {
+                  "analysisType": "后端传入的 analysisType",
+                  "title": "报告标题",
+                  "summary": "120字以内摘要",
+                  "keywords": ["2到6个关键词"],
+                  "sections": [{"title": "段落标题", "content": "段落内容"}],
+                  "recommendations": [{
+                    "subjectId": null,
+                    "title": "候选作品名",
+                    "coverUrl": null,
+                    "category": "ANIME",
+                    "tags": ["标签"],
+                    "franchiseName": null,
+                    "source": "LIBRARY",
+                    "reason": "推荐理由",
+                    "risk": "风险或边界",
+                    "evidence": "引用依据",
+                    "priority": "LOW",
+                    "matchScore": 60,
+                    "platformScore": null
+                  }],
+                  "evidence": ["引用后端上下文中的统计、作品或标签依据"],
+                  "warnings": ["数据不足或解释边界"],
+                  "scope": {"year": null, "quarter": null, "category": null},
+                  "mockMode": false,
+                  "modelName": "deepseek-v4-flash"
+                }
+                如果上下文没有 recommendations，recommendations 输出空数组。
                 """.formatted(scope);
     }
 }

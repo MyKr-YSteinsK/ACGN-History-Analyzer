@@ -471,8 +471,6 @@ function HomePage() {
                         </div>
                     </div>
                 </GlassCard>
-                    </div>
-                </GlassCard>
 
                 <div className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
                     <GlassCard className="overflow-hidden">
@@ -621,16 +619,12 @@ function HomeInsightPanel({
                               quarter,
                           }: HomeInsightPanelProps) {
     const theme = categoryTheme[category]
-    const visibleSections = report?.sections.slice(0, 2) ?? []
+    const visibleSections = report?.sections ?? []
+    const visibleRecommendations = report?.recommendations ?? []
 
     return (
         <GlassCard className="overflow-hidden">
-            <div
-                className={[
-                    'flex h-full min-h-[310px] flex-col bg-gradient-to-br p-5 transition-all duration-300',
-                    theme.softGradient,
-                ].join(' ')}
-            >
+            <div className="flex h-full min-h-[310px] flex-col bg-gradient-to-br p-5 transition-all duration-300">
                 <SectionHeader
                     eyebrow="ai insight"
                     title="首页图表解读"
@@ -649,22 +643,33 @@ function HomeInsightPanel({
                     </div>
                 ) : report ? (
                     <div className="mt-4 flex flex-1 flex-col gap-3">
+                        <div className="flex flex-wrap gap-2">
+                            <span className="rounded-full border border-white/75 bg-white/65 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                                {report.mockMode ? '预览模式' : report.modelName}
+                            </span>
+                            <span className="rounded-full border border-white/75 bg-white/65 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                                {report.analysisType}
+                            </span>
+                        </div>
+
                         <div className="rounded-[24px] border border-white/75 bg-white/62 p-4 shadow-sm backdrop-blur">
                             <p className="text-sm leading-6 text-slate-500">
                                 {report.summary}
                             </p>
                         </div>
 
-                        <div className="flex flex-wrap gap-1.5">
-                            {report.keywords.slice(0, 5).map((keyword) => (
-                                <span
-                                    key={keyword}
-                                    className="rounded-full border border-white/75 bg-white/65 px-2.5 py-1 text-[11px] font-semibold text-slate-500"
-                                >
-                                    #{keyword}
-                                </span>
-                            ))}
-                        </div>
+                        {report.keywords.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                                {report.keywords.slice(0, 6).map((keyword) => (
+                                    <span
+                                        key={keyword}
+                                        className="rounded-full border border-white/75 bg-white/65 px-2.5 py-1 text-[11px] font-semibold text-slate-500"
+                                    >
+                                        #{keyword}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
 
                         <div className="grid flex-1 gap-2.5">
                             {visibleSections.map((section) => (
@@ -675,14 +680,32 @@ function HomeInsightPanel({
                                     <h4 className="text-sm font-black text-slate-800">
                                         {section.title}
                                     </h4>
-                                    <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-500">
+                                    <p className="mt-1 line-clamp-4 text-xs leading-5 text-slate-500">
                                         {section.content}
                                     </p>
                                 </article>
                             ))}
                         </div>
 
-                        {report.evidence[0] ? (
+                        {visibleRecommendations.length > 0 ? (
+                            <div className="rounded-[22px] border border-white/70 bg-white/52 p-3.5">
+                                <h4 className="text-sm font-black text-slate-800">推荐</h4>
+                                <div className="mt-2 space-y-2">
+                                    {visibleRecommendations.slice(0, 2).map((item) => (
+                                        <div key={item.subjectId} className="rounded-[18px] bg-white/55 p-3">
+                                            <p className="text-sm font-semibold text-slate-700">
+                                                {item.title}
+                                            </p>
+                                            <p className="mt-1 text-xs leading-5 text-slate-500">
+                                                {item.reason}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {report.evidence.length > 0 ? (
                             <p className="rounded-2xl border border-white/70 bg-white/48 px-3 py-2 text-[11px] leading-5 text-slate-400">
                                 {report.evidence[0]}
                             </p>

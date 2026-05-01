@@ -6,6 +6,7 @@ import com.mykr.acgnhistoryanalyzer.common.enums.LibraryStatus;
 import com.mykr.acgnhistoryanalyzer.common.enums.SubjectPageSortType;
 import com.mykr.acgnhistoryanalyzer.entity.Franchise;
 import com.mykr.acgnhistoryanalyzer.entity.Subject;
+import com.mykr.acgnhistoryanalyzer.entity.Tag;
 import com.mykr.acgnhistoryanalyzer.repository.FranchiseRepository;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectCollectionRepository;

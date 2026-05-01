@@ -40,12 +40,22 @@ function getResponseMessage(value: unknown) {
 
 function getTransportErrorMessage(error: AxiosError<unknown>) {
     const status = error.response?.status
+    const url = error.config?.url ?? ''
+    const isLlmRequest = url.includes('/llm/')
 
     if (status === 502 || status === 503 || status === 504) {
+        if (isLlmRequest) {
+            return '大模型服务暂时不可用，请检查 API Key、模型名、Base URL 或稍后重试'
+        }
+
         return '后端服务暂时无法连接，请确认 Spring Boot 后端已经启动，并且 Vite 代理端口仍然是 8080'
     }
 
     if (error.code === 'ECONNABORTED') {
+        if (isLlmRequest) {
+            return '大模型生成超时，请稍后重试，或切换到预览模式检查页面流程'
+        }
+
         return '请求超时，请检查后端服务是否正在运行'
     }
 
@@ -120,6 +130,19 @@ export function apiGet<T>(url: string, params?: unknown) {
 
 export function apiPost<T, B = unknown>(url: string, data?: B) {
     return apiRequest<T>({
+        method: 'POST',
+        url,
+        data,
+    })
+}
+
+export function apiPostWithConfig<T, B = unknown>(
+    url: string,
+    data?: B,
+    config?: Omit<AxiosRequestConfig, 'method' | 'url' | 'data'>,
+) {
+    return apiRequest<T>({
+        ...config,
         method: 'POST',
         url,
         data,

@@ -565,6 +565,7 @@ public class LlmContextBuilder {
         context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
         context.put("recommendations", buildQuestionRecommendations(intent, category));
         context.put("evidence", buildEvidence(context));
+        context.put("questionAnswerStyle", "NATURAL_LANGUAGE");
         return context;
     }
 
