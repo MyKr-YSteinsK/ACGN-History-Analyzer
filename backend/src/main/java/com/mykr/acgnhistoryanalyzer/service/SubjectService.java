@@ -75,7 +75,7 @@ public class SubjectService {
     }
 
     public SubjectResponse createSubject(SubjectCreateRequest request) {
-        Subject subject = buildSubjectFromRequest(request, resolveFranchiseIdForCreate(request));
+        Subject subject = buildSubjectFromRequest(request, resolveFranchiseIdForUpdate(request));
         tagService.syncSubjectTags(subject, tagService.resolveAllowedSubjectTagNames(request.getTagNames()));
         Subject savedSubject = subjectRepository.save(subject);
         return toResponse(savedSubject);
@@ -346,7 +346,7 @@ public class SubjectService {
                 continue;
             }
 
-            Long resolvedFranchiseId = resolveFranchiseIdForImport(item);
+            Long resolvedFranchiseId = resolveFranchiseIdForUpdate(item);
 
             if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
                 skippedCount++;
@@ -483,7 +483,7 @@ public class SubjectService {
 
             List<Subject> matchedSubjects = findImportMatches(item);
             Subject existingSubject = chooseImportTarget(matchedSubjects);
-            Long resolvedFranchiseId = resolveFranchiseIdForImport(item);
+            Long resolvedFranchiseId = resolveFranchiseIdForUpdate(item);
             if (existingSubject != null) {
                 if (hasSubjectChanged(existingSubject, item, resolvedFranchiseId)) {
                     updatedCount++;
@@ -589,10 +589,6 @@ public class SubjectService {
         );
     }
 
-    private Long resolveFranchiseIdForCreate(SubjectCreateRequest request) {
-        return resolveFranchiseIdForUpdate(request);
-    }
-
     private Long resolveFranchiseIdForUpdate(SubjectCreateRequest request) {
         if (request.getFranchiseId() != null) {
             return request.getFranchiseId();
@@ -603,36 +599,12 @@ public class SubjectService {
         return null;
     }
 
-    private Long resolveFranchiseIdForImport(SubjectCreateRequest request) {
-        if (request.getFranchiseId() != null) {
-            return request.getFranchiseId();
-        }
-        if (hasText(request.getFranchiseName())) {
-            return resolveFranchiseIdByName(request.getFranchiseName());
-        }
-        return null;
-    }
-
-    private Subject findExistingBySource(SubjectCreateRequest request) {
-        if (!hasText(request.getSourceId())) {
-            return null;
-        }
-
-        return findExistingBySourceIdentity(request).stream()
-                .findFirst()
-                .orElse(null);
-    }
-
     private List<Subject> findExistingBySourceIdentity(SubjectCreateRequest request) {
         if (!hasText(request.getSourceId())) {
             return List.of();
         }
 
         return subjectRepository.findAllBySourceIdentity(normalizeTextKey(request.getSourceId()));
-    }
-
-    private Subject findImportMatch(SubjectCreateRequest request) {
-        return chooseImportTarget(findImportMatches(request));
     }
 
     private List<Subject> findImportMatches(SubjectCreateRequest request) {
@@ -642,9 +614,6 @@ public class SubjectService {
             matches.put(subject.getId(), subject);
         }
 
-        if (!matches.isEmpty()) {
-            return new ArrayList<>(matches.values());
-        }
         return new ArrayList<>(matches.values());
     }
 
@@ -767,10 +736,6 @@ public class SubjectService {
             return false;
         }
         return left.doubleValue() == right.doubleValue();
-    }
-
-    private boolean equalsText(String left, String right) {
-        return normalizeTextKey(left).equals(normalizeTextKey(right));
     }
 
     private Long resolveFranchiseIdByName(String franchiseName) {
@@ -1060,10 +1025,6 @@ public class SubjectService {
                 subject.getCreatedAt(),
                 subject.getUpdatedAt()
         );
-    }
-
-    private String formatText(String value) {
-        return hasText(value) ? value.trim() : "-";
     }
 
     private String formatNumber(Number value) {

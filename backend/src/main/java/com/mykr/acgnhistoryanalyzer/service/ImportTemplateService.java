@@ -42,8 +42,9 @@ public class ImportTemplateService {
         templateBody.put("subjects", subjects);
 
         List<String> rules = List.of(
-                "建议导入顺序：先准备 franchise，再导入 subject，最后再导入 record。",
+                "推荐顺序：导入中心 Bangumi 新番写入作品库，再导入 collections / records；系列由 Bangumi 与正式记录后的自动检测维护。",
                 "subject 唯一性仅由 sourceId 判断（默认 Bangumi subject id）。",
+                "同一 sourceId 已存在时，重复导入只会同步三项：tagNames、platformScore、episodeCount；其余字段保持库中原值。",
                 "franchiseId 和 franchiseName 二选一即可；如果都传，当前逻辑优先按 franchiseId 处理。",
                 "如果传 franchiseName，则后端会尝试匹配已有系列；匹配不到时不会跳过，会按无系列作品导入。",
                 "preview 和正式 import 使用同一套判定规则。",

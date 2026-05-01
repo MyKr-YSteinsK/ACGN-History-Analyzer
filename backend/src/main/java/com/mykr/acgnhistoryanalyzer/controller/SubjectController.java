@@ -27,8 +27,8 @@ public class SubjectController {
     public ApiResponse<SubjectResponse> createSubject(@Valid @RequestBody SubjectCreateRequest request) {
         if (request.getSourceId() == null || request.getSourceId().isBlank()) {
             return ApiResponse.fail(
-                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
-                    "sourceId 不能为空（作品库仅支持 Bangumi 唯一标识）"
+                    BusinessErrors.SUBJECT_SOURCE_ID_REQUIRED.getCode(),
+                    BusinessErrors.SUBJECT_SOURCE_ID_REQUIRED.getMessage()
             );
         }
         if (request.getFranchiseId() != null
@@ -118,8 +118,8 @@ public class SubjectController {
     ) {
         if (request.getSourceId() == null || request.getSourceId().isBlank()) {
             return ApiResponse.fail(
-                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
-                    "sourceId 不能为空（作品库仅支持 Bangumi 唯一标识）"
+                    BusinessErrors.SUBJECT_SOURCE_ID_REQUIRED.getCode(),
+                    BusinessErrors.SUBJECT_SOURCE_ID_REQUIRED.getMessage()
             );
         }
         if (!subjectService.subjectExists(id)) {

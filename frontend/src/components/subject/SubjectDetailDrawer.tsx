@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import CoverImage from '../common/CoverImage'
 import StatusBadge from '../common/StatusBadge'
 import {
@@ -9,6 +8,8 @@ import {
     quarterTheme,
     yearChipClassName,
 } from '../../theme/acgnTheme'
+import { useEscapeToClose } from '../../hooks/useEscapeToClose'
+import { buildSeasonPartDisplay } from '../../utils/subjectDisplay'
 import type { SubjectCardView } from '../../types/subject'
 
 type SubjectDetailDrawerProps = {
@@ -28,20 +29,6 @@ type SubjectDetailDrawerProps = {
     showStatusActions?: boolean
 }
 
-function buildSeasonPartText(subject: SubjectCardView) {
-    const parts: string[] = []
-
-    if (subject.seasonIndex) {
-        parts.push(`第 ${subject.seasonIndex} 季`)
-    }
-
-    if (subject.partIndex) {
-        parts.push(`Part ${subject.partIndex}`)
-    }
-
-    return parts.length > 0 ? parts.join(' · ') : '无季数 / Part 信息'
-}
-
 function SubjectDetailDrawer({
                                  subject,
                                  open,
@@ -58,23 +45,7 @@ function SubjectDetailDrawer({
                                  showActions = true,
                                  showStatusActions = true,
                              }: SubjectDetailDrawerProps) {
-    useEffect(() => {
-        if (!open) {
-            return
-        }
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                onClose()
-            }
-        }
-
-        window.addEventListener('keydown', handleKeyDown)
-
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown)
-        }
-    }, [open, onClose])
+    useEscapeToClose(open, onClose)
 
     if (!open || !subject) {
         return null
@@ -151,7 +122,8 @@ function SubjectDetailDrawer({
                                 </div>
                             ) : null}
 
-                            {subject.platformScore ? (
+                            {subject.platformScore !== null &&
+                            subject.platformScore !== undefined ? (
                                 <div
                                     className={[
                                         'rounded-2xl border px-3 py-1.5 text-sm font-black',
@@ -350,7 +322,7 @@ function SubjectDetailDrawer({
 
                                 <div className="mt-4 grid gap-2.5 text-sm">
                                     <InfoRow label="主标题" value={subject.titleCn} />
-                                    <InfoRow label="季数/Part" value={buildSeasonPartText(subject)} />
+                                    <InfoRow label="季数/Part" value={buildSeasonPartDisplay(subject)} />
                                     <InfoRow label="系列" value={subject.franchiseName ?? '未关联系列'} />
                                     <InfoRow label="制作方" value={subject.studioName ?? '未知'} />
                                     <InfoRow label="来源平台" value={subject.sourcePlatform ?? '未设置'} />

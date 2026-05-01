@@ -34,4 +34,8 @@ public final class BusinessErrors {
 
     public static final BusinessError SUBJECT_UNIQUE_DUPLICATED =
             new BusinessError(4095, "作品来源ID重复，请修改后再保存");
+
+    /** 必填字段缺失（与唯一冲突区分，便于前端与监控分类） */
+    public static final BusinessError SUBJECT_SOURCE_ID_REQUIRED =
+            new BusinessError(4001, "sourceId 不能为空（作品库仅支持 Bangumi 唯一标识）");
 }
