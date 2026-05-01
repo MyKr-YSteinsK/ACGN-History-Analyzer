@@ -565,7 +565,13 @@ public class LlmContextBuilder {
         context.put("libraryCandidateCount", buildLibraryCandidateCount(category));
         context.put("recommendations", buildQuestionRecommendations(intent, category));
         context.put("evidence", buildEvidence(context));
-        context.put("questionAnswerStyle", "NATURAL_LANGUAGE");
+        context.put("questionAnswerStyle", "FREEFORM_PERSONAL_ASSISTANT");
+        context.put("answerPolicy", List.of(
+                "用户可以自由提问，不需要只问统计问题",
+                "涉及个人记录、评分、标签、收藏、系列时必须基于上下文回答",
+                "开放聊天、创意建议、答辩话术、泛 ACGN 讨论可以给一般建议，但需要和个人数据结论区分",
+                "如果上下文不足，先说明限制，再给出可执行的替代建议"
+        ));
         return context;
     }
 

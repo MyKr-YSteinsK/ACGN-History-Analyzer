@@ -87,8 +87,8 @@ const analysisModes: AnalysisModeMeta[] = [
     },
     {
         value: 'QUESTION_ANSWER',
-        label: '自然问答',
-        description: '用一句话查询记录、评分、标签或补完建议',
+        label: '自由问答',
+        description: '自由聊天、查记录、做规划、写总结或问答辩思路',
         accent: 'from-sky-100/90 via-white/70 to-cyan-50/70',
     },
     {
@@ -142,10 +142,10 @@ const analysisModes: AnalysisModeMeta[] = [
 ]
 
 const questionExamples = [
-    '2025 年我有哪些高分动画？',
-    '我是不是更喜欢日常标签？',
-    '想看里有什么适合优先补？',
-    '哪些标签看得多但评分不稳定？',
+    '像朋友一样吐槽一下我最近的 ACGN 口味',
+    '帮我设计一个适合答辩展示的 AI 分析演示问题',
+    '如果今晚只补一部，我应该从想看里挑什么？',
+    '把我的高分动画口味写成一段有记忆感的总结',
 ]
 
 const defaultProgress: GenerationProgress = {
@@ -1040,7 +1040,7 @@ function QuestionAnswerControl({
                         value={question}
                         onChange={(event) => onQuestionChange(event.target.value)}
                         rows={3}
-                        placeholder="例如：2025 年我有哪些高分动画？"
+                        placeholder="可以自由问：查记录、要推荐、让它吐槽口味、写答辩话术，或做一个补番计划。"
                         className="min-h-[112px] w-full resize-none rounded-[26px] border border-white/80 bg-white/72 px-4 py-3 text-sm font-semibold leading-6 text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-300 focus:border-sky-200 focus:bg-white focus:ring-4 focus:ring-sky-100/70"
                     />
                 </div>
@@ -1939,9 +1939,9 @@ function isAcgnCategory(value: unknown): value is AcgnCategory {
 function toQuestionAnswerReport(response: LlmQuestionAnswerResponse): LlmAnalysisResponse {
     return {
         analysisType: 'QUESTION_ANSWER',
-        title: '自然语言问答',
+        title: '自由问答',
         summary: response.answer,
-        keywords: ['自然问答', '结构化依据'],
+        keywords: ['自由问答', '个人档案助手'],
         sections: [
             {
                 title: '问题',
@@ -1953,8 +1953,8 @@ function toQuestionAnswerReport(response: LlmQuestionAnswerResponse): LlmAnalysi
             },
         ],
         recommendations: [],
-        evidence: ['回答基于系统内作品、记录、标签、收藏和系列上下文生成'],
-        warnings: ['自然问答不会修改任何作品、记录或收藏数据'],
+        evidence: ['涉及个人记录的问题会优先参考系统内作品、记录、标签、收藏和系列上下文'],
+        warnings: ['自由问答可以包含一般建议；只有涉及你的个人数据时才代表系统记录结论'],
         scope: {
             year: null,
             quarter: null,
@@ -2015,7 +2015,7 @@ function buildScopeText(
     }
 
     if (mode === 'QUESTION_ANSWER') {
-        return '自然语言问答 · 个性化分析'
+        return '自由问答 · 个性化助手'
     }
 
     if (mode === 'QUARTERLY') {
