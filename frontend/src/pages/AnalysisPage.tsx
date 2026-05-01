@@ -94,6 +94,24 @@ type CacheInfo = {
     expiresAt: string
 }
 
+type GenerationJobStatus = 'queued' | 'running' | 'completed' | 'failed'
+
+type GenerationJob = {
+    id: string
+    cacheKey: string
+    analysisType: AnalysisMode
+    modeLabel: string
+    scope: string
+    year: number
+    quarter: ReleaseQuarter
+    category: CategoryFilter
+    question: string
+    status: GenerationJobStatus
+    createdAt: string
+    completedAt?: string
+    message?: string
+}
+
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
 const quarterOptions: ReleaseQuarter[] = [1, 2, 3, 4]
 
@@ -213,7 +231,14 @@ function AnalysisPage() {
     const [configTesting, setConfigTesting] = useState(false)
     const [configMessage, setConfigMessage] = useState<string | null>(null)
     const [progress, setProgress] = useState<GenerationProgress>(defaultProgress)
+    const [generationJobs, setGenerationJobs] = useState<GenerationJob[]>([])
+    const [activeGenerationJob, setActiveGenerationJob] = useState<GenerationJob | null>(null)
     const progressStartedAt = useRef<number | null>(null)
+    const processingQueueRef = useRef(false)
+    const currentSelectionRef = useRef({
+        cacheKey: '',
+        analysisType: 'COMPREHENSIVE_REPORT' as AnalysisMode,
+    })
 
     const activeMode = analysisModes.find((item) => item.value === analysisMode) ?? analysisModes[0]
     const activeTheme =
@@ -235,6 +260,10 @@ function AnalysisPage() {
         () => buildReportCacheKey(analysisMode, selectedYear, selectedQuarter, selectedCategory, question),
         [analysisMode, question, selectedCategory, selectedQuarter, selectedYear],
     )
+    currentSelectionRef.current = {
+        cacheKey: reportCacheKey,
+        analysisType: analysisMode,
+    }
     const syncConfigState = useCallback((status: LlmStatusResponse) => {
         setLlmStatus(status)
         setConfigMode(status.mockMode ? 'preview' : 'deepseek')
@@ -279,11 +308,15 @@ function AnalysisPage() {
             const startedAt = progressStartedAt.current ?? Date.now()
             const elapsedSeconds = (Date.now() - startedAt) / 1000
             const nextPercent = Math.min(94, Math.round(12 + elapsedSeconds * 2.4))
-            setProgress(buildGenerationProgress(nextPercent, analysisMode, llmStatus))
+            setProgress(buildGenerationProgress(
+                nextPercent,
+                activeGenerationJob?.analysisType ?? analysisMode,
+                llmStatus,
+            ))
         }, 650)
 
         return () => window.clearInterval(timer)
-    }, [analysisMode, llmStatus, loading])
+    }, [activeGenerationJob, analysisMode, llmStatus, loading])
 
     useEffect(() => {
         if (analysisMode === 'QUESTION_ANSWER' && !question.trim()) {
@@ -308,7 +341,107 @@ function AnalysisPage() {
         setCacheInfo(null)
     }, [analysisMode, question, reportCacheKey])
 
-    const generateReport = useCallback(async () => {
+    const runGenerationJob = useCallback(async (job: GenerationJob) => {
+        processingQueueRef.current = true
+        setLoading(true)
+        setActiveGenerationJob(job)
+        setProgress(buildGenerationProgress(8, job.analysisType, llmStatus))
+        setGenerationJobs((items) => items.map((item) => (
+            item.id === job.id
+                ? { ...item, status: 'running', message: '正在生成' }
+                : item
+        )))
+
+        try {
+            const response = await requestAnalysisResponse(job)
+            const normalizedReport = normalizeAnalysisReport(response, job.analysisType)
+            const cachedAt = new Date().toISOString()
+            writeCachedReport(job.cacheKey, normalizedReport, cachedAt)
+            setReportHistory((items) => upsertReportHistory(items, {
+                id: `${cachedAt}-${job.analysisType}`,
+                cacheKey: job.cacheKey,
+                analysisType: job.analysisType,
+                title: polishAnalysisText(normalizedReport.title),
+                scope: job.scope,
+                mode: job.modeLabel,
+                generatedAt: cachedAt,
+                year: job.year,
+                quarter: job.quarter,
+                category: job.category,
+                question: job.question,
+            }))
+            setGenerationJobs((items) => trimFinishedGenerationJobs(items.map((item) => (
+                item.id === job.id
+                    ? {
+                          ...item,
+                          status: 'completed',
+                          completedAt: cachedAt,
+                          message: polishAnalysisText(normalizedReport.title) || '已生成',
+                      }
+                    : item
+            ))))
+            setProgress(buildGenerationProgress(100, job.analysisType, llmStatus))
+
+            if (currentSelectionRef.current.cacheKey === job.cacheKey) {
+                setReport(normalizedReport)
+                setCacheInfo({
+                    source: 'fresh',
+                    cachedAt,
+                    expiresAt: getReportCacheExpiresAt(cachedAt),
+                })
+                setError(null)
+            }
+        } catch (generateError) {
+            const cached = readCachedReport(job.cacheKey, job.analysisType)
+            const errorMessage = getApiErrorMessage(generateError, '智能分析生成失败')
+            setGenerationJobs((items) => trimFinishedGenerationJobs(items.map((item) => (
+                item.id === job.id
+                    ? {
+                          ...item,
+                          status: 'failed',
+                          completedAt: new Date().toISOString(),
+                          message: cached ? `${errorMessage}，已保留缓存` : errorMessage,
+                      }
+                    : item
+            ))))
+
+            if (currentSelectionRef.current.cacheKey === job.cacheKey) {
+                if (cached) {
+                    setReport(cached.report)
+                    setCacheInfo({
+                        source: 'cache',
+                        cachedAt: cached.cachedAt,
+                        expiresAt: cached.expiresAt,
+                    })
+                    setError(`${errorMessage}。已回退到本地缓存结果。`)
+                } else {
+                    setReport(null)
+                    setCacheInfo(null)
+                    setError(errorMessage)
+                }
+            }
+            setProgress(defaultProgress)
+        } finally {
+            processingQueueRef.current = false
+            setLoading(false)
+            setActiveGenerationJob(null)
+        }
+    }, [llmStatus])
+
+    useEffect(() => {
+        if (processingQueueRef.current) {
+            return
+        }
+
+        const nextJob = generationJobs.find((job) => job.status === 'queued')
+        if (!nextJob) {
+            return
+        }
+
+        void runGenerationJob(nextJob)
+    }, [generationJobs, runGenerationJob])
+
+    const generateReport = useCallback(() => {
         if (analysisMode === 'QUESTION_ANSWER' && !question.trim()) {
             setReport(null)
             setError('请先输入一个想分析的问题')
@@ -322,111 +455,27 @@ function AnalysisPage() {
             return
         }
 
-        setLoading(true)
         setError(null)
-        setProgress(buildGenerationProgress(8, analysisMode, llmStatus))
 
-        try {
-            const category =
-                selectedCategory === 'ALL' ? undefined : selectedCategory
-            const response =
-                analysisMode === 'QUESTION_ANSWER'
-                    ? toQuestionAnswerReport(await getQuestionAnswerAnalysis({
-                          question: question.trim(),
-                      }))
-                    : analysisMode === 'QUARTERLY'
-                      ? await getQuarterlyAnalysis({
-                            year: selectedYear,
-                            quarter: selectedQuarter,
-                            category,
-                        })
-                      : analysisMode === 'TYPE_PREFERENCE'
-                        ? await getTypePreferenceAnalysis({
-                              category: selectedCategory === 'ALL' ? 'ANIME' : selectedCategory,
-                          })
-                        : analysisMode === 'SCORE_STRUCTURE'
-                          ? await getScoreStructureAnalysis({
-                                category,
-                            })
-                          : analysisMode === 'TAG_PREFERENCE'
-                            ? await getTagPreferenceAnalysis({
-                                  category,
-                              })
-                            : analysisMode === 'RECOMMENDATION'
-                              ? await getRecommendationAnalysis({
-                                    category,
-                                })
-                              : analysisMode === 'COLLECTION_BACKLOG'
-                                ? await getCollectionBacklogAnalysis({
-                                      category,
-                                  })
-                                : analysisMode === 'TASTE_PROFILE'
-                                  ? await getTasteProfileAnalysis({
-                                        category,
-                                    })
-                                    : analysisMode === 'PREFERENCE_CONTRADICTION'
-                                      ? await getPreferenceContradictionAnalysis({
-                                            category,
-                                        })
-                                      : analysisMode === 'INTEREST_TREND'
-                                        ? await getInterestTrendAnalysis({
-                                              category,
-                                          })
-                                        : analysisMode === 'FRANCHISE_COMPLETION'
-                                          ? await getFranchiseCompletionAnalysis({
-                                                category,
-                                            })
-                                          : analysisMode === 'COMPREHENSIVE_REPORT'
-                                            ? await getComprehensiveReportAnalysis({
-                                                  year: selectedYear,
-                                                  category,
-                                              })
-                                            : await getYearlyAnalysis({
-                                                  year: selectedYear,
-                                                  category,
-                                              })
-            const normalizedReport = normalizeAnalysisReport(response, analysisMode)
-            const cachedAt = new Date().toISOString()
-            writeCachedReport(reportCacheKey, normalizedReport, cachedAt)
-            setReportHistory((items) => upsertReportHistory(items, {
-                id: `${cachedAt}-${analysisMode}`,
-                cacheKey: reportCacheKey,
-                analysisType: analysisMode,
-                title: polishAnalysisText(normalizedReport.title),
-                scope: scopeText,
-                mode: activeMode.label,
-                generatedAt: cachedAt,
-                year: selectedYear,
-                quarter: selectedQuarter,
-                category: selectedCategory,
-                question: question.trim(),
-            }))
-            setProgress(buildGenerationProgress(100, analysisMode, llmStatus))
-            setReport(normalizedReport)
-            setCacheInfo({
-                source: 'fresh',
-                cachedAt,
-                expiresAt: getReportCacheExpiresAt(cachedAt),
-            })
-        } catch (generateError) {
-            const cached = readCachedReport(reportCacheKey, analysisMode)
-            if (cached) {
-                setReport(cached.report)
-                setCacheInfo({
-                    source: 'cache',
-                    cachedAt: cached.cachedAt,
-                    expiresAt: cached.expiresAt,
-                })
-                setError(`${getApiErrorMessage(generateError, '智能分析生成失败')}。已回退到本地缓存结果。`)
-            } else {
-                setReport(null)
-                setCacheInfo(null)
-                setError(getApiErrorMessage(generateError, '智能分析生成失败'))
-            }
-            setProgress(defaultProgress)
-        } finally {
-            setLoading(false)
+        const createdAt = new Date().toISOString()
+        const job: GenerationJob = {
+            id: `${createdAt}-${analysisMode}-${Math.random().toString(36).slice(2, 8)}`,
+            cacheKey: reportCacheKey,
+            analysisType: analysisMode,
+            modeLabel: activeMode.label,
+            scope: scopeText,
+            year: selectedYear,
+            quarter: selectedQuarter,
+            category: selectedCategory,
+            question: question.trim(),
+            status: 'queued',
+            createdAt,
+            message: '等待前面的报告生成完成',
         }
+        setGenerationJobs((items) => [
+            ...items,
+            job,
+        ].slice(-12))
     }, [
         activeMode.label,
         analysisMode,
@@ -706,13 +755,24 @@ function AnalysisPage() {
                 />
             ) : null}
 
-            {loading ? (
+            {loading && activeGenerationJob ? (
                 <GenerationProgressPanel
                     progress={progress}
-                    modeLabel={activeMode.label}
+                    modeLabel={activeGenerationJob.modeLabel}
                     modelLabel={llmStatus?.mockMode ? '预览模式' : (llmStatus?.model ?? 'DeepSeek API')}
                 />
-            ) : report ? (
+            ) : null}
+
+            {generationJobs.length > 0 ? (
+                <GenerationQueuePanel
+                    jobs={generationJobs}
+                    onClearFinished={() => setGenerationJobs((items) => (
+                        items.filter((item) => item.status === 'queued' || item.status === 'running')
+                    ))}
+                />
+            ) : null}
+
+            {report ? (
                 <AnalysisReport
                     report={report}
                     history={reportHistory}
@@ -726,7 +786,7 @@ function AnalysisPage() {
             ) : (
                 <EmptyState
                     title="等待生成分析结果"
-                    description="当前筛选还没有本地缓存。点击生成分析后，结果会写入本地缓存；之后切回同一条件会优先展示缓存，只有重新生成才会覆盖。"
+                    description="当前筛选还没有本地缓存。点击生成会把任务加入队列，后台依次生成；你可以继续切换条件并继续添加其它报告。"
                 />
             )}
         </div>
@@ -896,7 +956,7 @@ function AnalysisControlBar({
             <div className="flex items-end">
                 <GenerateButton
                     loading={loading}
-                    disabled={loading}
+                    disabled={false}
                     label={buttonLabel}
                     onClick={onSubmit}
                 />
@@ -977,7 +1037,7 @@ function QuestionAnswerControl({
                 <div className="flex items-end">
                     <GenerateButton
                         loading={loading}
-                        disabled={loading || !question.trim()}
+                        disabled={!question.trim()}
                         label={buttonLabel}
                         onClick={onSubmit}
                     />
@@ -1020,7 +1080,7 @@ function GenerateButton({ loading, disabled, label, onClick }: GenerateButtonPro
                     : 'border-sky-200 bg-sky-100/90 text-sky-700 hover:-translate-y-0.5 hover:bg-sky-50',
             ].join(' ')}
         >
-            {loading ? '生成中' : label}
+            {loading ? '加入队列' : label}
         </button>
     )
 }
@@ -1058,6 +1118,84 @@ function ScopeSummary({ scopeText, modeLabel, category }: ScopeSummaryProps) {
                     <span className="rounded-full border border-white/75 bg-white/65 px-4 py-2 text-xs font-black text-slate-500">
                         {category === 'ALL' ? '全部类型' : categoryTheme[category].cnName}
                     </span>
+                </div>
+            </div>
+        </GlassCard>
+    )
+}
+
+type GenerationQueuePanelProps = {
+    jobs: GenerationJob[]
+    onClearFinished: () => void
+}
+
+function GenerationQueuePanel({ jobs, onClearFinished }: GenerationQueuePanelProps) {
+    const activeCount = jobs.filter((job) => job.status === 'queued' || job.status === 'running').length
+    const finishedCount = jobs.length - activeCount
+
+    return (
+        <GlassCard className="overflow-hidden">
+            <div className="bg-gradient-to-br from-white/75 via-violet-50/45 to-sky-50/55 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                            generation queue
+                        </p>
+                        <h3 className="mt-1 text-lg font-black text-slate-800">
+                            报告生成队列
+                        </h3>
+                        <p className="mt-1 text-sm leading-6 text-slate-500">
+                            当前还有 {activeCount} 个任务在运行或等待。切换筛选不会打断已提交的任务，完成后会写入本地缓存和历史记录。
+                        </p>
+                    </div>
+                    {finishedCount > 0 ? (
+                        <button
+                            type="button"
+                            onClick={onClearFinished}
+                            className="rounded-full border border-slate-200 bg-white/75 px-4 py-2 text-xs font-black text-slate-500 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
+                        >
+                            清理已完成
+                        </button>
+                    ) : null}
+                </div>
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    {jobs.slice(-6).map((job) => (
+                        <div
+                            key={job.id}
+                            className={[
+                                'rounded-[22px] border bg-white/58 p-4 shadow-sm',
+                                job.status === 'running'
+                                    ? 'border-sky-200'
+                                    : job.status === 'failed'
+                                      ? 'border-rose-100'
+                                      : 'border-white/75',
+                            ].join(' ')}
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="text-sm font-black text-slate-800">
+                                        {job.modeLabel}
+                                    </p>
+                                    <p className="mt-1 line-clamp-1 text-xs text-slate-400">
+                                        {job.scope}
+                                    </p>
+                                </div>
+                                <span className={[
+                                    'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black',
+                                    getGenerationJobStatusClassName(job.status),
+                                ].join(' ')}
+                                >
+                                    {getGenerationJobStatusLabel(job.status)}
+                                </span>
+                            </div>
+                            {job.message ? (
+                                <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">
+                                    {job.message}
+                                </p>
+                            ) : null}
+                        </div>
+                    ))}
                 </div>
             </div>
         </GlassCard>
@@ -1191,6 +1329,8 @@ function AnalysisReport({
                         ))}
                     </div>
 
+                    <ReportReadingHighlights report={report} />
+
                     <div className="mt-6 grid gap-4 lg:grid-cols-2">
                         {report.sections.map((section, index) => {
                             const rawFallbackSection = isRawFallbackSection(section)
@@ -1322,6 +1462,70 @@ function SnapshotMetric({ label, value }: SnapshotMetricProps) {
         <div className="rounded-[22px] border border-white/75 bg-white/62 p-4 text-center shadow-sm">
             <p className="text-[11px] font-semibold text-slate-400">{label}</p>
             <p className="mt-1 text-2xl font-black text-slate-800">{value}</p>
+        </div>
+    )
+}
+
+type ReportReadingHighlightsProps = {
+    report: LlmAnalysisResponse
+}
+
+function ReportReadingHighlights({ report }: ReportReadingHighlightsProps) {
+    const posterItems = report.recommendations
+        .filter((item) => item.coverUrl)
+        .slice(0, 4)
+
+    return (
+        <div className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+            <div className="rounded-[28px] border border-white/75 bg-white/58 p-5 shadow-sm backdrop-blur">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
+                    reading guide
+                </p>
+                <h4 className="mt-2 text-base font-black text-slate-800">
+                    先看这几个结论点
+                </h4>
+                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <SnapshotMetric label="正文段落" value={report.sections.length} />
+                    <SnapshotMetric label="关键词" value={report.keywords.length} />
+                    <SnapshotMetric label="推荐作品" value={report.recommendations.length} />
+                    <SnapshotMetric label="依据条目" value={report.evidence.length} />
+                </div>
+            </div>
+
+            {posterItems.length > 0 ? (
+                <div className="rounded-[28px] border border-white/75 bg-white/58 p-5 shadow-sm backdrop-blur">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
+                        poster picks
+                    </p>
+                    <h4 className="mt-2 text-base font-black text-slate-800">
+                        报告提到的作品
+                    </h4>
+                    <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+                        {posterItems.map((item, index) => (
+                            <div
+                                key={`${item.subjectId ?? item.title}-${index}`}
+                                className="w-24 shrink-0"
+                            >
+                                <div className="h-36 overflow-hidden rounded-[18px] border border-white/80 bg-white/60 shadow-sm">
+                                    <CoverImage
+                                        src={item.coverUrl}
+                                        alt={item.title}
+                                        className="h-full w-full object-cover"
+                                        fallback={
+                                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 to-sky-50 text-2xl font-black text-slate-400">
+                                                {polishAnalysisText(item.title).slice(0, 1) || 'A'}
+                                            </div>
+                                        }
+                                    />
+                                </div>
+                                <p className="mt-2 line-clamp-2 text-xs font-black leading-4 text-slate-700">
+                                    {polishAnalysisText(item.title)}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
         </div>
     )
 }
@@ -1594,6 +1798,115 @@ function RecommendationCard({ item }: RecommendationCardProps) {
             </div>
         </article>
     )
+}
+
+async function requestAnalysisResponse(job: GenerationJob) {
+    const category = job.category === 'ALL' ? undefined : job.category
+
+    if (job.analysisType === 'QUESTION_ANSWER') {
+        return toQuestionAnswerReport(await getQuestionAnswerAnalysis({
+            question: job.question,
+        }))
+    }
+
+    if (job.analysisType === 'QUARTERLY') {
+        return getQuarterlyAnalysis({
+            year: job.year,
+            quarter: job.quarter,
+            category,
+        })
+    }
+
+    if (job.analysisType === 'TYPE_PREFERENCE') {
+        return getTypePreferenceAnalysis({
+            category: job.category === 'ALL' ? 'ANIME' : job.category,
+        })
+    }
+
+    if (job.analysisType === 'SCORE_STRUCTURE') {
+        return getScoreStructureAnalysis({ category })
+    }
+
+    if (job.analysisType === 'TAG_PREFERENCE') {
+        return getTagPreferenceAnalysis({ category })
+    }
+
+    if (job.analysisType === 'RECOMMENDATION') {
+        return getRecommendationAnalysis({ category })
+    }
+
+    if (job.analysisType === 'COLLECTION_BACKLOG') {
+        return getCollectionBacklogAnalysis({ category })
+    }
+
+    if (job.analysisType === 'TASTE_PROFILE') {
+        return getTasteProfileAnalysis({ category })
+    }
+
+    if (job.analysisType === 'PREFERENCE_CONTRADICTION') {
+        return getPreferenceContradictionAnalysis({ category })
+    }
+
+    if (job.analysisType === 'INTEREST_TREND') {
+        return getInterestTrendAnalysis({ category })
+    }
+
+    if (job.analysisType === 'FRANCHISE_COMPLETION') {
+        return getFranchiseCompletionAnalysis({ category })
+    }
+
+    if (job.analysisType === 'COMPREHENSIVE_REPORT') {
+        return getComprehensiveReportAnalysis({
+            year: job.year,
+            category,
+        })
+    }
+
+    return getYearlyAnalysis({
+        year: job.year,
+        category,
+    })
+}
+
+function trimFinishedGenerationJobs(jobs: GenerationJob[]) {
+    const activeJobs = jobs.filter((job) => job.status === 'queued' || job.status === 'running')
+    const finishedJobs = jobs.filter((job) => job.status !== 'queued' && job.status !== 'running')
+    return [
+        ...activeJobs,
+        ...finishedJobs.slice(-6),
+    ].slice(-12)
+}
+
+function getGenerationJobStatusLabel(status: GenerationJobStatus) {
+    if (status === 'queued') {
+        return '排队中'
+    }
+
+    if (status === 'running') {
+        return '生成中'
+    }
+
+    if (status === 'completed') {
+        return '已完成'
+    }
+
+    return '失败'
+}
+
+function getGenerationJobStatusClassName(status: GenerationJobStatus) {
+    if (status === 'queued') {
+        return 'border-violet-100 bg-violet-50/85 text-violet-600'
+    }
+
+    if (status === 'running') {
+        return 'border-sky-200 bg-sky-50/90 text-sky-700'
+    }
+
+    if (status === 'completed') {
+        return 'border-emerald-200 bg-emerald-50/90 text-emerald-700'
+    }
+
+    return 'border-rose-200 bg-rose-50/90 text-rose-700'
 }
 
 function buildGenerationProgress(
