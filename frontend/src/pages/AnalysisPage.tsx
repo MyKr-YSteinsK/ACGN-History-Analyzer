@@ -56,10 +56,17 @@ type AnalysisModeMeta = {
 }
 
 type HistoryItem = {
+    id: string
+    cacheKey: string
+    analysisType: AnalysisMode
     title: string
     scope: string
     mode: string
-    time: string
+    generatedAt: string
+    year: number
+    quarter: ReleaseQuarter
+    category: CategoryFilter
+    question: string
 }
 
 type LlmConfigMode = 'deepseek' | 'preview'
@@ -156,6 +163,8 @@ const defaultProgress: GenerationProgress = {
 
 const reportCachePrefix = 'acgn-llm-report-cache'
 const reportCacheVersion = 1
+const reportHistoryStorageKey = 'acgn-llm-report-history'
+const maxReportHistoryCount = 20
 const allAiCachePrefixes = [reportCachePrefix, 'acgn-home-insight-cache']
 
 function AnalysisPage() {
@@ -165,6 +174,7 @@ function AnalysisPage() {
     const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('ALL')
     const [question, setQuestion] = useState('2025 年我有哪些高分动画？')
     const [report, setReport] = useState<LlmAnalysisResponse | null>(null)
+    const [reportHistory, setReportHistory] = useState<HistoryItem[]>(() => readReportHistory())
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null)
@@ -200,21 +210,6 @@ function AnalysisPage() {
         () => buildReportCacheKey(analysisMode, selectedYear, selectedQuarter, selectedCategory, question),
         [analysisMode, question, selectedCategory, selectedQuarter, selectedYear],
     )
-    const reportHistory = useMemo(() => {
-        if (!report) {
-            return []
-        }
-
-        return [
-            {
-                title: polishAnalysisText(report.title),
-                scope: scopeText,
-                mode: activeMode.label,
-                time: formatGeneratedAt(report.generatedAt),
-            },
-        ]
-    }, [activeMode.label, report, scopeText])
-
     const syncConfigState = useCallback((status: LlmStatusResponse) => {
         setLlmStatus(status)
         setConfigMode(status.mockMode ? 'preview' : 'deepseek')
@@ -354,6 +349,19 @@ function AnalysisPage() {
             const normalizedReport = normalizeAnalysisReport(response, analysisMode)
             const cachedAt = new Date().toISOString()
             writeCachedReport(reportCacheKey, normalizedReport, cachedAt)
+            setReportHistory((items) => upsertReportHistory(items, {
+                id: `${cachedAt}-${analysisMode}`,
+                cacheKey: reportCacheKey,
+                analysisType: analysisMode,
+                title: polishAnalysisText(normalizedReport.title),
+                scope: scopeText,
+                mode: activeMode.label,
+                generatedAt: cachedAt,
+                year: selectedYear,
+                quarter: selectedQuarter,
+                category: selectedCategory,
+                question: question.trim(),
+            }))
             setProgress(buildGenerationProgress(100, analysisMode, llmStatus))
             setReport(normalizedReport)
             setCacheInfo({
@@ -378,7 +386,17 @@ function AnalysisPage() {
         } finally {
             setLoading(false)
         }
-    }, [analysisMode, llmStatus, question, reportCacheKey, selectedCategory, selectedQuarter, selectedYear])
+    }, [
+        activeMode.label,
+        analysisMode,
+        llmStatus,
+        question,
+        reportCacheKey,
+        scopeText,
+        selectedCategory,
+        selectedQuarter,
+        selectedYear,
+    ])
 
     const saveLlmConfig = useCallback(async () => {
         setConfigSaving(true)
@@ -452,9 +470,38 @@ function AnalysisPage() {
 
     const clearAllAiCaches = useCallback(() => {
         removeCacheItemsByPrefixes(allAiCachePrefixes)
+        writeReportHistory([])
+        setReportHistory([])
         setReport(null)
         setCacheInfo(null)
         setError(null)
+    }, [])
+
+    const restoreHistoryItem = useCallback((item: HistoryItem) => {
+        const cached = readCachedReport(item.cacheKey, item.analysisType)
+        if (!cached) {
+            setError('这条历史记录对应的本地缓存已经不存在，请重新生成。')
+            return
+        }
+
+        setAnalysisMode(item.analysisType)
+        setSelectedYear(item.year)
+        setSelectedQuarter(item.quarter)
+        setSelectedCategory(item.category)
+        if (item.analysisType === 'QUESTION_ANSWER') {
+            setQuestion(item.question)
+        }
+        setReport(cached.report)
+        setCacheInfo({
+            source: 'cache',
+            cachedAt: cached.cachedAt,
+        })
+        setError(null)
+    }, [])
+
+    const clearReportHistory = useCallback(() => {
+        writeReportHistory([])
+        setReportHistory([])
     }, [])
 
     function handleModeChange(mode: AnalysisMode) {
@@ -597,6 +644,8 @@ function AnalysisPage() {
                     report={report}
                     history={reportHistory}
                     activeCategory={selectedCategory}
+                    onSelectHistory={restoreHistoryItem}
+                    onClearHistory={clearReportHistory}
                 />
             ) : (
                 <EmptyState
@@ -1214,9 +1263,17 @@ type AnalysisReportProps = {
     report: LlmAnalysisResponse
     history: HistoryItem[]
     activeCategory: CategoryFilter
+    onSelectHistory: (item: HistoryItem) => void
+    onClearHistory: () => void
 }
 
-function AnalysisReport({ report, history, activeCategory }: AnalysisReportProps) {
+function AnalysisReport({
+    report,
+    history,
+    activeCategory,
+    onSelectHistory,
+    onClearHistory,
+}: AnalysisReportProps) {
     const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
     const visibleWarnings = report.warnings
         .map(polishAnalysisText)
@@ -1360,7 +1417,11 @@ function AnalysisReport({ report, history, activeCategory }: AnalysisReportProps
                     </SidePanel>
                 ) : null}
 
-                <ReportHistoryPanel items={history} />
+                <ReportHistoryPanel
+                    items={history}
+                    onSelect={onSelectHistory}
+                    onClear={onClearHistory}
+                />
             </div>
         </div>
     )
@@ -1429,21 +1490,36 @@ function SidePanel({ eyebrow, title, gradient, children }: SidePanelProps) {
 
 type ReportHistoryPanelProps = {
     items: HistoryItem[]
+    onSelect: (item: HistoryItem) => void
+    onClear: () => void
 }
 
-function ReportHistoryPanel({ items }: ReportHistoryPanelProps) {
+function ReportHistoryPanel({ items, onSelect, onClear }: ReportHistoryPanelProps) {
     return (
         <SidePanel
             title="分析记录"
             eyebrow="history"
             gradient="from-white/75 to-violet-50/65"
         >
+            {items.length > 0 ? (
+                <div className="mb-3 flex justify-end">
+                    <button
+                        type="button"
+                        onClick={onClear}
+                        className="rounded-full border border-slate-200 bg-white/70 px-3 py-1.5 text-[11px] font-black text-slate-500 transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
+                    >
+                        清空历史
+                    </button>
+                </div>
+            ) : null}
             <div className="space-y-2.5">
                 {items.length > 0 ? (
                     items.slice(0, 4).map((item, index) => (
-                        <article
-                            key={`${item.title}-${index}`}
-                            className="rounded-[22px] border border-white/75 bg-white/58 p-4 shadow-sm"
+                        <button
+                            key={`${item.id}-${index}`}
+                            type="button"
+                            onClick={() => onSelect(item)}
+                            className="w-full rounded-[22px] border border-white/75 bg-white/58 p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/75"
                         >
                             <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
@@ -1459,9 +1535,9 @@ function ReportHistoryPanel({ items }: ReportHistoryPanelProps) {
                                 </span>
                             </div>
                             <p className="mt-3 text-[11px] font-semibold text-slate-300">
-                                {item.time}
+                                {formatGeneratedAt(item.generatedAt)}
                             </p>
-                        </article>
+                        </button>
                     ))
                 ) : (
                     <p className="rounded-[22px] border border-white/75 bg-white/58 p-4 text-sm leading-6 text-slate-400">
@@ -1871,6 +1947,67 @@ function writeCachedReport(
     } catch {
         // localStorage may be full or disabled; analysis can still render without cache.
     }
+}
+
+function readReportHistory() {
+    try {
+        const raw = window.localStorage.getItem(reportHistoryStorageKey)
+        if (!raw) {
+            return []
+        }
+
+        const parsed = JSON.parse(raw)
+        if (!Array.isArray(parsed)) {
+            return []
+        }
+
+        return parsed
+            .filter(isHistoryItem)
+            .slice(0, maxReportHistoryCount)
+    } catch {
+        return []
+    }
+}
+
+function writeReportHistory(items: HistoryItem[]) {
+    try {
+        window.localStorage.setItem(
+            reportHistoryStorageKey,
+            JSON.stringify(items.slice(0, maxReportHistoryCount)),
+        )
+    } catch {
+        // History is optional; report generation should not depend on localStorage.
+    }
+}
+
+function upsertReportHistory(items: HistoryItem[], item: HistoryItem) {
+    const nextItems = [
+        item,
+        ...items.filter((historyItem) => historyItem.cacheKey !== item.cacheKey),
+    ].slice(0, maxReportHistoryCount)
+    writeReportHistory(nextItems)
+    return nextItems
+}
+
+function isHistoryItem(value: unknown): value is HistoryItem {
+    if (typeof value !== 'object' || value === null) {
+        return false
+    }
+
+    const item = value as Partial<HistoryItem>
+    return (
+        typeof item.id === 'string' &&
+        typeof item.cacheKey === 'string' &&
+        typeof item.analysisType === 'string' &&
+        typeof item.title === 'string' &&
+        typeof item.scope === 'string' &&
+        typeof item.mode === 'string' &&
+        typeof item.generatedAt === 'string' &&
+        typeof item.year === 'number' &&
+        typeof item.quarter === 'number' &&
+        typeof item.question === 'string' &&
+        (item.category === 'ALL' || isAcgnCategory(item.category))
+    )
 }
 
 function removeCacheItem(cacheKey: string) {
