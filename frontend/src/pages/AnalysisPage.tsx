@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
+    getHighScoreRecords,
+    type UserSubjectRecordResponse,
+} from '../api/recordApi'
+import {
     getCollectionBacklogAnalysis,
     getComprehensiveReportAnalysis,
     getLlmStatus,
@@ -221,6 +225,7 @@ function AnalysisPage() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null)
+    const [highScoreRecords, setHighScoreRecords] = useState<UserSubjectRecordResponse[]>([])
     const [llmStatus, setLlmStatus] = useState<LlmStatusResponse | null>(null)
     const [configOpen, setConfigOpen] = useState(false)
     const [configMode, setConfigMode] = useState<LlmConfigMode>('deepseek')
@@ -341,6 +346,41 @@ function AnalysisPage() {
         setCacheInfo(null)
     }, [analysisMode, question, reportCacheKey])
 
+    useEffect(() => {
+        async function loadHighScoreRecords() {
+            try {
+                const records = await getHighScoreRecords({
+                    year: usesYearFilter ? selectedYear : undefined,
+                    quarter: usesQuarterFilter ? selectedQuarter : undefined,
+                    minScore: 45,
+                })
+                const filteredRecords = records
+                    .filter((record) => (
+                        selectedCategory === 'ALL' || record.subjectCategory === selectedCategory
+                    ))
+                    .sort((first, second) => (second.scoreValue ?? -1) - (first.scoreValue ?? -1))
+                    .slice(0, 6)
+                setHighScoreRecords(filteredRecords)
+            } catch {
+                setHighScoreRecords([])
+            }
+        }
+
+        if (analysisMode === 'QUESTION_ANSWER') {
+            setHighScoreRecords([])
+            return
+        }
+
+        void loadHighScoreRecords()
+    }, [
+        analysisMode,
+        selectedCategory,
+        selectedQuarter,
+        selectedYear,
+        usesQuarterFilter,
+        usesYearFilter,
+    ])
+
     const runGenerationJob = useCallback(async (job: GenerationJob) => {
         processingQueueRef.current = true
         setLoading(true)
@@ -425,6 +465,7 @@ function AnalysisPage() {
             processingQueueRef.current = false
             setLoading(false)
             setActiveGenerationJob(null)
+            setGenerationJobs((items) => [...items])
         }
     }, [llmStatus])
 
@@ -777,6 +818,7 @@ function AnalysisPage() {
                     report={report}
                     history={reportHistory}
                     activeCategory={selectedCategory}
+                    highScoreRecords={highScoreRecords}
                     onSelectHistory={restoreHistoryItem}
                     onDeleteHistory={deleteReportHistoryItem}
                     onPruneInvalidHistory={pruneInvalidReportHistory}
@@ -1206,6 +1248,7 @@ type AnalysisReportProps = {
     report: LlmAnalysisResponse
     history: HistoryItem[]
     activeCategory: CategoryFilter
+    highScoreRecords: UserSubjectRecordResponse[]
     onSelectHistory: (item: HistoryItem) => void
     onDeleteHistory: (item: HistoryItem) => void
     onPruneInvalidHistory: () => void
@@ -1217,6 +1260,7 @@ function AnalysisReport({
     report,
     history,
     activeCategory,
+    highScoreRecords,
     onSelectHistory,
     onDeleteHistory,
     onPruneInvalidHistory,
@@ -1329,7 +1373,10 @@ function AnalysisReport({
                         ))}
                     </div>
 
-                    <ReportReadingHighlights report={report} />
+                    <ReportReadingHighlights
+                        report={report}
+                        highScoreRecords={highScoreRecords}
+                    />
 
                     <div className="mt-6 grid gap-4 lg:grid-cols-2">
                         {report.sections.map((section, index) => {
@@ -1468,15 +1515,17 @@ function SnapshotMetric({ label, value }: SnapshotMetricProps) {
 
 type ReportReadingHighlightsProps = {
     report: LlmAnalysisResponse
+    highScoreRecords: UserSubjectRecordResponse[]
 }
 
-function ReportReadingHighlights({ report }: ReportReadingHighlightsProps) {
+function ReportReadingHighlights({ report, highScoreRecords }: ReportReadingHighlightsProps) {
     const posterItems = report.recommendations
         .filter((item) => item.coverUrl)
         .slice(0, 4)
+    const visibleHighScoreRecords = highScoreRecords.slice(0, 4)
 
     return (
-        <div className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+        <div className="mt-6 grid gap-4 xl:grid-cols-[1.1fr_1fr]">
             <div className="rounded-[28px] border border-white/75 bg-white/58 p-5 shadow-sm backdrop-blur">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
                     reading guide
@@ -1492,7 +1541,50 @@ function ReportReadingHighlights({ report }: ReportReadingHighlightsProps) {
                 </div>
             </div>
 
-            {posterItems.length > 0 ? (
+            {visibleHighScoreRecords.length > 0 ? (
+                <div className="rounded-[28px] border border-white/75 bg-white/58 p-5 shadow-sm backdrop-blur">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
+                        favorite records
+                    </p>
+                    <h4 className="mt-2 text-base font-black text-slate-800">
+                        高分记录速览
+                    </h4>
+                    <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4">
+                        {visibleHighScoreRecords.map((record) => (
+                            <div
+                                key={record.id}
+                                className="overflow-hidden rounded-[20px] border border-white/75 bg-white/62 shadow-sm"
+                            >
+                                <div className="relative aspect-[3/4] overflow-hidden bg-white/70">
+                                    <CoverImage
+                                        src={record.subjectCoverUrl}
+                                        alt={record.subjectTitle}
+                                        className="h-full w-full object-cover"
+                                        fallback={
+                                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 to-sky-50 text-2xl font-black text-slate-400">
+                                                {record.subjectTitle.slice(0, 1) || 'A'}
+                                            </div>
+                                        }
+                                    />
+                                    {record.scoreValue !== null ? (
+                                        <span className="absolute right-2 top-2 rounded-full border border-white/80 bg-white/85 px-2.5 py-1 text-xs font-black text-rose-600 shadow-sm">
+                                            {record.scoreValue}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                <div className="p-3">
+                                    <p className="line-clamp-2 text-xs font-black leading-4 text-slate-700">
+                                        {record.subjectTitle}
+                                    </p>
+                                    <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                                        {record.recordYear} · {getReleaseQuarterLabel(record.recordQuarter)}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : posterItems.length > 0 ? (
                 <div className="rounded-[28px] border border-white/75 bg-white/58 p-5 shadow-sm backdrop-blur">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
                         poster picks
