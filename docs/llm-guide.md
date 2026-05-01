@@ -1,81 +1,60 @@
 # ACGN History Analyzer LLM 模块指南
 
-本指南专门说明项目中的 LLM 子系统：它做什么、怎么做、如何配置、出现问题怎么降级。
+本文档描述 LLM 子系统的真实职责、调用链、输入输出契约和故障策略。
 
----
+## 1. 定位
 
-## 1. 模块定位
+LLM 模块用于把结构化行为数据（作品、记录、收藏、标签、系列）转成可解释分析结论。  
+它不是通用闲聊模块，而是“面向个人历史数据的分析引擎”。
 
-LLM 模块并不是“纯聊天”功能，而是把系统已有结构化数据（作品、记录、收藏、标签、系列）转换成可读结论，服务于：
+## 2. 能力范围
 
-- 年度/季度复盘
-- 偏好画像
-- 推荐与补坑
-- 趋势观察
-- 自然语言问答
+接口前缀：`/api/llm`
 
-核心原则：**先结构化聚合，再交给模型生成表达层结果**。
+- 状态与配置：`/status`, `/config`, `/test-connection`
+- 分析报告：`/analysis/*`
+- 问答：`GET/POST /qa`
 
----
+分析类型包含：
 
-## 2. 功能矩阵
-
-接口统一前缀：`/api/llm`
-
-- 配置与状态
-  - `GET /status`
-  - `POST /config`
-  - `POST /test-connection`
-- 报告分析（GET/POST 双入口）
-  - `yearly`, `quarterly`, `type-preference`, `score-structure`, `tag-preference`
-  - `recommendations`, `collection-backlog`
-  - `taste-profile`, `preference-contradictions`, `interest-trend`
-  - `franchise-completion`, `comprehensive-report`, `home-insight`
-- 问答
-  - `GET /qa`
-  - `POST /qa`
-
----
+- yearly, quarterly
+- type-preference, score-structure, tag-preference
+- recommendations, collection-backlog
+- taste-profile, preference-contradictions, interest-trend
+- franchise-completion, comprehensive-report, home-insight
 
 ## 3. 后端调用链
 
 ```text
 LlmAnalysisController
   -> LlmAnalysisService
-      -> LlmContextBuilder (聚合上下文)
-      -> LlmPromptService  (构建 prompt)
+      -> LlmContextBuilder
+      -> LlmPromptService
       -> RuntimeSwitchingLlmClient
-           -> MockLlmClient 或 RealLlmClient
+           -> MockLlmClient / RealLlmClient
 ```
 
-### 关键职责
+职责：
 
-- `LlmContextBuilder`: 把原始业务数据转成“可推理上下文”
-- `LlmPromptService`: 把上下文 + 分析目标转换成指令
-- `RuntimeSwitchingLlmClient`: 运行时选择 mock/real
-- `RealLlmClient`: 调外部模型（当前默认 DeepSeek）
-
----
+- `LlmContextBuilder`：生成可推理上下文和证据
+- `LlmPromptService`：按分析类型组织提示词与约束
+- `RuntimeSwitchingLlmClient`：运行时路由 mock / real
 
 ## 4. 上下文构建策略
 
-构建过程并不是简单拼文本，而是按分析目标做字段聚合：
+核心流程：
 
-1. 参数归一化（year/quarter/category）
-2. 拉取记录、作品、收藏、系列
-3. 统计衍生（均分、评分带、类别分布、标签分桶、趋势信号）
-4. 生成 evidence（证据列表）
-5. 交给 prompt 层统一描述
+1. 参数归一化（年、档期、类型）
+2. 聚合业务数据（记录、作品、收藏、系列、标签）
+3. 计算统计信号（评分分布、偏好权重、趋势特征）
+4. 生成 evidence（供前端展示与追溯）
+5. 输出给 Prompt 层
 
-这样能显著降低“模型随口编造”的风险，并保证输出可解释。
+目标：减少幻觉，增强可解释性和稳定性。
 
----
+## 5. 返回契约
 
-## 5. 输出契约
-
-### 报告类
-
-输出统一映射到 `LlmAnalysisResponse`，关键字段：
+报告类输出（`LlmAnalysisResponse`）关键字段：
 
 - `analysisType`
 - `title`, `summary`
@@ -87,25 +66,16 @@ LlmAnalysisController
 - `scope`
 - `mockMode`, `modelName`, `generatedAt`
 
-### 问答类
+问答类输出（`LlmQuestionAnswerResponse`）关键字段：
 
-输出映射到 `LlmQuestionAnswerResponse`：
+- `question`, `answer`
+- `mockMode`, `modelName`, `generatedAt`
 
-- `question`
-- `answer`
-- `mockMode`
-- `modelName`
-- `generatedAt`
+## 6. 配置与运行模式
 
----
+启动配置来源：`backend/src/main/resources/application.properties`
 
-## 6. 配置与模式切换
-
-### 启动配置
-
-来源：`backend/src/main/resources/application.properties`
-
-典型项：
+常见配置：
 
 - `app.llm.enabled`
 - `app.llm.provider`
@@ -116,34 +86,24 @@ LlmAnalysisController
 - `app.llm.temperature`
 - `app.llm.max-tokens`
 
-### 运行时切换
+运行时通过 `POST /api/llm/config` 切换：
 
-通过 `POST /api/llm/config` 可在运行时切换：
+- `previewMode=true`：强制 mock
+- `previewMode=false`：走 real（需有效 provider/baseUrl/apiKey/model）
 
-- `previewMode=true` -> 强制 mock
-- 否则走 real（需完整 provider/baseUrl/apiKey/model）
+运行时配置是内存态，重启后回到启动配置。
 
-注意：运行时配置为内存态，重启后恢复到启动配置。
+## 7. 失败与降级
 
----
+- real 调用支持重试（典型限流/5xx场景）
+- 返回 JSON 不规整时会做清洗/回退
+- real 失败可降级到 mock（保证功能可用）
+- 异常统一映射为标准业务错误响应
 
-## 7. 异常与降级
+## 8. 前端消费策略（AnalysisPage）
 
-- real 调用层有重试（限流/5xx）
-- 返回内容 JSON 异常时有清洗与回退策略
-- real 模式失败可降级 mock，尽量保证前端可用
-- 统一异常由全局异常处理器映射为可读业务错误
-
----
-
-## 8. 前端分析页策略
-
-`AnalysisPage` 主要策略：
-
-- 模式化分析 + 问答
-- 本地缓存（结果与历史）
-- 失败时优先回退缓存
-- 配置测试与状态感知
-
-这保证“可用性优先 + 结果持续可追溯”。
+- 分析报告与问答分流
+- 本地缓存报告与历史问答
+- 请求失败时优先回退缓存
+- UI 展示 evidence/warnings，保证结果可追溯
 

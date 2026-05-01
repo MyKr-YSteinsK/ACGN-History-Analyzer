@@ -1,70 +1,59 @@
 # ACGN History Analyzer 架构速查
 
-这是一份面向开发者的快速架构索引，帮助你在不通读全仓库的前提下快速定位模块职责。
+这是一份给开发者的“最短上手索引”，用于快速确认模块职责与关键约束。
 
----
-
-## 1. 分层总览
+## 1. 分层结构
 
 ```text
 Frontend (React + TS)
-  pages / components / api / mappers / theme
+  pages / components / api / mappers / hooks / utils
         |
         v
 Backend (Spring Boot)
   controller -> service -> repository -> entity
         |
         +-> llm/*
-        +-> import/bangumi*
+        +-> import/*
 ```
 
----
+## 2. 模块映射
 
-## 2. 业务模块映射
+- `subjects`：作品库查询、详情、分页、导入逻辑
+- `records`：正式记录 CRUD、导入、统计
+- `collections`：收藏状态管理与导入
+- `franchises`：系列管理与自动关联
+- `tags`：标签列表和白名单清理
+- `import`：导入总览、模板、Bangumi 导入入口
+- `llm`：分析、问答、配置、降级
+- `home/top/options`：首页、榜单、枚举选项
 
-- `subjects`: 作品库主数据与导入
-- `records`: 正式记录与统计
-- `collections`: 想看/搁置
-- `franchises`: 系列管理与自动关联
-- `tags`: 标签体系与白名单清理
-- `import`: 导入总览、模板与 Bangumi 流程
-- `llm`: AI 分析与问答
-- `home/top/options`: 首页、榜单、枚举选项
-
----
-
-## 3. 核心规则
+## 3. 当前核心约束
 
 - 作品唯一键：`sourceId`
-- 一作品一正式记录
+- 一作品只保留一条正式记录
 - 一作品最多一个收藏状态
-- 重复作品导入只更新：标签、平台评分、集数
-- 导入定位优先级：`subjectId > sourceId > 标题关键词(+季/Part)`
+- 作品重复导入仅更新：`tagNames/platformScore/episodeCount`
+- 记录/收藏导入定位优先级：`subjectId > sourceId > subjectTitle(+season/part)`
+- 记录导入重复命中执行覆盖更新（`UPDATED`）
 
----
+## 4. 关键链路
 
-## 4. 导入链路
+### 导入链路
 
-### 作品导入
+1. 前端先调 preview
+2. 若有 `AMBIGUOUS`，前端选择候选
+3. 再执行 import
+4. 返回分层结果（可导入/更新/歧义/跳过/错误）
 
-1. Bangumi 季度导入（异步任务）
-2. sourceId JSON 补录导入（按 sourceId 拉单作品）
-
-### 记录/收藏导入
-
-1. preview 返回结果与候选
-2. 前端处理歧义项选择
-3. import 正式写入
-
----
-
-## 5. LLM 链路（简）
+### LLM 链路
 
 ```text
-Controller -> AnalysisService
-          -> ContextBuilder + PromptService
-          -> RuntimeSwitchingClient (mock/real)
+Controller
+  -> AnalysisService
+      -> ContextBuilder
+      -> PromptService
+      -> RuntimeSwitchingClient (mock/real)
 ```
 
-详细见：`docs/llm-guide.md`
+详细说明见 `docs/llm-guide.md`。
 

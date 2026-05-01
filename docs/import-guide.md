@@ -1,166 +1,113 @@
-# ACGN History Analyzer 数据导入规范
+# ACGN History Analyzer 导入规范
 
-本文档用于批量整理真实 ACGN 历史数据。
+本文档是当前系统导入行为的主规范，覆盖作品库、收藏、正式记录三条导入链路。
 
-当前系统的导入边界很明确：
+## 1. 导入边界
 
-```text
-作品库：产品流程上只用 Bangumi 新番自动导入（导入中心）
-收藏夹：允许 JSON / CSV 手动导入
-正式记录：允许 JSON / CSV 手动导入
-```
+- 作品库：推荐仅通过 Bangumi 导入
+- 收藏夹：支持 JSON / CSV 手动导入
+- 正式记录：支持 JSON / CSV 手动导入
 
-这样做是为了保护作品库。作品本体一旦被乱写，后面的记录、收藏、系列、标签和 AI 分析都会跟着变脏；所以**日常使用**应统一从 Bangumi 拉取作品，手动导入只负责「我的行为数据」。
+说明：作品主数据是全系统的数据底座，常规流程不建议手工拼完整 `subjects` 内容。
 
-开发与数据修复场景下，后端仍提供 `POST /api/subjects/import/preview` 与 `POST /api/subjects/import`，但不建议在常规流程中手工拼作品 JSON。
+## 2. 推荐顺序
 
-## 推荐顺序
+1. 先导入作品库（Bangumi 季度导入）
+2. 再导入收藏（WANT / PAUSED）
+3. 最后导入正式记录（评分 / 备注）
 
-1. 清空旧测试数据，重启后端，让 JPA 自动建表。
-2. 在导入中心使用 Bangumi 新番导入，按年份和一月 / 四月 / 七月 / 十月档期导入作品库。
-3. 如需保留想看 / 搁置，导入收藏夹 `collections.json`。
-4. 导入正式记录 `records.json`。
+## 3. 统一流程与结果语义
 
-Bangumi 导入和正式记录导入后，后端会按作品主标题做一次轻量系列检测：同名多季、Part 或跨媒介作品会自动创建/复用系列并关联。这个检测不会把所有未记录作品都强行塞进系列，只围绕已有标题关系和多季 / Part 特征做收束。
+所有导入都遵循 `preview -> import`。  
+单行异常不会阻塞整批。
 
-推荐先调用 preview，再正式 import。
+常见结果码：
 
-导入接口按行处理数据：某一行字段不合法会返回 `ERROR`，重复或无法匹配会返回 `SKIPPED`，但不会阻塞其他合法行继续预览或写入。
+- `CAN_IMPORT`：预览可导入
+- `IMPORTED`：正式导入成功
+- `UPDATED`：命中已有数据并执行更新
+- `AMBIGUOUS`：多候选，需要前端先选定
+- `SKIPPED`：规则性跳过
+- `ERROR`：字段或业务校验失败
 
-```text
-POST /api/import/bangumi/season/preview
-POST /api/import/bangumi/season/import-jobs        （异步任务，导入中心默认）
-GET  /api/import/bangumi/season/import-jobs/{jobId}
+## 4. 月份档期口径
 
-POST /api/subjects/import/preview                （可选：手工/脚本作品批量）
-POST /api/subjects/import
+系统统一使用季度索引而非自然月：
 
-POST /api/collections/import/preview
-POST /api/collections/import
+- `1` = 一月
+- `2` = 四月
+- `3` = 七月
+- `4` = 十月
 
-POST /api/records/import/preview
-POST /api/records/import
-```
+## 5. 作品库导入
 
-## 月份档期口径
+### 5.1 Bangumi 季度导入（主流程）
 
-本项目按 1/4/7/10 月档期记录作品和个人记录：
+接口：
 
-```text
-1 = 一月
-2 = 四月
-3 = 七月
-4 = 十月
-```
+- `POST /api/import/bangumi/season/preview`
+- `POST /api/import/bangumi/season/import-jobs`
+- `GET /api/import/bangumi/season/import-jobs/{jobId}`
 
-页面展示顺序是：一月、四月、七月、十月。
+说明：
 
-## 作品库来源：Bangumi 自动导入
+- 支持 `includeWeb`、`japaneseOnly`、`excludedSourceIds`
+- 正式导入时会走封面缓存、标签同步、重复检查等完整流程
 
-导入页的“Bangumi 新番”模式可以直接选择年份和月份档期。后端会调用 Bangumi 官方 `/v0/subjects` 浏览接口，按 `type=2`、`cat=1`、`year`、`month` 拉取 TV 动画，再转换成系统内部的作品写入请求。
+### 5.2 Bangumi sourceId 补录导入（补漏）
 
-可选项：
+接口：
 
-- 优先日本动画：使用 Bangumi 的“日本”标签做轻量过滤。
-- 包含 WEB 动画：额外拉取 Bangumi `cat=5` 的 WEB 动画。
+- `POST /api/import/bangumi/subject/preview`
+- `POST /api/import/bangumi/subject/import`
 
-正式写入时仍然复用作品导入逻辑，所以重复判断、结构化标签、封面缓存都会按原规则执行。预览后可以排除不想写入的条目，再确认导入。
-
-### 作品字段
-
-| 字段 | 必填 | 格式 | 说明 |
-| --- | --- | --- | --- |
-| `titleCn` | 是 | 字符串，最长 255 | 作品主标题 |
-| `subtitle` | 否 | 字符串或 null，最长 255 | 副标题 |
-| `displayTitle` | 是 | 字符串，最长 500 | 页面展示标题 |
-| `franchiseId` | 否 | 正整数或 null | 内部字段。前端不再提供手动系列导入 |
-| `franchiseName` | 否 | 字符串或 null，最长 200 | 内部字段。Bangumi 导入后由自动检测决定是否建系列 |
-| `seasonIndex` | 否 | 正整数或 null | 第几季 |
-| `partIndex` | 否 | 正整数或 null | 第几 Part。Bangumi 导入时会尽量从标题中推断 |
-| `coverUrl` | 否 | URL 或 `/api/assets/covers/...` | 远程 URL 会在正式导入时尝试缓存到本地 |
-| `summary` | 否 | 字符串或 null，最长 2000 | 简介 |
-| `releaseYear` | 是 | 1900-2100 | 发行年份 |
-| `releaseQuarter` | 是 | 1/2/3/4 | 1 一月，2 四月，3 七月，4 十月 |
-| `category` | 是 | `ANIME`/`COMIC`/`GAME`/`NOVEL` | ACGN 类型 |
-| `studioName` | 否 | 字符串或 null，最长 255 | 制作方、出版社、开发商等 |
-| `platformLink` | 否 | 字符串或 null，最长 500 | Bangumi 等外部链接 |
-| `platformScore` | 否 | 0.00-10.00 或 null | 平台评分 |
-| `episodeCount` | 否 | >=0 或 null | 集数、话数、章节数 |
-| `tagNames` | 否 | 字符串数组，最多 12 个 | 结构化标签，推荐 3-7 个 |
-| `sourcePlatform` | 否 | 字符串或 null，最长 64 | 推荐 `BANGUMI` |
-| `sourceId` | 是 | 字符串，最长 128 | Bangumi subject id，作品唯一键 |
-| `status` | 是 | `NORMAL`/`HIDDEN` | 通常写 `NORMAL` |
-
-### 作品唯一性
-
-作品重复判断只使用：
-
-```text
-sourceId
-```
-
-同一个 `sourceId` 会被视为同一作品。若该作品**已存在**，重复导入时**只会同步三项**：`tagNames`、`platformScore`、`episodeCount`；其余字段（标题、档期、系列、封面等）保持库中原值不变。
-
-### 标签
-
-只使用 `tagNames`，不要再生成旧的 `tags` 字符串。
-
-作品库的标签会被控制在常见标签集合内。Bangumi 上奇怪的个人化标签、声优梗、短句吐槽、重复外文标签都会被忽略，避免标签系统失控。
-
-当前保留的常见标签大致包括：
-
-```text
-原创、漫画改、小说改、游戏改、奇幻、战斗、冒险、科幻、悬疑、
-校园、青春、恋爱、喜剧、日常、治愈、致郁、运动、音乐、偶像、
-机战、异世界、转生、后宫、百合、乙女、女性向、历史、战争、
-职场、美食、家庭、社团、短片、3D、少儿向、少年向、少女向
-```
-
-后端会自动：
-
-1. 查找已有标签。
-2. 没有则创建结构化标签。
-3. 写入 `subject_tag` 关联表。
-
-推荐每部作品最后保留 3-7 个标签。标签是后续 AI 分析个人偏好、兴趣聚类和推荐理由的重要输入，所以宁可少而准，不要多而杂。
-
-### 封面
-
-可以直接填 Bangumi 图片 URL：
+请求体最小字段：
 
 ```json
-"coverUrl": "https://lain.bgm.tv/pic/cover/l/example.jpg",
-"sourcePlatform": "BANGUMI",
-"sourceId": "400602"
+{
+  "subjects": [
+    { "sourceId": "400602", "releaseYear": 2020, "releaseQuarter": 4 }
+  ]
+}
 ```
 
-正式导入时后端会尝试下载到：
+行为：
 
-```text
-backend/uploads/covers/
-```
+- 后端按 `sourceId` 去 Bangumi 拉完整作品数据
+- `releaseYear` / `releaseQuarter` 以请求值为准并覆盖
 
-并把数据库中的 `cover_url` 改成本地访问路径：
+## 6. 作品唯一性与更新边界
 
-```text
-/api/assets/covers/bangumi-400602.jpg
-```
+作品唯一键：`sourceId`。  
+若命中同 `sourceId`，重复导入只更新：
 
-如果你手动放图片，文件放到：
+- `tagNames`
+- `platformScore`
+- `episodeCount`
 
-```text
-backend/uploads/covers/
-```
+其他字段（标题、系列、档期、封面等）保持原值。
 
-JSON 写：
+## 7. 正式记录导入
 
-```json
-"coverUrl": "/api/assets/covers/your-file-name.jpg"
-```
+接口：
 
-## 正式记录 JSON
+- `POST /api/records/import/preview`
+- `POST /api/records/import`
 
-顶层必须是对象，字段必须叫 `records`。
+顶层字段：`records`。
+
+定位优先级：
+
+`subjectId > sourceId > subjectTitle(+subjectSeasonIndex/subjectPartIndex)`
+
+关键规则：
+
+- `subjectId` / `sourceId` / `subjectTitle` 至少提供一个
+- 标题多命中返回 `AMBIGUOUS`，需前端先选候选
+- 一作品仅保留一条正式记录
+- 若记录已存在，正式导入执行覆盖更新并返回 `UPDATED`（不是跳过）
+
+示例：
 
 ```json
 {
@@ -170,39 +117,32 @@ JSON 写：
       "scoreValue": 48,
       "recordYear": 2024,
       "recordQuarter": 1,
-      "note": "节奏舒缓但后劲很强，人物情绪非常细。"
+      "note": "节奏舒缓但后劲很强。"
     }
   ]
 }
 ```
 
-### 记录字段
+## 8. 收藏导入
 
-| 字段 | 必填 | 格式 | 说明 |
-| --- | --- | --- | --- |
-| `subjectId` | 否 | 正整数 | 直接指定作品 id，优先级最高 |
-| `sourceId` | 否 | 字符串 | Bangumi subject id（规范化后与作品库匹配） |
-| `subjectTitle` | 否 | 字符串 | 标题关键词，在 `titleCn` / `displayTitle` 中模糊匹配 |
-| `subjectSeasonIndex` | 否 | 整数 ≥1 | 与标题匹配时可选，用于缩小范围 |
-| `subjectPartIndex` | 否 | 整数 ≥1 | 与标题匹配时可选，用于缩小范围 |
-| `scoreValue` | 否 | 0-50 或 null | 个人评分 |
-| `recordYear` | 是 | 1900-2100 | 记录年份，不一定等于发行年份 |
-| `recordQuarter` | 是 | 1/2/3/4 | 记录月份档期：1 一月，2 四月，3 七月，4 十月 |
-| `note` | 否 | 字符串或 null，最长 500 | 评价/备注 |
+接口：
 
-`subjectId`、`sourceId`、`subjectTitle` **至少填一个**。若标题匹配到多部作品，预览会返回 `AMBIGUOUS` 与候选列表，需在前端选定后再正式导入。
+- `POST /api/collections/import/preview`
+- `POST /api/collections/import`
 
-如果找不到作品，记录会跳过。一个作品只能有一条正式记录。
+顶层字段：`collections`。
 
-## 一个作品一条记录
+定位优先级与正式记录一致：
 
-当前系统约定：一个作品只保留一条正式记录。
+`subjectId > sourceId > subjectTitle(+subjectSeasonIndex/subjectPartIndex)`
 
-如果一部半年番跨档期播放，不再为了统计把它人为拆成两条记录。作品的发行档期来自 Bangumi 和作品库；个人记录只表示你在哪一年、哪个月份档期完成它，以及你的评分和备注。
+关键规则：
 
-## 收藏夹 JSON
+- `collectionType` 必填，取值 `WANT` / `PAUSED`
+- 若作品已有正式记录，收藏导入会被跳过
+- 若已有收藏记录，正式导入会更新类型和备注
 
-顶层必须是对象，字段必须叫 `collections`。收藏夹只表示想看 / 搁置，不表示正式完成记录。
+示例：
 
 ```json
 {
@@ -216,38 +156,7 @@ JSON 写：
 }
 ```
 
-### 收藏字段
+## 9. 旧接口说明
 
-| 字段 | 必填 | 格式 | 说明 |
-| --- | --- | --- | --- |
-| `subjectId` | 否 | 正整数 | 直接指定作品 id，优先级最高 |
-| `sourceId` | 否 | 字符串 | Bangumi subject id |
-| `subjectTitle` | 否 | 字符串 | 标题关键词模糊匹配 |
-| `subjectSeasonIndex` | 否 | 整数 ≥1 | 与标题匹配时可选 |
-| `subjectPartIndex` | 否 | 整数 ≥1 | 与标题匹配时可选 |
-| `collectionType` | 是 | `WANT`/`PAUSED` | WANT 想看，PAUSED 搁置 |
-| `note` | 否 | 字符串或 null，最长 500 | 收藏备注 |
-
-`subjectId`、`sourceId`、`subjectTitle` **至少填一个**。多候选时与记录导入相同，预览 `AMBIGUOUS` 后需选定再导入。
-
-如果作品已有正式记录，收藏导入会跳过。  
-如果作品已经在收藏夹中，正式导入会更新为新的 `collectionType` 和 `note`。
-
-## 给 GPT / Bangumi 整理器的提示词
-
-```text
-请根据 Bangumi 信息生成 ACGN History Analyzer 导入 JSON。
-
-先通过系统导入中心的 Bangumi 新番导入作品库。
-
-然后根据我提供的旧数据，生成两个 JSON 文件：
-1. collections.json（如需要想看/搁置）
-2. records.json
-
-作品 category 只能是 ANIME / COMIC / GAME / NOVEL。
-月份档期规则：1 一月，2 四月，3 七月，4 十月。
-作品唯一键是 sourceId（Bangumi subject id）。
-记录与收藏可用 subjectId、sourceId 或 subjectTitle（+ 可选季/Part）定位作品，优先级 subjectId > sourceId > 标题匹配。
-收藏 JSON 使用 collections 顶层字段，collectionType 只能是 WANT 或 PAUSED；已有正式记录的作品不要再生成收藏。
-不要生成 subjects.json；作品本体请用 Bangumi 导入中心写入。
-```
+`/api/subjects/import*` 仍可用于开发/脚本场景，但不是导入中心推荐路径。  
+日常使用请优先走 `/api/import/bangumi/*`。

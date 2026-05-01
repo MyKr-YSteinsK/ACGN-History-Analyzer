@@ -1,16 +1,10 @@
 # API Integration Guide
 
-本指南面向前后端协作和二次开发，聚焦最常用、最容易踩坑的接口：
+本指南用于前后端联调与二次开发，聚焦当前版本高频接口与行为约束。
 
-- 导入链路（Bangumi 季度、sourceId 补录、记录/收藏导入）
-- LLM 链路（状态、配置、分析、问答）
-- 统一响应与错误处理建议
+## 1. 统一响应
 
----
-
-## 1. 统一响应格式
-
-系统返回统一 `ApiResponse<T>`：
+所有接口返回 `ApiResponse<T>`：
 
 ```json
 {
@@ -20,18 +14,18 @@
 }
 ```
 
-- `code = 0` 表示成功
-- 非 0 表示业务失败（前端应显示 `message`）
-
----
+- `code = 0`：成功
+- `code != 0`：业务失败，应直接展示 `message`
 
 ## 2. 导入接口
 
-## 2.1 Bangumi 新番季度预览
+### 2.1 Bangumi 季度导入
 
-`POST /api/import/bangumi/season/preview`
+- `POST /api/import/bangumi/season/preview`
+- `POST /api/import/bangumi/season/import-jobs`
+- `GET /api/import/bangumi/season/import-jobs/{jobId}`
 
-请求：
+请求示例：
 
 ```json
 {
@@ -39,95 +33,29 @@
   "quarter": 1,
   "includeWeb": false,
   "japaneseOnly": true,
-  "excludedSourceIds": ["400602"]
+  "excludedSourceIds": []
 }
 ```
 
-用途：只做预览，不写库。
+### 2.2 Bangumi sourceId 补录导入
 
----
+- `POST /api/import/bangumi/subject/preview`
+- `POST /api/import/bangumi/subject/import`
 
-## 2.2 Bangumi 新番异步导入（推荐）
-
-1) 启动任务  
-`POST /api/import/bangumi/season/import-jobs`
-
-请求同预览。
-
-返回：
-
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": {
-    "jobId": "9a7f6a4f-...."
-  }
-}
-```
-
-2) 查询进度  
-`GET /api/import/bangumi/season/import-jobs/{jobId}`
-
-返回（示例）：
-
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": {
-    "jobId": "9a7f6a4f-....",
-    "status": "RUNNING",
-    "stage": "FETCHING",
-    "message": "正在获取 Bangumi TV 动画列表",
-    "percent": 34,
-    "result": null,
-    "errorMessage": null
-  }
-}
-```
-
----
-
-## 2.3 作品库 sourceId JSON 补录（你当前新增）
-
-### 预览
-
-`POST /api/import/bangumi/subject/preview`
-
-请求：
+请求示例：
 
 ```json
 {
   "subjects": [
-    { "sourceId": "400602", "releaseYear": 2020, "releaseQuarter": 4 },
-    { "sourceId": "414767", "releaseYear": 2024, "releaseQuarter": 1 }
+    { "sourceId": "400602", "releaseYear": 2020, "releaseQuarter": 4 }
   ]
 }
 ```
 
-### 正式导入
-
-`POST /api/import/bangumi/subject/import`
-
-请求体同上。
-
-关键逻辑：
-
-- 后端按 `sourceId` 去 Bangumi 拉完整作品信息
-- `releaseYear/releaseQuarter` 使用请求值覆盖
-- 命中已有作品时仅更新：`tagNames/platformScore/episodeCount`
-
----
-
-## 2.4 记录导入（preview/import）
+### 2.3 正式记录导入
 
 - `POST /api/records/import/preview`
 - `POST /api/records/import`
-
-定位优先级：
-
-`subjectId > sourceId > subjectTitle(+subjectSeasonIndex/subjectPartIndex)`
 
 请求示例：
 
@@ -145,9 +73,16 @@
 }
 ```
 
----
+定位优先级：
 
-## 2.5 收藏导入（preview/import）
+`subjectId > sourceId > subjectTitle(+subjectSeasonIndex/subjectPartIndex)`
+
+关键语义：
+
+- 预览多候选返回 `AMBIGUOUS`
+- 正式导入命中已有记录时返回 `UPDATED`（覆盖更新）
+
+### 2.4 收藏导入
 
 - `POST /api/collections/import/preview`
 - `POST /api/collections/import`
@@ -166,30 +101,30 @@
 }
 ```
 
----
+## 3. 导入结果码
 
-## 3. 导入结果码语义
+- `CAN_IMPORT`
+- `IMPORTED`
+- `UPDATED`
+- `AMBIGUOUS`
+- `SKIPPED`
+- `ERROR`
 
-常见 `item.result`：
+前端建议：
 
-- `CAN_IMPORT`: 预览可导入
-- `IMPORTED`: 正式导入成功
-- `UPDATED`: 命中已有并执行更新
-- `SKIPPED`: 跳过（重复、冲突或规则限制）
-- `ERROR`: 参数或数据错误
-- `AMBIGUOUS`: 多候选需先人工选择
-
----
+- `AMBIGUOUS`：必须先选候选再导入
+- `UPDATED`：展示覆盖更新信息
+- `ERROR`：展示 message 并允许继续处理其他行
 
 ## 4. LLM 接口
 
-## 4.1 状态与配置
+### 4.1 状态与配置
 
 - `GET /api/llm/status`
 - `POST /api/llm/config`
 - `POST /api/llm/test-connection`
 
-配置请求示例：
+配置示例：
 
 ```json
 {
@@ -204,14 +139,12 @@
 }
 ```
 
----
+### 4.2 分析与问答
 
-## 4.2 分析接口（以综合报告为例）
+- 报告：`GET/POST /api/llm/analysis/*`
+- 问答：`GET/POST /api/llm/qa`
 
-- `GET /api/llm/analysis/comprehensive-report?year=2025&quarter=1&category=ANIME`
-- `POST /api/llm/analysis/comprehensive-report`
-
-POST 请求示例：
+综合报告请求示例：
 
 ```json
 {
@@ -221,59 +154,10 @@ POST 请求示例：
 }
 ```
 
-返回核心结构：
+## 5. 联调建议顺序
 
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": {
-    "analysisType": "COMPREHENSIVE_REPORT",
-    "title": "2025 一季度观影复盘",
-    "summary": "...",
-    "keywords": ["高分集中", "剧情向"],
-    "sections": [],
-    "recommendations": [],
-    "evidence": [],
-    "warnings": [],
-    "scope": {},
-    "mockMode": false,
-    "modelName": "deepseek-v4-flash",
-    "generatedAt": "2026-05-02T01:20:00"
-  }
-}
-```
-
----
-
-## 4.3 问答接口
-
-- `GET /api/llm/qa?question=2025年我有哪些高分动画`
-- `POST /api/llm/qa`
-
-POST 请求：
-
-```json
-{
-  "question": "2025年我有哪些高分动画？"
-}
-```
-
----
-
-## 5. 常见错误与前端处理建议
-
-- 参数校验失败：直接展示后端 `message`
-- LLM 服务不可用：提示用户切换 preview(mock) 模式重试
-- 导入 `AMBIGUOUS`：引导用户在预览候选中手动选定后再 import
-- 导入 `UPDATED`：前端展示 `changeSummary`（旧值 -> 新值）
-
----
-
-## 6. 联调建议顺序
-
-1. 调 `/api/import/overview` 和 `/api/import/templates/*` 对齐字段。
-2. 先跑 preview，确认 result 分布与 message。
-3. 再跑 import，核对写入条数和跳过原因。
-4. 最后联调 LLM status/config/test，再接分析与问答页。
+1. `/api/import/overview` 与 `/api/import/templates/*` 对齐字段
+2. 先调 preview，处理 `AMBIGUOUS` 与 `ERROR`
+3. 再调 import，核对 `IMPORTED/UPDATED/SKIPPED`
+4. 最后联调 LLM status/config/test，再接分析和问答
 
