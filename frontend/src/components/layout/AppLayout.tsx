@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import AppNavigation from './AppNavigation'
+import SystemTipBar from './SystemTipBar'
 
 function AppLayout() {
     return (
@@ -8,6 +9,7 @@ function AppLayout() {
                 <AppNavigation />
 
                 <main className="min-w-0 flex-1 pb-4 lg:pb-8">
+                    <SystemTipBar />
                     <Outlet />
                 </main>
             </div>

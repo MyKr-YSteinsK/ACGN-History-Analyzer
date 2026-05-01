@@ -4,8 +4,13 @@ target/
 *.log
 
 # Maven
-.mvn/
+.mvn/*
+!.mvn/wrapper/
 !.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+backend/.mvn/*
+!backend/.mvn/wrapper/
+!backend/.mvn/wrapper/maven-wrapper.properties
 
 # IntelliJ IDEA
 .idea/

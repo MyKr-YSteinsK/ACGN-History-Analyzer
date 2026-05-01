@@ -54,8 +54,12 @@ public class RealLlmClient implements LlmClient {
 
             JsonNode root = sendChatCompletion(body, "LLM 请求");
             String content = extractContent(root);
-            JsonNode data = parseAnalysisPayload(content);
-            return mapResponse(request, data);
+            try {
+                JsonNode data = parseAnalysisPayload(content);
+                return mapResponse(request, data);
+            } catch (JsonProcessingException parseError) {
+                return mapTextFallbackResponse(request, content, parseError);
+            }
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("LLM 调用被中断", error);
@@ -264,6 +268,41 @@ public class RealLlmClient implements LlmClient {
                 mockMode,
                 modelName,
                 generatedAt
+        );
+    }
+
+    private LlmAnalysisResponse mapTextFallbackResponse(
+            LlmGenerateRequest request,
+            String content,
+            JsonProcessingException parseError
+    ) {
+        String text = content == null || content.isBlank()
+                ? "模型返回了非标准结构，且没有可展示的正文。"
+                : content.trim();
+        String summary = abbreviate(text);
+        List<LlmAnalysisSectionResponse> sections = List.of(new LlmAnalysisSectionResponse(
+                "模型原始回答",
+                text
+        ));
+        List<String> evidence = List.of("DeepSeek 已返回内容，但没有严格遵守 JSON 输出格式");
+        List<String> warnings = List.of(
+                "模型输出不是标准 JSON，系统已自动转换为可展示的自然语言报告。",
+                "结构化字段可能不完整，建议稍后重新生成一次。解析错误：" + describeException(parseError)
+        );
+
+        return new LlmAnalysisResponse(
+                request.analysisType(),
+                "智能分析报告",
+                summary,
+                List.of("格式兜底", "自然语言报告"),
+                sections,
+                List.of(),
+                evidence,
+                warnings,
+                new LlmAnalysisScopeResponse(null, null, null),
+                false,
+                properties.getModel(),
+                LocalDateTime.now()
         );
     }
 

@@ -25,6 +25,12 @@ import { getApiErrorMessage } from '../api/request'
 import {
     EmptyState,
 } from '../components/common/FeedbackState'
+import LlmConfigPanel, { type LlmConfigMode } from '../components/analysis/LlmConfigPanel'
+import {
+    CacheStatusPanel,
+    GenerationErrorPanel,
+    GenerationProgressPanel,
+} from '../components/analysis/AnalysisRuntimePanels'
 import CoverImage from '../components/common/CoverImage'
 import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
@@ -75,8 +81,6 @@ type HistoryItem = {
     category: CategoryFilter
     question: string
 }
-
-type LlmConfigMode = 'deepseek' | 'preview'
 
 type GenerationProgress = {
     percent: number
@@ -722,219 +726,6 @@ type CapabilityPillProps = {
     value: string
 }
 
-type LlmConfigPanelProps = {
-    open: boolean
-    status: LlmStatusResponse | null
-    mode: LlmConfigMode
-    baseUrl: string
-    model: string
-    apiKey: string
-    saving: boolean
-    testing: boolean
-    message: string | null
-    onToggle: () => void
-    onModeChange: (mode: LlmConfigMode) => void
-    onBaseUrlChange: (value: string) => void
-    onModelChange: (value: string) => void
-    onApiKeyChange: (value: string) => void
-    onSave: () => void
-    onTest: () => void
-}
-
-function LlmConfigPanel({
-    open,
-    status,
-    mode,
-    baseUrl,
-    model,
-    apiKey,
-    saving,
-    testing,
-    message,
-    onToggle,
-    onModeChange,
-    onBaseUrlChange,
-    onModelChange,
-    onApiKeyChange,
-    onSave,
-    onTest,
-}: LlmConfigPanelProps) {
-    const currentModeLabel = status
-        ? status.mockMode ? '预览模式' : 'DeepSeek API'
-        : '读取中'
-
-    return (
-        <GlassCard className="overflow-hidden">
-            <div className="bg-gradient-to-br from-white/75 via-sky-50/45 to-violet-50/55 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                            llm settings
-                        </p>
-                        <h3 className="mt-1 text-lg font-black text-slate-800">
-                            大模型配置
-                        </h3>
-                        <p className="mt-1 text-sm leading-6 text-slate-500">
-                            当前：{currentModeLabel}
-                            {status && !status.mockMode ? ` · ${status.model}` : ''}
-                            {status && !status.mockMode
-                                ? status.apiKeyConfigured
-                                    ? ' · API Key 已配置'
-                                    : ' · API Key 未配置'
-                                : ''}
-                        </p>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={onToggle}
-                        className="rounded-full border border-sky-200 bg-white/75 px-5 py-2.5 text-sm font-black text-sky-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-50"
-                    >
-                        {open ? '收起设置' : '设置 API'}
-                    </button>
-                </div>
-
-                {open ? (
-                    <div className="mt-5 rounded-[28px] border border-white/75 bg-white/58 p-5 shadow-sm backdrop-blur">
-                        <div className="grid gap-3 md:grid-cols-2">
-                            <ConfigModeButton
-                                active={mode === 'deepseek'}
-                                title="DeepSeek API"
-                                description="使用 deepseek-v4-flash 生成真实分析结果"
-                                onClick={() => onModeChange('deepseek')}
-                            />
-                            <ConfigModeButton
-                                active={mode === 'preview'}
-                                title="预览模式"
-                                description="不调用外部接口，使用本地统计生成演示结果"
-                                onClick={() => onModeChange('preview')}
-                            />
-                        </div>
-
-                        {mode === 'deepseek' ? (
-                            <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_1fr_1.4fr]">
-                                <ConfigField
-                                    label="Base URL"
-                                    value={baseUrl}
-                                    placeholder="https://api.deepseek.com"
-                                    onChange={onBaseUrlChange}
-                                />
-                                <ConfigField
-                                    label="模型"
-                                    value={model}
-                                    placeholder="deepseek-v4-flash"
-                                    onChange={onModelChange}
-                                />
-                                <ConfigField
-                                    label="API Key"
-                                    value={apiKey}
-                                    placeholder="留空表示沿用后端已配置的 Key"
-                                    type="password"
-                                    onChange={onApiKeyChange}
-                                />
-                            </div>
-                        ) : null}
-
-                        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-                            <p className="text-xs leading-5 text-slate-400">
-                                页面保存的是后端运行时配置，不会把 Key 写入仓库配置文件；“保存并测试”会先应用当前表单再发起连接测试。
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    onClick={onTest}
-                                    disabled={saving || testing}
-                                    className={[
-                                        'rounded-full border px-5 py-2.5 text-sm font-black shadow-sm transition-all duration-200',
-                                        saving || testing
-                                            ? 'cursor-not-allowed border-white/60 bg-white/50 text-slate-300'
-                                            : 'border-sky-200 bg-sky-100/90 text-sky-700 hover:-translate-y-0.5 hover:bg-sky-50',
-                                    ].join(' ')}
-                                >
-                                    {testing ? '测试中' : '保存并测试'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={onSave}
-                                    disabled={saving || testing}
-                                    className={[
-                                        'rounded-full border px-5 py-2.5 text-sm font-black shadow-sm transition-all duration-200',
-                                        saving || testing
-                                            ? 'cursor-not-allowed border-white/60 bg-white/50 text-slate-300'
-                                            : 'border-emerald-200 bg-emerald-100/90 text-emerald-700 hover:-translate-y-0.5 hover:bg-emerald-50',
-                                    ].join(' ')}
-                                >
-                                    {saving ? '保存中' : '保存配置'}
-                                </button>
-                            </div>
-                        </div>
-
-                        {message ? (
-                            <p className="mt-3 rounded-2xl border border-white/75 bg-white/65 px-4 py-3 text-sm leading-6 text-slate-500">
-                                {message}
-                            </p>
-                        ) : null}
-                    </div>
-                ) : null}
-            </div>
-        </GlassCard>
-    )
-}
-
-type ConfigModeButtonProps = {
-    active: boolean
-    title: string
-    description: string
-    onClick: () => void
-}
-
-function ConfigModeButton({ active, title, description, onClick }: ConfigModeButtonProps) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={[
-                'rounded-[24px] border p-4 text-left transition-all duration-200',
-                active
-                    ? 'border-sky-200 bg-sky-50/90 text-sky-700 shadow-sm'
-                    : 'border-white/75 bg-white/55 text-slate-500 hover:-translate-y-0.5 hover:bg-white',
-            ].join(' ')}
-        >
-            <p className="text-sm font-black">{title}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-400">{description}</p>
-        </button>
-    )
-}
-
-type ConfigFieldProps = {
-    label: string
-    value: string
-    placeholder: string
-    type?: 'text' | 'password'
-    onChange: (value: string) => void
-}
-
-function ConfigField({
-    label,
-    value,
-    placeholder,
-    type = 'text',
-    onChange,
-}: ConfigFieldProps) {
-    return (
-        <label className="block">
-            <ControlLabel>{label}</ControlLabel>
-            <input
-                type={type}
-                value={value}
-                placeholder={placeholder}
-                onChange={(event) => onChange(event.target.value)}
-                className="h-12 w-full rounded-2xl border border-white/80 bg-white/72 px-4 text-sm font-semibold text-slate-700 outline-none transition-all duration-200 placeholder:text-slate-300 focus:border-sky-200 focus:bg-white focus:ring-4 focus:ring-sky-100/70"
-            />
-        </label>
-    )
-}
-
 function CapabilityPill({ label, value }: CapabilityPillProps) {
     return (
         <div className="rounded-2xl border border-white/70 bg-white/58 px-4 py-2 text-center shadow-sm backdrop-blur">
@@ -1255,64 +1046,6 @@ function ScopeSummary({ scopeText, modeLabel, category }: ScopeSummaryProps) {
                     <span className="rounded-full border border-white/75 bg-white/65 px-4 py-2 text-xs font-black text-slate-500">
                         {category === 'ALL' ? '全部类型' : categoryTheme[category].cnName}
                     </span>
-                </div>
-            </div>
-        </GlassCard>
-    )
-}
-
-type CacheStatusPanelProps = {
-    cacheInfo: CacheInfo
-    onRegenerate: () => void
-    onClearCurrent: () => void
-    onClearAll: () => void
-}
-
-function CacheStatusPanel({
-    cacheInfo,
-    onRegenerate,
-    onClearCurrent,
-    onClearAll,
-}: CacheStatusPanelProps) {
-    const isCache = cacheInfo.source === 'cache'
-
-    return (
-        <GlassCard className="overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-4 bg-gradient-to-br from-white/72 via-emerald-50/45 to-sky-50/45 p-4">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        local cache
-                    </p>
-                    <h3 className="mt-1 text-base font-black text-slate-800">
-                        {isCache ? '当前显示本地缓存结果' : '当前结果已写入本地缓存'}
-                    </h3>
-                    <p className="mt-1 text-sm leading-6 text-slate-500">
-                        缓存时间：{formatGeneratedAt(cacheInfo.cachedAt)}，有效至 {formatGeneratedAt(cacheInfo.expiresAt)}。切换回同一分析条件时会优先使用这份结果。
-                    </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        type="button"
-                        onClick={onRegenerate}
-                        className="rounded-full border border-emerald-200 bg-white/75 px-5 py-2.5 text-sm font-black text-emerald-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-50"
-                    >
-                        重新生成并覆盖缓存
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onClearCurrent}
-                        className="rounded-full border border-slate-200 bg-white/70 px-5 py-2.5 text-sm font-black text-slate-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
-                    >
-                        清除当前缓存
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onClearAll}
-                        className="rounded-full border border-rose-200 bg-white/70 px-5 py-2.5 text-sm font-black text-rose-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-rose-50"
-                    >
-                        清除全部 AI 缓存
-                    </button>
                 </div>
             </div>
         </GlassCard>
@@ -1831,123 +1564,6 @@ function RecommendationCard({ item }: RecommendationCardProps) {
     )
 }
 
-type GenerationProgressPanelProps = {
-    progress: GenerationProgress
-    modeLabel: string
-    modelLabel: string
-}
-
-function GenerationProgressPanel({
-    progress,
-    modeLabel,
-    modelLabel,
-}: GenerationProgressPanelProps) {
-    return (
-        <GlassCard className="overflow-hidden">
-            <div className="bg-gradient-to-br from-white/75 via-sky-50/55 to-violet-50/55 p-6">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                            generating
-                        </p>
-                        <h3 className="mt-2 text-2xl font-black text-slate-800">
-                            {progress.title}
-                        </h3>
-                        <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-500">
-                            {progress.detail}
-                        </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full border border-white/75 bg-white/70 px-4 py-2 text-xs font-black text-slate-500">
-                            {modeLabel}
-                        </span>
-                        <span className="rounded-full border border-white/75 bg-white/70 px-4 py-2 text-xs font-black text-slate-500">
-                            {modelLabel}
-                        </span>
-                    </div>
-                </div>
-
-                <div className="mt-6 overflow-hidden rounded-full border border-white/80 bg-white/60 p-1 shadow-inner">
-                    <div
-                        className="h-3 rounded-full bg-gradient-to-r from-sky-300 via-violet-300 to-emerald-300 transition-all duration-500"
-                        style={{ width: `${progress.percent}%` }}
-                    />
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-4">
-                    {getProgressSteps(progress.percent).map((step) => (
-                        <div
-                            key={step.label}
-                            className={[
-                                'rounded-[22px] border px-4 py-3 shadow-sm transition-all duration-200',
-                                step.active
-                                    ? 'border-sky-200 bg-white/78 text-sky-700'
-                                    : 'border-white/70 bg-white/45 text-slate-400',
-                            ].join(' ')}
-                        >
-                            <p className="text-xs font-black">{step.label}</p>
-                            <p className="mt-1 text-[11px] leading-5">{step.description}</p>
-                        </div>
-                    ))}
-                </div>
-
-                <p className="mt-4 text-xs leading-5 text-slate-400">
-                    真实模型调用无法逐字返回内部思考过程，这里展示的是前端根据请求阶段整理的可解释进度。
-                </p>
-            </div>
-        </GlassCard>
-    )
-}
-
-type GenerationErrorPanelProps = {
-    message: string
-    canOpenConfig: boolean
-    onRetry: () => void
-    onOpenConfig: () => void
-}
-
-function GenerationErrorPanel({
-    message,
-    canOpenConfig,
-    onRetry,
-    onOpenConfig,
-}: GenerationErrorPanelProps) {
-    return (
-        <GlassCard className="overflow-hidden">
-            <div className="bg-gradient-to-br from-white/80 to-rose-50/75 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-300">
-                    generation failed
-                </p>
-                <h3 className="mt-2 text-lg font-black text-rose-700">
-                    智能分析生成失败
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-rose-600">
-                    {message}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                        type="button"
-                        onClick={onRetry}
-                        className="rounded-full border border-rose-200 bg-white/75 px-5 py-2.5 text-sm font-black text-rose-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-rose-50"
-                    >
-                        重试生成
-                    </button>
-                    {canOpenConfig ? (
-                        <button
-                            type="button"
-                            onClick={onOpenConfig}
-                            className="rounded-full border border-sky-200 bg-white/75 px-5 py-2.5 text-sm font-black text-sky-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-50"
-                        >
-                            检查 API 设置
-                        </button>
-                    ) : null}
-                </div>
-            </div>
-        </GlassCard>
-    )
-}
-
 function buildGenerationProgress(
     percent: number,
     mode: AnalysisMode,
@@ -1996,31 +1612,6 @@ function buildGenerationProgress(
         title: '正在准备分析任务',
         detail: '正在确认分析范围、模型配置和请求参数。',
     }
-}
-
-function getProgressSteps(percent: number) {
-    return [
-        {
-            label: '参数校验',
-            description: '确认年份、月份、类型和问题内容。',
-            active: percent >= 8,
-        },
-        {
-            label: '上下文构建',
-            description: '整理记录、标签、收藏和系列关系。',
-            active: percent >= 22,
-        },
-        {
-            label: '模型生成',
-            description: '调用 DeepSeek 或生成本地预览。',
-            active: percent >= 44,
-        },
-        {
-            label: '格式渲染',
-            description: '校验 JSON 字段并渲染报告。',
-            active: percent >= 78,
-        },
-    ]
 }
 
 function buildReportCacheKey(

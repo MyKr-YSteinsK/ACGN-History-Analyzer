@@ -45,29 +45,29 @@ function getTransportErrorMessage(error: AxiosError<unknown>) {
 
     if (status === 502 || status === 503 || status === 504) {
         if (isLlmRequest) {
-            return '大模型服务暂时不可用，请检查 API Key、模型名、Base URL 或稍后重试'
+            return '大模型服务这次没接上。可以检查 API Key、模型名、Base URL，或者先切到预览模式继续演示'
         }
 
-        return '后端服务暂时无法连接，请确认 Spring Boot 后端已经启动，并且 Vite 代理端口仍然是 8080'
+        return '后端服务暂时不可用。请看一下 Spring Boot 控制台，通常是数据库账号、端口或启动配置没有对上'
     }
 
     if (error.code === 'ECONNABORTED') {
         if (isLlmRequest) {
-            return '大模型生成超时，请稍后重试，或切换到预览模式检查页面流程'
+            return '大模型思考时间太久了。可以重试一次，或先切到预览模式确认页面流程'
         }
 
-        return '请求超时，请检查后端服务是否正在运行'
+        return '请求等得太久了，请确认后端还在运行，数据库连接也没有卡住'
     }
 
     if (!error.response) {
-        return '无法连接后端服务，请检查后端是否启动'
+        return '前端还没连上后端。请先确认 Spring Boot 已启动，并且 Vite 代理指向 8080'
     }
 
     if (status && status >= 500) {
-        return '后端服务返回异常，请查看 Spring Boot 控制台日志'
+        return '后端处理时出了异常。控制台日志会给出真正原因，常见是数据库连接或外部 API 调用失败'
     }
 
-    return error.message || '网络请求失败，请检查后端服务是否正常运行'
+    return error.message || '网络请求没有成功，请稍后重试；如果连续失败，先看后端控制台日志'
 }
 
 request.interceptors.response.use(
