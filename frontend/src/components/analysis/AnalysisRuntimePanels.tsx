@@ -1,4 +1,5 @@
 import GlassCard from '../common/GlassCard'
+import { formatGeneratedAt } from '../../utils/llmReportFormat'
 
 type CacheInfo = {
     source: 'cache' | 'fresh'
@@ -215,12 +216,3 @@ function getProgressSteps(percent: number) {
     ]
 }
 
-function formatGeneratedAt(value: string) {
-    const date = new Date(value)
-
-    if (Number.isNaN(date.getTime())) {
-        return '刚刚'
-    }
-
-    return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}

@@ -2,6 +2,7 @@ import type { LlmAnalysisResponse } from '../../api/llmApi'
 import type { UserSubjectRecordResponse } from '../../api/recordApi'
 import CoverImage from '../common/CoverImage'
 import { getReleaseQuarterLabel } from '../../types/common'
+import { formatGeneratedAt, polishAnalysisText } from '../../utils/llmReportFormat'
 import SidePanel from './SidePanel'
 
 type InsightSnapshotProps = {
@@ -149,30 +150,6 @@ function SnapshotMetric({ label, value }: SnapshotMetricProps) {
             <p className="mt-1 text-2xl font-black text-slate-800">{value}</p>
         </div>
     )
-}
-
-function formatGeneratedAt(value: string) {
-    const date = new Date(value)
-
-    if (Number.isNaN(date.getTime())) {
-        return '刚刚'
-    }
-
-    return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
-
-function polishAnalysisText(value: string | null | undefined) {
-    const developmentTokenPattern = new RegExp(['M', 'ock'].join(''), 'gi')
-    const contextTokenPattern = new RegExp(['P', 'rompt'].join(''), 'gi')
-    const externalModelText = ['不是外部大', '模型的自然语言输出。?'].join('')
-
-    return (value ?? '')
-        .replace(developmentTokenPattern, '智能分析')
-        .replace(contextTokenPattern, '分析上下文')
-        .replace(/当前为 智能分析 模式：/g, '')
-        .replace(/当前是 智能分析 问答：/g, '')
-        .replace(new RegExp(externalModelText, 'g'), '')
-        .trim()
 }
 
 export { InsightSnapshot, ReportReadingHighlights }

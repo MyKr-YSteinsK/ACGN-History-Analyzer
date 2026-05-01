@@ -1,4 +1,5 @@
 import type { AcgnCategory, ReleaseQuarter } from '../../types/common'
+import { formatGeneratedAt } from '../../utils/llmReportFormat'
 import SidePanel from './SidePanel'
 
 type CategoryFilter = AcgnCategory | 'ALL'
@@ -134,16 +135,6 @@ function ReportHistoryPanel({
             </div>
         </SidePanel>
     )
-}
-
-function formatGeneratedAt(value: string) {
-    const date = new Date(value)
-
-    if (Number.isNaN(date.getTime())) {
-        return '刚刚'
-    }
-
-    return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 export default ReportHistoryPanel

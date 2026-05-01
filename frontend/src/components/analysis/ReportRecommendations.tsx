@@ -1,6 +1,12 @@
 import type { LlmRecommendationResponse } from '../../api/llmApi'
 import { categoryTheme } from '../../theme/acgnTheme'
 import { categoryOrder, type AcgnCategory } from '../../types/common'
+import {
+    getPriorityClassName,
+    getPriorityLabel,
+    getSourceLabel,
+    polishAnalysisText,
+} from '../../utils/llmReportFormat'
 import CoverImage from '../common/CoverImage'
 
 type RecommendationGridProps = {
@@ -148,56 +154,6 @@ function RecommendationCard({ item }: RecommendationCardProps) {
 
 function isAcgnCategory(value: unknown): value is AcgnCategory {
     return typeof value === 'string' && categoryOrder.includes(value as AcgnCategory)
-}
-
-function getSourceLabel(source: LlmRecommendationResponse['source']) {
-    if (source === 'WANT') {
-        return '想看'
-    }
-
-    if (source === 'PAUSED') {
-        return '搁置'
-    }
-
-    return '作品库'
-}
-
-function getPriorityLabel(priority: LlmRecommendationResponse['priority']) {
-    if (priority === 'HIGH') {
-        return '高'
-    }
-
-    if (priority === 'MEDIUM') {
-        return '中'
-    }
-
-    return '低'
-}
-
-function getPriorityClassName(priority: LlmRecommendationResponse['priority']) {
-    if (priority === 'HIGH') {
-        return 'border-rose-200 bg-rose-50/90 text-rose-700'
-    }
-
-    if (priority === 'MEDIUM') {
-        return 'border-amber-200 bg-amber-50/90 text-amber-700'
-    }
-
-    return 'border-slate-200 bg-slate-50/90 text-slate-500'
-}
-
-function polishAnalysisText(value: string | null | undefined) {
-    const developmentTokenPattern = new RegExp(['M', 'ock'].join(''), 'gi')
-    const contextTokenPattern = new RegExp(['P', 'rompt'].join(''), 'gi')
-    const externalModelText = ['不是外部大', '模型的自然语言输出。?'].join('')
-
-    return (value ?? '')
-        .replace(developmentTokenPattern, '智能分析')
-        .replace(contextTokenPattern, '分析上下文')
-        .replace(/当前为 智能分析 模式：/g, '')
-        .replace(/当前是 智能分析 问答：/g, '')
-        .replace(new RegExp(externalModelText, 'g'), '')
-        .trim()
 }
 
 export default RecommendationGrid
