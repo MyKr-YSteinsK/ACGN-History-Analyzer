@@ -39,7 +39,14 @@ type QuarterCount = {
     count: number
 }
 
+type InsightCacheInfo = {
+    source: 'cache' | 'fresh'
+    cachedAt: string
+}
+
 const quarters: ReleaseQuarter[] = [1, 2, 3, 4]
+const homeInsightCachePrefix = 'acgn-home-insight-cache'
+const homeInsightCacheVersion = 1
 
 function getCurrentQuarter(): ReleaseQuarter {
     const month = new Date().getMonth() + 1
@@ -57,6 +64,73 @@ function getCurrentQuarter(): ReleaseQuarter {
     }
 
     return 4
+}
+
+function buildHomeInsightCacheKey(
+    year: number,
+    quarter: ReleaseQuarter,
+    category: AcgnCategory,
+) {
+    return [
+        homeInsightCachePrefix,
+        `v${homeInsightCacheVersion}`,
+        year,
+        quarter,
+        category,
+    ].join('::')
+}
+
+function readHomeInsightCache(cacheKey: string) {
+    try {
+        const raw = window.localStorage.getItem(cacheKey)
+        if (!raw) {
+            return null
+        }
+
+        const parsed = JSON.parse(raw) as {
+            report?: LlmAnalysisResponse
+            cachedAt?: string
+        }
+
+        if (!parsed.report || !parsed.cachedAt) {
+            return null
+        }
+
+        return {
+            report: parsed.report,
+            cachedAt: parsed.cachedAt,
+        }
+    } catch {
+        return null
+    }
+}
+
+function writeHomeInsightCache(
+    cacheKey: string,
+    report: LlmAnalysisResponse,
+    cachedAt: string,
+) {
+    try {
+        window.localStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+                report,
+                cachedAt,
+            }),
+        )
+    } catch {
+        // The insight can still render if localStorage is unavailable.
+    }
+}
+
+function formatHomeInsightTime(value: string) {
+    const date = new Date(value)
+
+    if (Number.isNaN(date.getTime())) {
+        return '刚刚'
+    }
+
+    return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 function getErrorMessage(error: unknown) {
@@ -176,6 +250,7 @@ function HomePage() {
     const [detailLoading, setDetailLoading] = useState(false)
     const [insightLoading, setInsightLoading] = useState(false)
     const [homeInsight, setHomeInsight] = useState<LlmAnalysisResponse | null>(null)
+    const [insightCacheInfo, setInsightCacheInfo] = useState<InsightCacheInfo | null>(null)
     const [insightError, setInsightError] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const latestSelectionApplied = useRef(false)
@@ -184,6 +259,10 @@ function HomePage() {
     const selectedQuarterTheme = quarterTheme[selectedQuarter]
     const selectedQuarterGradient =
         selectedQuarterTheme?.panelGradient ?? neutralPanelGradient
+    const homeInsightCacheKey = useMemo(
+        () => buildHomeInsightCacheKey(selectedYear, selectedQuarter, selectedCategory),
+        [selectedCategory, selectedQuarter, selectedYear],
+    )
 
     const loadRecords = useCallback(async () => {
         setLoading(true)
@@ -217,28 +296,56 @@ function HomePage() {
         void loadRecords()
     }, [loadRecords])
 
-    useEffect(() => {
-        async function loadHomeInsight() {
-            setInsightLoading(true)
+    const loadHomeInsight = useCallback(async (forceRefresh = false) => {
+        const cached = forceRefresh ? null : readHomeInsightCache(homeInsightCacheKey)
+        if (cached) {
+            setHomeInsight(cached.report)
+            setInsightCacheInfo({
+                source: 'cache',
+                cachedAt: cached.cachedAt,
+            })
             setInsightError(null)
-
-            try {
-                const response = await getHomeInsightAnalysis({
-                    year: selectedYear,
-                    quarter: selectedQuarter,
-                    category: selectedCategory,
-                })
-                setHomeInsight(response)
-            } catch (insightLoadError) {
-                setHomeInsight(null)
-                setInsightError(getErrorMessage(insightLoadError))
-            } finally {
-                setInsightLoading(false)
-            }
+            return
         }
 
-        void loadHomeInsight()
-    }, [selectedCategory, selectedQuarter, selectedYear])
+        setInsightLoading(true)
+        setInsightError(null)
+
+        try {
+            const response = await getHomeInsightAnalysis({
+                year: selectedYear,
+                quarter: selectedQuarter,
+                category: selectedCategory,
+            })
+            const cachedAt = new Date().toISOString()
+            writeHomeInsightCache(homeInsightCacheKey, response, cachedAt)
+            setHomeInsight(response)
+            setInsightCacheInfo({
+                source: 'fresh',
+                cachedAt,
+            })
+        } catch (insightLoadError) {
+            const fallback = readHomeInsightCache(homeInsightCacheKey)
+            if (fallback) {
+                setHomeInsight(fallback.report)
+                setInsightCacheInfo({
+                    source: 'cache',
+                    cachedAt: fallback.cachedAt,
+                })
+                setInsightError(`${getErrorMessage(insightLoadError)}。已显示本地缓存解读。`)
+            } else {
+                setHomeInsight(null)
+                setInsightCacheInfo(null)
+                setInsightError(getErrorMessage(insightLoadError))
+            }
+        } finally {
+            setInsightLoading(false)
+        }
+    }, [homeInsightCacheKey, selectedCategory, selectedQuarter, selectedYear])
+
+    useEffect(() => {
+        void loadHomeInsight(false)
+    }, [loadHomeInsight])
 
     const yearRecords = useMemo(() => {
         return records.filter((record) => record.recordYear === selectedYear)
@@ -558,9 +665,11 @@ function HomePage() {
                         report={homeInsight}
                         loading={insightLoading}
                         error={insightError}
+                        cacheInfo={insightCacheInfo}
                         category={selectedCategory}
                         year={selectedYear}
                         quarter={selectedQuarter}
+                        onRefresh={() => void loadHomeInsight(true)}
                     />
                 </div>
             </div>
@@ -605,18 +714,22 @@ type HomeInsightPanelProps = {
     report: LlmAnalysisResponse | null
     loading: boolean
     error: string | null
+    cacheInfo: InsightCacheInfo | null
     category: AcgnCategory
     year: number
     quarter: ReleaseQuarter
+    onRefresh: () => void
 }
 
 function HomeInsightPanel({
                               report,
                               loading,
                               error,
+                              cacheInfo,
                               category,
                               year,
                               quarter,
+                              onRefresh,
                           }: HomeInsightPanelProps) {
     const theme = categoryTheme[category]
     const visibleSections = report?.sections ?? []
@@ -630,6 +743,29 @@ function HomeInsightPanel({
                     title="首页图表解读"
                     description={`${year} · ${getReleaseQuarterLabel(quarter)} · ${theme.cnName}`}
                 />
+
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <span className="rounded-full border border-white/75 bg-white/62 px-3 py-1.5 text-[11px] font-semibold text-slate-400">
+                        {cacheInfo
+                            ? cacheInfo.source === 'cache'
+                                ? `缓存 ${formatHomeInsightTime(cacheInfo.cachedAt)}`
+                                : `已更新 ${formatHomeInsightTime(cacheInfo.cachedAt)}`
+                            : '未缓存'}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={onRefresh}
+                        disabled={loading}
+                        className={[
+                            'rounded-full border px-3 py-1.5 text-[11px] font-black transition-all duration-200',
+                            loading
+                                ? 'cursor-not-allowed border-white/60 bg-white/45 text-slate-300'
+                                : 'border-sky-200 bg-white/70 text-sky-700 hover:-translate-y-0.5 hover:bg-sky-50',
+                        ].join(' ')}
+                    >
+                        {loading ? '生成中' : '重新生成'}
+                    </button>
+                </div>
 
                 {loading ? (
                     <div className="mt-4 space-y-3">
@@ -691,8 +827,11 @@ function HomeInsightPanel({
                             <div className="rounded-[22px] border border-white/70 bg-white/52 p-3.5">
                                 <h4 className="text-sm font-black text-slate-800">推荐</h4>
                                 <div className="mt-2 space-y-2">
-                                    {visibleRecommendations.slice(0, 2).map((item) => (
-                                        <div key={item.subjectId} className="rounded-[18px] bg-white/55 p-3">
+                                    {visibleRecommendations.slice(0, 2).map((item, index) => (
+                                        <div
+                                            key={`${item.subjectId ?? item.title}-${index}`}
+                                            className="rounded-[18px] bg-white/55 p-3"
+                                        >
                                             <p className="text-sm font-semibold text-slate-700">
                                                 {item.title}
                                             </p>

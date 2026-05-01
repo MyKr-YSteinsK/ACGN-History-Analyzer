@@ -1,13 +1,38 @@
+import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import AnalysisPage from '../pages/AnalysisPage'
 import AppLayout from '../components/layout/AppLayout'
-import CollectionsPage from '../pages/CollectionsPage'
-import FranchisesPage from '../pages/FranchisesPage'
-import HomePage from '../pages/HomePage'
-import ImportPage from '../pages/ImportPage'
-import LibraryPage from '../pages/LibraryPage'
-import RecordsPage from '../pages/RecordsPage'
-import TopPage from '../pages/TopPage'
+
+const AnalysisPage = lazy(() => import('../pages/AnalysisPage'))
+const CollectionsPage = lazy(() => import('../pages/CollectionsPage'))
+const FranchisesPage = lazy(() => import('../pages/FranchisesPage'))
+const HomePage = lazy(() => import('../pages/HomePage'))
+const ImportPage = lazy(() => import('../pages/ImportPage'))
+const LibraryPage = lazy(() => import('../pages/LibraryPage'))
+const RecordsPage = lazy(() => import('../pages/RecordsPage'))
+const TopPage = lazy(() => import('../pages/TopPage'))
+
+function PageFallback() {
+    return (
+        <div className="rounded-[28px] border border-white/70 bg-white/58 p-6 shadow-sm backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">
+                loading
+            </p>
+            <div className="mt-4 space-y-3">
+                <div className="h-7 w-56 animate-pulse rounded-full bg-slate-200/70" />
+                <div className="h-24 animate-pulse rounded-[24px] bg-slate-200/55" />
+                <div className="grid gap-3 md:grid-cols-3">
+                    <div className="h-28 animate-pulse rounded-[24px] bg-slate-200/45" />
+                    <div className="h-28 animate-pulse rounded-[24px] bg-slate-200/45" />
+                    <div className="h-28 animate-pulse rounded-[24px] bg-slate-200/45" />
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function lazyPage(page: ReactNode) {
+    return <Suspense fallback={<PageFallback />}>{page}</Suspense>
+}
 
 const router = createBrowserRouter([
     {
@@ -16,35 +41,35 @@ const router = createBrowserRouter([
         children: [
             {
                 index: true,
-                element: <HomePage />,
+                element: lazyPage(<HomePage />),
             },
             {
                 path: 'records',
-                element: <RecordsPage />,
+                element: lazyPage(<RecordsPage />),
             },
             {
                 path: 'library',
-                element: <LibraryPage />,
+                element: lazyPage(<LibraryPage />),
             },
             {
                 path: 'top',
-                element: <TopPage />,
+                element: lazyPage(<TopPage />),
             },
             {
                 path: 'collections',
-                element: <CollectionsPage />,
+                element: lazyPage(<CollectionsPage />),
             },
             {
                 path: 'import',
-                element: <ImportPage />,
+                element: lazyPage(<ImportPage />),
             },
             {
                 path: 'franchises',
-                element: <FranchisesPage />,
+                element: lazyPage(<FranchisesPage />),
             },
             {
                 path: 'analysis',
-                element: <AnalysisPage />,
+                element: lazyPage(<AnalysisPage />),
             },
         ],
     },
