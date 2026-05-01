@@ -42,6 +42,7 @@ Content-Type: application/json
 {
   "titleCn": "非法作品",
   "displayTitle": "非法作品",
+  "sourceId": "subject-http-invalid-quarter",
   "releaseYear": 2024,
   "releaseQuarter": 5,
   "category": "ANIME",
@@ -55,6 +56,7 @@ Content-Type: application/json
 {
   "titleCn": "错误系列作品",
   "displayTitle": "错误系列作品",
+  "sourceId": "subject-http-bad-franchise",
   "franchiseId": 999999,
   "releaseYear": 2025,
   "releaseQuarter": 1,
@@ -72,6 +74,7 @@ Content-Type: application/json
   "titleCn": "临时测试作品",
   "subtitle": "subject-http-temp",
   "displayTitle": "临时测试作品 subject-http-temp",
+  "sourceId": "subject-http-temp",
   "releaseYear": 2025,
   "releaseQuarter": 3,
   "category": "NOVEL",
@@ -92,6 +95,7 @@ Content-Type: application/json
   "titleCn": "临时测试作品",
   "subtitle": "已更新",
   "displayTitle": "临时测试作品（已更新）",
+  "sourceId": "subject-http-temp",
   "releaseYear": 2025,
   "releaseQuarter": 4,
   "category": "NOVEL",
@@ -126,7 +130,7 @@ GET {{baseUrl}}/api/subjects/{{subject_aot_p1_id}}
 ### 22. 查询带 franchise 的作品详情
 GET {{baseUrl}}/api/subjects/{{subject_aot_p2_id}}
 
-### 23. 创建重复作品（应 4095）
+### 23. 创建重复作品（sourceId 重复，应 4095）
 POST {{baseUrl}}/api/subjects
 Content-Type: application/json
 
@@ -134,6 +138,7 @@ Content-Type: application/json
   "titleCn": "进击的巨人",
   "subtitle": "The Final Season Part 1",
   "displayTitle": "进击的巨人 重复测试",
+  "sourceId": "400602",
   "seasonIndex": 4,
   "partIndex": 1,
   "franchiseId": {{franchise_aot_id}},

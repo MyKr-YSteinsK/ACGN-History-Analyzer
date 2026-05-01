@@ -4,18 +4,20 @@ import jakarta.validation.constraints.*;
 
 public class UserSubjectRecordImportItemRequest {
 
-    @NotBlank(message = "作品主标题不能为空")
-    private String subjectTitleCn;
+    @Positive(message = "subjectId 必须大于0")
+    private Long subjectId;
 
-    private String subjectSubtitle;
+    @Size(max = 255, message = "subjectTitle 不能超过255个字符")
+    private String subjectTitle;
 
+    @Min(value = 1, message = "subjectSeasonIndex 必须大于等于1")
     private Integer subjectSeasonIndex;
 
+    @Min(value = 1, message = "subjectPartIndex 必须大于等于1")
     private Integer subjectPartIndex;
 
-    @NotBlank(message = "作品类型不能为空")
-    @Pattern(regexp = "ANIME|COMIC|NOVEL|GAME", message = "作品类型只能是 ANIME、COMIC、NOVEL 或 GAME")
-    private String subjectCategory;
+    @Size(max = 255, message = "sourceId 不能超过255个字符")
+    private String sourceId;
 
     @Min(value = 0, message = "评分不能小于0")
     @Max(value = 50, message = "评分不能大于50")
@@ -34,15 +36,15 @@ public class UserSubjectRecordImportItemRequest {
     @Size(max = 500, message = "备注不能超过500个字符")
     private String note;
 
-    public String getSubjectTitleCn() { return subjectTitleCn; }
+    public Long getSubjectId() { return subjectId; }
 
-    public String getSubjectSubtitle() { return subjectSubtitle; }
+    public String getSubjectTitle() { return subjectTitle; }
 
     public Integer getSubjectSeasonIndex() { return subjectSeasonIndex; }
 
     public Integer getSubjectPartIndex() { return subjectPartIndex; }
 
-    public String getSubjectCategory() { return subjectCategory; }
+    public String getSourceId() { return sourceId; }
 
     public Integer getScoreValue() { return scoreValue; }
 
@@ -52,15 +54,15 @@ public class UserSubjectRecordImportItemRequest {
 
     public String getNote() { return note; }
 
-    public void setSubjectTitleCn(String subjectTitleCn) { this.subjectTitleCn = subjectTitleCn; }
+    public void setSubjectId(Long subjectId) { this.subjectId = subjectId; }
 
-    public void setSubjectSubtitle(String subjectSubtitle) { this.subjectSubtitle = subjectSubtitle; }
+    public void setSubjectTitle(String subjectTitle) { this.subjectTitle = subjectTitle; }
 
     public void setSubjectSeasonIndex(Integer subjectSeasonIndex) { this.subjectSeasonIndex = subjectSeasonIndex; }
 
     public void setSubjectPartIndex(Integer subjectPartIndex) { this.subjectPartIndex = subjectPartIndex; }
 
-    public void setSubjectCategory(String subjectCategory) { this.subjectCategory = subjectCategory; }
+    public void setSourceId(String sourceId) { this.sourceId = sourceId; }
 
     public void setScoreValue(Integer scoreValue) { this.scoreValue = scoreValue; }
 

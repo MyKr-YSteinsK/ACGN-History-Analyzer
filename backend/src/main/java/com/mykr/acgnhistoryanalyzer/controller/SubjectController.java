@@ -25,17 +25,17 @@ public class SubjectController {
     }
     @PostMapping
     public ApiResponse<SubjectResponse> createSubject(@Valid @RequestBody SubjectCreateRequest request) {
+        if (request.getSourceId() == null || request.getSourceId().isBlank()) {
+            return ApiResponse.fail(
+                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
+                    "sourceId 不能为空（作品库仅支持 Bangumi 唯一标识）"
+            );
+        }
         if (request.getFranchiseId() != null
                 && !franchiseService.franchiseExists(request.getFranchiseId())) {
             return ApiResponse.fail(
                     BusinessErrors.FRANCHISE_NOT_FOUND.getCode(),
                     BusinessErrors.FRANCHISE_NOT_FOUND.getMessage()
-            );
-        }
-        if (subjectService.subjectBusinessUniqueExistsForCreate(request)) {
-            return ApiResponse.fail(
-                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
-                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getMessage()
             );
         }
         if (subjectService.subjectSourceUniqueExistsForCreate(request)) {
@@ -116,6 +116,12 @@ public class SubjectController {
             @PathVariable Long id,
             @Valid @RequestBody SubjectCreateRequest request
     ) {
+        if (request.getSourceId() == null || request.getSourceId().isBlank()) {
+            return ApiResponse.fail(
+                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
+                    "sourceId 不能为空（作品库仅支持 Bangumi 唯一标识）"
+            );
+        }
         if (!subjectService.subjectExists(id)) {
             return ApiResponse.fail(
                     BusinessErrors.SUBJECT_NOT_FOUND.getCode(),
@@ -130,12 +136,6 @@ public class SubjectController {
             );
         }
 
-        if (subjectService.subjectBusinessUniqueExistsForUpdate(id, request)) {
-            return ApiResponse.fail(
-                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),
-                    BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getMessage()
-            );
-        }
         if (subjectService.subjectSourceUniqueExistsForUpdate(id, request)) {
             return ApiResponse.fail(
                     BusinessErrors.SUBJECT_UNIQUE_DUPLICATED.getCode(),

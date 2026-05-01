@@ -33,5 +33,5 @@ public final class BusinessErrors {
             new BusinessError(4094, "系列名称重复，请修改后再保存");
 
     public static final BusinessError SUBJECT_UNIQUE_DUPLICATED =
-            new BusinessError(4095, "作品唯一信息重复，请修改后再保存");
+            new BusinessError(4095, "作品来源ID重复，请修改后再保存");
 }

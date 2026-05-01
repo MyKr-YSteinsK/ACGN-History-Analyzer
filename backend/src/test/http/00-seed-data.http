@@ -45,6 +45,7 @@ Content-Type: application/json
   "titleCn": "进击的巨人",
   "subtitle": "The Final Season Part 1",
   "displayTitle": "进击的巨人 The Final Season Part 1",
+  "sourceId": "400602",
   "seasonIndex": 4,
   "partIndex": 1,
   "franchiseId": {{franchise_aot_id}},
@@ -69,6 +70,7 @@ Content-Type: application/json
   "titleCn": "进击的巨人",
   "subtitle": "The Final Season Part 2",
   "displayTitle": "进击的巨人 The Final Season Part 2",
+  "sourceId": "400603",
   "seasonIndex": 4,
   "partIndex": 2,
   "franchiseId": {{franchise_aot_id}},
@@ -92,6 +94,7 @@ Content-Type: application/json
 {
   "titleCn": "孤独摇滚！",
   "displayTitle": "孤独摇滚！",
+  "sourceId": "376564",
   "coverUrl": "https://example.com/bocchi.jpg",
   "summary": "样例：普通单作品动画",
   "releaseYear": 2022,
@@ -112,6 +115,7 @@ Content-Type: application/json
 {
   "titleCn": "葬送的芙莉莲",
   "displayTitle": "葬送的芙莉莲",
+  "sourceId": "414767",
   "coverUrl": "https://example.com/frieren.jpg",
     "summary": "样例：2023 Q4 作品",
   "releaseYear": 2023,
@@ -132,6 +136,7 @@ Content-Type: application/json
 {
   "titleCn": "蓝色监狱",
   "displayTitle": "蓝色监狱",
+  "sourceId": "352064",
   "franchiseId": {{franchise_bluelock_id}},
   "coverUrl": "https://example.com/bluelock-comic.jpg",
   "summary": "样例：漫画类型作品",
@@ -153,6 +158,7 @@ Content-Type: application/json
 {
   "titleCn": "测试低分作品",
   "displayTitle": "测试低分作品",
+  "sourceId": "seed-bad-sample",
   "coverUrl": "https://example.com/bad-sample.jpg",
   "summary": "样例：用于难看分段统计",
   "releaseYear": 2025,
@@ -173,6 +179,7 @@ Content-Type: application/json
 {
   "titleCn": "测试42分作品",
   "displayTitle": "测试42分作品",
+  "sourceId": "seed-score42-sample",
   "coverUrl": "https://example.com/score42-sample.jpg",
   "summary": "样例：用于 42 分优秀区间统计",
   "releaseYear": 2025,
@@ -193,6 +200,7 @@ Content-Type: application/json
 {
   "titleCn": "测试隐藏作品",
   "displayTitle": "测试隐藏作品",
+  "sourceId": "seed-hidden-sample",
   "coverUrl": "https://example.com/hidden.jpg",
   "summary": "样例：用于测试 HIDDEN 状态",
   "releaseYear": 2024,

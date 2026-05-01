@@ -204,32 +204,57 @@ function AnalysisControlBar({
         : usesYearFilter
           ? 'mt-6 grid gap-4 xl:grid-cols-[300px_1fr_150px]'
           : 'mt-6 grid gap-4 xl:grid-cols-[1fr_150px]'
+    const selectedYearIndex = yearOptions.findIndex((year) => year === selectedYear)
+    const canPrevYear = selectedYearIndex > 0
+    const canNextYear = selectedYearIndex >= 0 && selectedYearIndex < yearOptions.length - 1
 
     return (
         <div className={gridClassName}>
             {usesYearFilter ? (
                 <div>
                     <ControlLabel>年份</ControlLabel>
-                    <div className="flex flex-wrap gap-2">
-                        {yearOptions.map((year) => {
-                            const selected = selectedYear === year
+                    <div className="flex items-center gap-2 rounded-2xl border border-white/75 bg-white/55 p-2">
+                        <button
+                            type="button"
+                            disabled={!canPrevYear}
+                            onClick={() => {
+                                if (canPrevYear) {
+                                    onYearChange(yearOptions[selectedYearIndex - 1])
+                                }
+                            }}
+                            className={[
+                                'h-10 w-10 rounded-xl border text-lg font-black transition-all duration-200',
+                                canPrevYear
+                                    ? 'border-amber-200/80 bg-amber-50/90 text-amber-600 hover:-translate-x-0.5'
+                                    : 'cursor-not-allowed border-white/50 bg-white/40 text-slate-300',
+                            ].join(' ')}
+                            aria-label="上一年"
+                        >
+                            &lt;
+                        </button>
 
-                            return (
-                                <button
-                                    key={year}
-                                    type="button"
-                                    onClick={() => onYearChange(year)}
-                                    className={[
-                                        'rounded-2xl border px-4 py-2.5 text-sm font-black transition-all duration-200',
-                                        selected
-                                            ? 'border-amber-200 bg-amber-100/90 text-amber-700 shadow-sm'
-                                            : 'border-white/75 bg-white/55 text-slate-400 hover:-translate-y-0.5 hover:bg-white',
-                                    ].join(' ')}
-                                >
-                                    {year}
-                                </button>
-                            )
-                        })}
+                        <div className="min-w-[120px] rounded-xl border border-amber-200 bg-amber-100/90 px-4 py-2 text-center text-sm font-black text-amber-700">
+                            {selectedYear}
+                        </div>
+
+                        <button
+                            type="button"
+                            disabled={!canNextYear}
+                            onClick={() => {
+                                if (canNextYear) {
+                                    onYearChange(yearOptions[selectedYearIndex + 1])
+                                }
+                            }}
+                            className={[
+                                'h-10 w-10 rounded-xl border text-lg font-black transition-all duration-200',
+                                canNextYear
+                                    ? 'border-amber-200/80 bg-amber-50/90 text-amber-600 hover:translate-x-0.5'
+                                    : 'cursor-not-allowed border-white/50 bg-white/40 text-slate-300',
+                            ].join(' ')}
+                            aria-label="下一年"
+                        >
+                            &gt;
+                        </button>
                     </div>
                 </div>
             ) : null}

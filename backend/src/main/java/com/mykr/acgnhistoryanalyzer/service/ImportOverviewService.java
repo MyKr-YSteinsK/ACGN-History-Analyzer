@@ -19,9 +19,10 @@ public class ImportOverviewService {
 
         List<String> notes = List.of(
                 "作品库不再开放手动 JSON/CSV 导入，避免脏数据污染作品本体。",
-                "subject 的业务层唯一性规则为：titleCn + subtitle + seasonIndex + partIndex + category 全都一样，则视为重复作品。",
-                "Bangumi 导入会额外使用 sourcePlatform + sourceId 去重，同一批次内也会去重。",
-                "record 导入定位 subject 的规则，已经与 subject 的业务唯一性规则对齐。",
+                "subject 唯一性规则仅使用 sourceId（Bangumi subject id）。",
+                "Bangumi 导入按 sourceId 去重，同一批次内也会去重。",
+                "record 与 collection 导入支持 subjectId、sourceId、subjectTitle 三种定位方式。",
+                "标题匹配时会按 titleCn/displayTitle 做关键词检索，并可用 season/part 缩小范围；多候选需前端选择。",
                 "当前系统规则是一作品一记录；如果某个 subject 已经有记录，则新的 record 导入会跳过。",
                 "collection 导入只管理 WANT / PAUSED；如果作品已有正式记录，则收藏导入会跳过。",
                 "Bangumi 导入和 record 正式导入成功后，会触发轻量系列检测，同名多季、Part 或跨媒介作品会自动关联系列。",

@@ -347,10 +347,10 @@ TOP 榜单       -> /api/top/*、/api/records/stats/*
 作品唯一性规则：
 
 ```text
-titleCn + subtitle + seasonIndex + partIndex + category
+sourceId（Bangumi subject id）
 ```
 
-这些字段全部相同，才视为同一个作品。任意一个不同，就可以是另一个作品。
+同一个 `sourceId` 视为同一个作品。
 
 ### UserSubjectRecord：正式记录
 

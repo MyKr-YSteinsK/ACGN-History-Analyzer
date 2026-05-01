@@ -24,6 +24,7 @@ import {
 import {
     importRecords,
     previewImportRecords,
+    type SubjectMatchCandidateResponse,
     type UserSubjectRecordBatchImportRequest,
     type UserSubjectRecordImportItemResponse,
     type UserSubjectRecordImportPreviewItemResponse,
@@ -83,6 +84,7 @@ type PreviewItem = {
     title: string
     result: string
     message: string
+    candidates?: SubjectMatchCandidateResponse[]
     sourcePlatform?: string | null
     sourceId?: string | null
     changeSummary?: string | null
@@ -149,33 +151,12 @@ const numericFields = new Set([
     'releaseQuarter',
     'platformScore',
     'episodeCount',
-    'subjectSeasonIndex',
-    'subjectPartIndex',
     'scoreValue',
     'recordYear',
     'recordQuarter',
 ])
 
 const arrayFields = new Set(['tagNames'])
-
-const importTips = [
-    {
-        title: '作品唯一键',
-        description: 'titleCn + subtitle + seasonIndex + partIndex + category 全部相同视为重复作品。',
-    },
-    {
-        title: '标签写 tagNames',
-        description: '推荐 3-7 个中文标签。JSON 用数组，CSV 可用 战斗|奇幻|漫画改。',
-    },
-    {
-        title: '封面可填远程 URL',
-        description: '正式导入时后端会尝试下载到 uploads/covers，并返回 /api/assets/covers 路径。',
-    },
-    {
-        title: '收藏 / 记录匹配作品',
-        description: '收藏可用 subjectId 或作品唯一键；记录用作品唯一键定位已有作品。',
-    },
-]
 
 const importFlowSteps = [
     {
@@ -267,6 +248,55 @@ function getPreviewItemKey(item: PreviewItem, index: number) {
 
 function isImportablePreviewItem(item: PreviewItem) {
     return item.result === 'CAN_IMPORT' || item.result === 'UPDATED'
+}
+
+function isAmbiguousPreviewItem(item: PreviewItem) {
+    return item.result === 'AMBIGUOUS' && (item.candidates?.length ?? 0) > 1
+}
+
+function buildImportPayloadWithSelections(
+    target: ImportTarget,
+    payload: ParsedPayload,
+    items: PreviewItem[],
+    selections: Record<number, number | 'SKIP'>,
+) {
+    if (target === 'RECORD') {
+        const records = [...(payload as UserSubjectRecordBatchImportRequest).records]
+            .map((item) => ({ ...item }))
+        records.forEach((record, index) => {
+            const previewItem = items[index]
+            if (!previewItem || !isAmbiguousPreviewItem(previewItem)) {
+                return
+            }
+            const selected = selections[index]
+            if (typeof selected === 'number') {
+                record.subjectId = selected
+            }
+        })
+        return {
+            records: records.filter((_, index) => selections[index] !== 'SKIP'),
+        } as UserSubjectRecordBatchImportRequest
+    }
+
+    if (target === 'COLLECTION') {
+        const collections = [...(payload as UserSubjectCollectionBatchImportRequest).collections]
+            .map((item) => ({ ...item }))
+        collections.forEach((collection, index) => {
+            const previewItem = items[index]
+            if (!previewItem || !isAmbiguousPreviewItem(previewItem)) {
+                return
+            }
+            const selected = selections[index]
+            if (typeof selected === 'number') {
+                collection.subjectId = selected
+            }
+        })
+        return {
+            collections: collections.filter((_, index) => selections[index] !== 'SKIP'),
+        } as UserSubjectCollectionBatchImportRequest
+    }
+
+    return payload
 }
 
 function stringifyTemplate(template: ImportTemplateResponse | null) {
@@ -477,6 +507,7 @@ function getPreviewItems(preview: PreviewState | null): PreviewItem[] {
             title: item.subjectDisplayTitle,
             result: item.result,
             message: item.message,
+            candidates: item.candidates,
         }))
     }
 
@@ -484,6 +515,7 @@ function getPreviewItems(preview: PreviewState | null): PreviewItem[] {
         title: item.subjectDisplayTitle,
         result: item.result,
         message: item.message,
+        candidates: item.candidates,
     }))
 }
 
@@ -549,6 +581,7 @@ function ImportPage() {
     const [draftText, setDraftText] = useState('')
     const [preview, setPreview] = useState<PreviewState | null>(null)
     const [excludedPreviewKeys, setExcludedPreviewKeys] = useState<string[]>([])
+    const [previewSelections, setPreviewSelections] = useState<Record<number, number | 'SKIP'>>({})
     const [importResult, setImportResult] = useState<ImportResultState | null>(null)
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [loadingDocs, setLoadingDocs] = useState(false)
@@ -627,7 +660,16 @@ function ImportPage() {
             previewItems,
         ],
     )
-    const activeCanImportCount = activePreviewItems.filter(isImportablePreviewItem).length
+    const activeCanImportCount = activePreviewItems.filter((item, index) => {
+        if (isImportablePreviewItem(item)) {
+            return true
+        }
+        if (!isAmbiguousPreviewItem(item)) {
+            return false
+        }
+        const selected = previewSelections[index]
+        return typeof selected === 'number'
+    }).length
     const activeUpdatedCount = activePreviewItems.filter((item) => item.result === 'UPDATED').length
 
     const draftLineCount = useMemo(() => {
@@ -680,6 +722,7 @@ function ImportPage() {
     function resetResultState() {
         setPreview(null)
         setExcludedPreviewKeys([])
+        setPreviewSelections({})
         setImportResult(null)
         setFeedbackMessage(null)
         setBangumiJobStatus(null)
@@ -799,6 +842,7 @@ function ImportPage() {
         setSubmitting(true)
         setPreview(null)
         setExcludedPreviewKeys([])
+        setPreviewSelections({})
         setImportResult(null)
         setFeedbackMessage(null)
         let previewTimer: number | undefined
@@ -903,7 +947,13 @@ function ImportPage() {
                 return
             }
 
-            const payload = parseDraftPayload(draftText, selectedMode, selectedTarget)
+            const rawPayload = parseDraftPayload(draftText, selectedMode, selectedTarget)
+            const payload = buildImportPayloadWithSelections(
+                selectedTarget,
+                rawPayload,
+                activePreviewItems,
+                previewSelections,
+            )
 
             if (selectedTarget === 'COLLECTION') {
                 const response = await importCollections(
@@ -957,20 +1007,6 @@ function ImportPage() {
             />
 
             <ImportFlowStepper currentStep={currentFlowStep} />
-
-            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {importTips.map((tip) => (
-                    <div
-                        key={tip.title}
-                        className="rounded-[24px] border border-white/70 bg-white/50 p-4 shadow-sm backdrop-blur-xl"
-                    >
-                        <p className="text-sm font-black text-slate-700">{tip.title}</p>
-                        <p className="mt-1 text-xs leading-5 text-slate-400">
-                            {tip.description}
-                        </p>
-                    </div>
-                ))}
-            </section>
 
             <GlassCard className="overflow-hidden">
                 <div className="bg-gradient-to-br from-white/62 via-white/45 to-sky-50/45 p-6">
@@ -1239,6 +1275,13 @@ function ImportPage() {
                     skippedCount={previewItemMetrics.skipped}
                     errorCount={previewItemMetrics.error}
                     items={activePreviewItems}
+                    selections={previewSelections}
+                    onSelectCandidate={(index, value) => {
+                        setPreviewSelections((current) => ({
+                            ...current,
+                            [index]: value,
+                        }))
+                    }}
                     onExcludeItem={
                         isBangumiMode
                             ? (item, index) => {
@@ -1573,6 +1616,8 @@ type PreviewPanelProps = {
     skippedCount: number
     errorCount: number
     items: PreviewItem[]
+    selections: Record<number, number | 'SKIP'>
+    onSelectCandidate: (index: number, value: number | 'SKIP') => void
     onExcludeItem?: (item: PreviewItem, index: number) => void
     emptyText: string
 }
@@ -1585,6 +1630,8 @@ function PreviewPanel({
                           skippedCount,
                           errorCount,
                           items,
+                          selections,
+                          onSelectCandidate,
                           onExcludeItem,
                           emptyText,
                       }: PreviewPanelProps) {
@@ -1605,6 +1652,8 @@ function PreviewPanel({
 
                 <ImportItemList
                     items={items}
+                    selections={selections}
+                    onSelectCandidate={onSelectCandidate}
                     onExcludeItem={onExcludeItem}
                     emptyText={emptyText}
                 />
@@ -1677,11 +1726,13 @@ function StatCard({ label, value, tone = 'normal' }: StatCardProps) {
 
 type ImportItemListProps = {
     items: PreviewItem[]
+    selections?: Record<number, number | 'SKIP'>
+    onSelectCandidate?: (index: number, value: number | 'SKIP') => void
     onExcludeItem?: (item: PreviewItem, index: number) => void
     emptyText: string
 }
 
-function ImportItemList({ items, onExcludeItem, emptyText }: ImportItemListProps) {
+function ImportItemList({ items, selections, onSelectCandidate, onExcludeItem, emptyText }: ImportItemListProps) {
     const [filter, setFilter] = useState<ImportItemFilter>('ALL')
     const successCount = items.filter((item) => getImportItemFilter(item) === 'SUCCESS').length
     const warningCount = items.filter((item) => getImportItemFilter(item) === 'WARNING').length
@@ -1698,7 +1749,11 @@ function ImportItemList({ items, onExcludeItem, emptyText }: ImportItemListProps
         { value: 'ERROR', label: '错误', count: errorCount },
     ]
 
-    const visibleItems = filter === 'ALL' ? items : items.filter((item) => getImportItemFilter(item) === filter)
+    const visibleItems = (filter === 'ALL'
+        ? items.map((item, index) => ({ item, index }))
+        : items
+            .map((item, index) => ({ item, index }))
+            .filter((entry) => getImportItemFilter(entry.item) === filter))
 
     if (items.length === 0) {
         return (
@@ -1739,7 +1794,7 @@ function ImportItemList({ items, onExcludeItem, emptyText }: ImportItemListProps
             ) : null}
 
             <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
-                {visibleItems.map((item, index) => {
+                {visibleItems.map(({ item, index }) => {
                     const canImport = item.result === 'CAN_IMPORT' || item.result === 'IMPORTED'
                     const hasError = item.result === 'ERROR'
                     const className = canImport
@@ -1781,6 +1836,48 @@ function ImportItemList({ items, onExcludeItem, emptyText }: ImportItemListProps
                                         <p className="text-[11px] leading-5 text-slate-500">
                                             变化摘要：{item.changeSummary}
                                         </p>
+                                    ) : null}
+                                    {isAmbiguousPreviewItem(item) && onSelectCandidate ? (
+                                        <div className="mt-2 space-y-2 rounded-2xl border border-violet-100 bg-violet-50/50 p-2">
+                                            <p className="text-[11px] font-semibold text-violet-500">
+                                                匹配到多个作品，请点击选择其一（或跳过）
+                                            </p>
+                                            {(item.candidates ?? []).map((candidate) => {
+                                                const selected = selections?.[index] === candidate.subjectId
+                                                return (
+                                                    <button
+                                                        key={candidate.subjectId}
+                                                        type="button"
+                                                        onClick={() => onSelectCandidate(index, candidate.subjectId)}
+                                                        className={[
+                                                            'w-full rounded-xl border px-2.5 py-2 text-left transition',
+                                                            selected
+                                                                ? 'border-violet-200 bg-violet-100 text-violet-700 shadow-sm'
+                                                                : 'border-white bg-white/90 text-slate-500 hover:border-violet-100 hover:bg-violet-50/70',
+                                                        ].join(' ')}
+                                                    >
+                                                        <p className="text-[12px] font-semibold">
+                                                            {candidate.displayTitle}
+                                                        </p>
+                                                        <p className="mt-0.5 text-[11px] opacity-80">
+                                                            ID {candidate.subjectId} · S{candidate.seasonIndex ?? '-'} · P{candidate.partIndex ?? '-'} · {candidate.releaseYear ?? '-'}年{candidate.releaseQuarter ?? '-'}档 · {candidate.category ?? '-'}
+                                                        </p>
+                                                    </button>
+                                                )
+                                            })}
+                                            <button
+                                                type="button"
+                                                onClick={() => onSelectCandidate(index, 'SKIP')}
+                                                className={[
+                                                    'w-full rounded-xl border px-2.5 py-2 text-left text-[12px] font-semibold transition',
+                                                    selections?.[index] === 'SKIP'
+                                                        ? 'border-rose-200 bg-rose-100 text-rose-600 shadow-sm'
+                                                        : 'border-white bg-white/90 text-slate-500 hover:border-rose-100 hover:bg-rose-50/70',
+                                                ].join(' ')}
+                                            >
+                                                跳过该行
+                                            </button>
+                                        </div>
                                     ) : null}
                                 </div>
                                 {onExcludeItem && isImportablePreviewItem(item) ? (

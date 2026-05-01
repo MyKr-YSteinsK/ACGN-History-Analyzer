@@ -1,6 +1,7 @@
 import { apiDelete, apiGet, apiPost, apiPut } from './request'
 import type { AcgnCategory, CollectionType, ReleaseQuarter } from '../types/common'
 import type { PageQuery, PageResponse } from '../types/api'
+import type { SubjectMatchCandidateResponse } from './recordApi'
 
 export type UserSubjectCollectionResponse = {
     id: number
@@ -36,11 +37,10 @@ export type CollectionPageParams = PageQuery & {
 
 export type UserSubjectCollectionImportItemRequest = {
     subjectId?: number | null
-    subjectTitleCn?: string | null
-    subjectSubtitle?: string | null
+    subjectTitle?: string | null
     subjectSeasonIndex?: number | null
     subjectPartIndex?: number | null
-    subjectCategory?: AcgnCategory | null
+    sourceId?: string | null
     collectionType: CollectionType
     note?: string | null
 }
@@ -53,6 +53,7 @@ export type UserSubjectCollectionImportPreviewItemResponse = {
     subjectDisplayTitle: string
     result: string
     message: string
+    candidates?: SubjectMatchCandidateResponse[]
 }
 
 export type UserSubjectCollectionImportPreviewResponse = {

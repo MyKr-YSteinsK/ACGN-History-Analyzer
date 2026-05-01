@@ -12,6 +12,7 @@ Content-Type: application/json
 {
   "titleCn": "记录导入专用作品A",
   "displayTitle": "记录导入专用作品A",
+  "sourceId": "record-import-a",
   "releaseYear": 2026,
   "releaseQuarter": 1,
   "category": "ANIME",
@@ -27,6 +28,7 @@ Content-Type: application/json
 {
   "titleCn": "记录导入专用作品B",
   "displayTitle": "记录导入专用作品B",
+  "sourceId": "record-import-b",
   "releaseYear": 2026,
   "releaseQuarter": 2,
   "category": "COMIC",
@@ -42,40 +44,28 @@ Content-Type: application/json
 {
   "records": [
     {
-      "subjectDisplayTitle": "记录导入专用作品A",
-      "subjectReleaseYear": 2026,
-      "subjectReleaseQuarter": 1,
-      "subjectCategory": "ANIME",
+      "sourceId": "record-import-a",
       "scoreValue": 44,
       "recordYear": 2026,
       "recordQuarter": 1,
       "note": "记录导入成功样例A"
     },
     {
-      "subjectDisplayTitle": "记录导入专用作品B",
-      "subjectReleaseYear": 2026,
-      "subjectReleaseQuarter": 2,
-      "subjectCategory": "COMIC",
+      "sourceId": "record-import-b",
       "scoreValue": 36,
       "recordYear": 2026,
       "recordQuarter": 2,
       "note": "记录导入成功样例B"
     },
     {
-      "subjectDisplayTitle": "进击的巨人 The Final Season Part 1",
-      "subjectReleaseYear": 2020,
-      "subjectReleaseQuarter": 4,
-      "subjectCategory": "ANIME",
+      "sourceId": "400602",
       "scoreValue": 48,
       "recordYear": 2024,
       "recordQuarter": 1,
       "note": "已存在记录，应跳过"
     },
     {
-      "subjectDisplayTitle": "根本不存在的作品",
-      "subjectReleaseYear": 2026,
-      "subjectReleaseQuarter": 3,
-      "subjectCategory": "NOVEL",
+      "sourceId": "record-import-not-exist",
       "recordYear": 2026,
       "recordQuarter": 3,
       "note": "作品不存在，应跳过"
@@ -90,40 +80,28 @@ Content-Type: application/json
 {
   "records": [
     {
-      "subjectDisplayTitle": "记录导入专用作品A",
-      "subjectReleaseYear": 2026,
-      "subjectReleaseQuarter": 1,
-      "subjectCategory": "ANIME",
+      "sourceId": "record-import-a",
       "scoreValue": 44,
       "recordYear": 2026,
       "recordQuarter": 1,
       "note": "记录导入成功样例A"
     },
     {
-      "subjectDisplayTitle": "记录导入专用作品B",
-      "subjectReleaseYear": 2026,
-      "subjectReleaseQuarter": 2,
-      "subjectCategory": "COMIC",
+      "sourceId": "record-import-b",
       "scoreValue": 36,
       "recordYear": 2026,
       "recordQuarter": 2,
       "note": "记录导入成功样例B"
     },
     {
-      "subjectDisplayTitle": "进击的巨人 The Final Season Part 1",
-      "subjectReleaseYear": 2020,
-      "subjectReleaseQuarter": 4,
-      "subjectCategory": "ANIME",
+      "sourceId": "400602",
       "scoreValue": 48,
       "recordYear": 2024,
       "recordQuarter": 1,
       "note": "已存在记录，应跳过"
     },
     {
-      "subjectDisplayTitle": "根本不存在的作品",
-      "subjectReleaseYear": 2026,
-      "subjectReleaseQuarter": 3,
-      "subjectCategory": "NOVEL",
+      "sourceId": "record-import-not-exist",
       "recordYear": 2026,
       "recordQuarter": 3,
       "note": "作品不存在，应跳过"

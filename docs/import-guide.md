@@ -64,13 +64,13 @@ POST /api/records/import
 
 | 字段 | 必填 | 格式 | 说明 |
 | --- | --- | --- | --- |
-| `titleCn` | 是 | 字符串，最长 255 | 作品主标题，参与唯一性判断 |
-| `subtitle` | 否 | 字符串或 null，最长 255 | 副标题，参与唯一性判断 |
+| `titleCn` | 是 | 字符串，最长 255 | 作品主标题 |
+| `subtitle` | 否 | 字符串或 null，最长 255 | 副标题 |
 | `displayTitle` | 是 | 字符串，最长 500 | 页面展示标题 |
 | `franchiseId` | 否 | 正整数或 null | 内部字段。前端不再提供手动系列导入 |
 | `franchiseName` | 否 | 字符串或 null，最长 200 | 内部字段。Bangumi 导入后由自动检测决定是否建系列 |
-| `seasonIndex` | 否 | 正整数或 null | 第几季，参与唯一性判断 |
-| `partIndex` | 否 | 正整数或 null | 第几 Part，参与唯一性判断。Bangumi 导入时会尽量从标题中推断 |
+| `seasonIndex` | 否 | 正整数或 null | 第几季 |
+| `partIndex` | 否 | 正整数或 null | 第几 Part。Bangumi 导入时会尽量从标题中推断 |
 | `coverUrl` | 否 | URL 或 `/api/assets/covers/...` | 远程 URL 会在正式导入时尝试缓存到本地 |
 | `summary` | 否 | 字符串或 null，最长 2000 | 简介 |
 | `releaseYear` | 是 | 1900-2100 | 发行年份 |
@@ -82,18 +82,18 @@ POST /api/records/import
 | `episodeCount` | 否 | >=0 或 null | 集数、话数、章节数 |
 | `tagNames` | 否 | 字符串数组，最多 12 个 | 结构化标签，推荐 3-7 个 |
 | `sourcePlatform` | 否 | 字符串或 null，最长 64 | 推荐 `BANGUMI` |
-| `sourceId` | 否 | 字符串或 null，最长 128 | 推荐 Bangumi subject id |
+| `sourceId` | 是 | 字符串，最长 128 | Bangumi subject id，作品唯一键 |
 | `status` | 是 | `NORMAL`/`HIDDEN` | 通常写 `NORMAL` |
 
 ### 作品唯一性
 
-作品重复判断使用：
+作品重复判断只使用：
 
 ```text
-titleCn + subtitle + seasonIndex + partIndex + category
+sourceId
 ```
 
-这些字段全部相同，就视为同一个作品。`displayTitle`、`releaseYear`、`releaseQuarter` 不参与当前唯一性判断。
+同一个 `sourceId` 会被视为同一作品并执行更新逻辑。
 
 ### 标签
 
@@ -160,11 +160,7 @@ JSON 写：
 {
   "records": [
     {
-      "subjectTitleCn": "葬送的芙莉莲",
-      "subjectSubtitle": null,
-      "subjectSeasonIndex": 1,
-      "subjectPartIndex": 1,
-      "subjectCategory": "ANIME",
+      "sourceId": "414767",
       "scoreValue": 48,
       "recordYear": 2024,
       "recordQuarter": 1,
@@ -178,21 +174,11 @@ JSON 写：
 
 | 字段 | 必填 | 格式 | 说明 |
 | --- | --- | --- | --- |
-| `subjectTitleCn` | 是 | 字符串 | 用于定位作品 |
-| `subjectSubtitle` | 否 | 字符串或 null | 用于定位作品 |
-| `subjectSeasonIndex` | 否 | 正整数或 null | 用于定位作品 |
-| `subjectPartIndex` | 否 | 正整数或 null | 用于定位作品 |
-| `subjectCategory` | 是 | `ANIME`/`COMIC`/`GAME`/`NOVEL` | 用于定位作品 |
+| `sourceId` | 是 | 字符串 | Bangumi subject id，用于定位作品 |
 | `scoreValue` | 否 | 0-50 或 null | 个人评分 |
 | `recordYear` | 是 | 1900-2100 | 记录年份，不一定等于发行年份 |
 | `recordQuarter` | 是 | 1/2/3/4 | 记录月份档期：1 一月，2 四月，3 七月，4 十月 |
 | `note` | 否 | 字符串或 null，最长 500 | 评价/备注 |
-
-记录导入使用作品唯一键匹配作品：
-
-```text
-subjectTitleCn + subjectSubtitle + subjectSeasonIndex + subjectPartIndex + subjectCategory
-```
 
 如果找不到作品，记录会跳过。一个作品只能有一条正式记录。
 
@@ -210,12 +196,7 @@ subjectTitleCn + subjectSubtitle + subjectSeasonIndex + subjectPartIndex + subje
 {
   "collections": [
     {
-      "subjectId": null,
-      "subjectTitleCn": "葬送的芙莉莲",
-      "subjectSubtitle": null,
-      "subjectSeasonIndex": 1,
-      "subjectPartIndex": 1,
-      "subjectCategory": "ANIME",
+      "sourceId": "414767",
       "collectionType": "WANT",
       "note": "之后想补完。"
     }
@@ -227,12 +208,7 @@ subjectTitleCn + subjectSubtitle + subjectSeasonIndex + subjectPartIndex + subje
 
 | 字段 | 必填 | 格式 | 说明 |
 | --- | --- | --- | --- |
-| `subjectId` | 否 | 正整数或 null | 如果知道数据库作品 id，可直接定位作品 |
-| `subjectTitleCn` | 否 | 字符串 | `subjectId` 为空时，用于定位作品 |
-| `subjectSubtitle` | 否 | 字符串或 null | 用于定位作品 |
-| `subjectSeasonIndex` | 否 | 正整数或 null | 用于定位作品 |
-| `subjectPartIndex` | 否 | 正整数或 null | 用于定位作品 |
-| `subjectCategory` | 否 | `ANIME`/`COMIC`/`GAME`/`NOVEL` | `subjectId` 为空时必填 |
+| `sourceId` | 是 | 字符串 | Bangumi subject id，用于定位作品 |
 | `collectionType` | 是 | `WANT`/`PAUSED` | WANT 想看，PAUSED 搁置 |
 | `note` | 否 | 字符串或 null，最长 500 | 收藏备注 |
 
@@ -252,8 +228,8 @@ subjectTitleCn + subjectSubtitle + subjectSeasonIndex + subjectPartIndex + subje
 
 作品 category 只能是 ANIME / COMIC / GAME / NOVEL。
 月份档期规则：1 一月，2 四月，3 七月，4 十月。
-作品唯一键是 titleCn + subtitle + seasonIndex + partIndex + category。
-记录 JSON 必须用 subjectTitleCn、subjectSubtitle、subjectSeasonIndex、subjectPartIndex、subjectCategory 匹配作品。
+作品唯一键是 sourceId（Bangumi subject id）。
+记录 JSON 必须用 sourceId 匹配作品。
 收藏 JSON 使用 collections 顶层字段，collectionType 只能是 WANT 或 PAUSED；已有正式记录的作品不要再生成收藏。
 不要生成 subjects.json，不要手动写入作品库。
 ```

@@ -93,15 +93,25 @@ export type RecordYearOverviewResponse = {
 }
 
 export type UserSubjectRecordImportItemRequest = {
-    subjectTitleCn: string
-    subjectSubtitle?: string | null
+    subjectId?: number | null
+    subjectTitle?: string | null
     subjectSeasonIndex?: number | null
     subjectPartIndex?: number | null
-    subjectCategory: AcgnCategory
+    sourceId?: string | null
     scoreValue?: number | null
     recordYear: number
     recordQuarter: ReleaseQuarter
     note?: string | null
+}
+
+export type SubjectMatchCandidateResponse = {
+    subjectId: number
+    displayTitle: string
+    seasonIndex: number | null
+    partIndex: number | null
+    releaseYear: number | null
+    releaseQuarter: ReleaseQuarter | null
+    category: AcgnCategory | null
 }
 
 export type UserSubjectRecordBatchImportRequest = {
@@ -112,6 +122,7 @@ export type UserSubjectRecordImportPreviewItemResponse = {
     subjectDisplayTitle: string
     result: string
     message: string
+    candidates?: SubjectMatchCandidateResponse[]
 }
 
 export type UserSubjectRecordImportPreviewResponse = {

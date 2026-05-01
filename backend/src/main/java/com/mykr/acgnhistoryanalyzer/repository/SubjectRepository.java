@@ -44,68 +44,36 @@ public interface SubjectRepository
     @Query("""
         select (count(s) > 0)
         from Subject s
-        where lower(trim(coalesce(s.titleCn, ''))) = :titleCnKey
-          and lower(trim(coalesce(s.subtitle, ''))) = :subtitleKey
-          and coalesce(s.seasonIndex, -1) = :seasonIndexKey
-          and coalesce(s.partIndex, -1) = :partIndexKey
-          and lower(trim(coalesce(s.category, ''))) = :categoryKey
+        where lower(trim(coalesce(s.sourceId, ''))) = :sourceIdKey
         """)
-    boolean existsByBusinessUnique(@Param("titleCnKey") String titleCnKey,
-                                   @Param("subtitleKey") String subtitleKey,
-                                   @Param("seasonIndexKey") Integer seasonIndexKey,
-                                   @Param("partIndexKey") Integer partIndexKey,
-                                   @Param("categoryKey") String categoryKey);
-
-    @Query("""
-        select (count(s) > 0)
-        from Subject s
-        where lower(trim(coalesce(s.sourcePlatform, ''))) = :sourcePlatformKey
-          and lower(trim(coalesce(s.sourceId, ''))) = :sourceIdKey
-        """)
-    boolean existsBySourceIdentity(@Param("sourcePlatformKey") String sourcePlatformKey,
-                                   @Param("sourceIdKey") String sourceIdKey);
+    boolean existsBySourceIdentity(@Param("sourceIdKey") String sourceIdKey);
 
     @Query("""
         select (count(s) > 0)
         from Subject s
         where s.id <> :id
-          and lower(trim(coalesce(s.titleCn, ''))) = :titleCnKey
-          and lower(trim(coalesce(s.subtitle, ''))) = :subtitleKey
-          and coalesce(s.seasonIndex, -1) = :seasonIndexKey
-          and coalesce(s.partIndex, -1) = :partIndexKey
-          and lower(trim(coalesce(s.category, ''))) = :categoryKey
-        """)
-    boolean existsByBusinessUniqueAndIdNot(@Param("titleCnKey") String titleCnKey,
-                                           @Param("subtitleKey") String subtitleKey,
-                                           @Param("seasonIndexKey") Integer seasonIndexKey,
-                                           @Param("partIndexKey") Integer partIndexKey,
-                                           @Param("categoryKey") String categoryKey,
-                                           @Param("id") Long id);
-
-    @Query("""
-        select (count(s) > 0)
-        from Subject s
-        where s.id <> :id
-          and lower(trim(coalesce(s.sourcePlatform, ''))) = :sourcePlatformKey
           and lower(trim(coalesce(s.sourceId, ''))) = :sourceIdKey
         """)
-    boolean existsBySourceIdentityAndIdNot(@Param("sourcePlatformKey") String sourcePlatformKey,
-                                           @Param("sourceIdKey") String sourceIdKey,
+    boolean existsBySourceIdentityAndIdNot(@Param("sourceIdKey") String sourceIdKey,
                                            @Param("id") Long id);
 
     @Query("""
         select s
         from Subject s
-        where lower(trim(coalesce(s.titleCn, ''))) = :titleCnKey
-          and lower(trim(coalesce(s.subtitle, ''))) = :subtitleKey
-          and coalesce(s.seasonIndex, -1) = :seasonIndexKey
-          and coalesce(s.partIndex, -1) = :partIndexKey
-          and lower(trim(coalesce(s.category, ''))) = :categoryKey
+        where lower(trim(coalesce(s.sourceId, ''))) = :sourceIdKey
         order by s.id asc
         """)
-    List<Subject> findAllByBusinessUnique(@Param("titleCnKey") String titleCnKey,
-                                          @Param("subtitleKey") String subtitleKey,
-                                          @Param("seasonIndexKey") Integer seasonIndexKey,
-                                          @Param("partIndexKey") Integer partIndexKey,
-                                          @Param("categoryKey") String categoryKey);
+    List<Subject> findAllBySourceIdentity(@Param("sourceIdKey") String sourceIdKey);
+
+    @Query("""
+        select s
+        from Subject s
+        where s.status = 'NORMAL'
+          and (
+                lower(trim(coalesce(s.titleCn, ''))) like concat('%', :keywordKey, '%')
+                or lower(trim(coalesce(s.displayTitle, ''))) like concat('%', :keywordKey, '%')
+          )
+        order by s.id asc
+        """)
+    List<Subject> searchAllNormalByTitleKeyword(@Param("keywordKey") String keywordKey);
 }

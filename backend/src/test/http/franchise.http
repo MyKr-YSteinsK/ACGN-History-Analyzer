@@ -46,6 +46,7 @@ Content-Type: application/json
   "titleCn": "临时系列作品",
   "subtitle": "franchise-temp-subject",
   "displayTitle": "临时系列作品 franchise-temp-subject",
+  "sourceId": "franchise-http-temp-subject",
   "franchiseId": {{franchise_temp_id}},
   "releaseYear": 2025,
   "releaseQuarter": 4,

@@ -4,7 +4,9 @@ import com.mykr.acgnhistoryanalyzer.entity.Subject;
 import com.mykr.acgnhistoryanalyzer.entity.Tag;
 import com.mykr.acgnhistoryanalyzer.repository.TagRepository;
 import com.mykr.acgnhistoryanalyzer.response.TagResponse;
+import com.mykr.acgnhistoryanalyzer.response.TagWhitelistCleanupResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
@@ -40,6 +42,34 @@ public class TagService {
         return tags.stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional
+    public TagWhitelistCleanupResponse cleanupToSubjectWhitelist() {
+        List<Tag> allTags = tagRepository.findAll();
+        Set<String> allowedNormalizedNames = SUBJECT_ALLOWED_TAG_NAMES.stream()
+                .map(this::normalizeTagName)
+                .collect(java.util.stream.Collectors.toSet());
+
+        List<Tag> toDelete = allTags.stream()
+                .filter(tag -> !allowedNormalizedNames.contains(tag.getNormalizedName()))
+                .toList();
+
+        if (!toDelete.isEmpty()) {
+            tagRepository.deleteAll(toDelete);
+        }
+
+        List<String> deletedNames = toDelete.stream()
+                .map(Tag::getName)
+                .sorted()
+                .toList();
+
+        return new TagWhitelistCleanupResponse(
+                allTags.size(),
+                allTags.size() - toDelete.size(),
+                toDelete.size(),
+                deletedNames
+        );
     }
 
     public void syncSubjectTags(Subject subject, List<String> tagNames) {

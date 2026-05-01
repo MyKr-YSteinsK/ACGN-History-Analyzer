@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -103,13 +104,19 @@ public class UserSubjectRecordService {
                 continue;
             }
 
-            SubjectResolveResult resolveResult = resolveSubjectForRecordImport(
-                    item.getSubjectTitleCn(),
-                    item.getSubjectSubtitle(),
-                    item.getSubjectSeasonIndex(),
-                    item.getSubjectPartIndex(),
-                    item.getSubjectCategory()
-            );
+            SubjectResolveResult resolveResult = resolveSubjectForRecordImport(item);
+
+            if (resolveResult.hasAmbiguousCandidates()) {
+                skippedCount++;
+                items.add(new UserSubjectRecordImportItemResponse(
+                        null,
+                        buildSubjectLabel(item),
+                        "SKIPPED",
+                        "匹配到多个作品，请先在预览中选择一个候选作品后再导入"
+                ));
+                rowNumber++;
+                continue;
+            }
 
             if (resolveResult.hasError()) {
                 skippedCount++;
@@ -129,7 +136,7 @@ public class UserSubjectRecordService {
                 skippedCount++;
                 items.add(new UserSubjectRecordImportItemResponse(
                         null,
-                        buildSubjectLabel(item),
+                        subject.getDisplayTitle(),
                         "SKIPPED",
                         "该作品已有正式记录，已跳过"
                 ));
@@ -149,7 +156,7 @@ public class UserSubjectRecordService {
 
             items.add(new UserSubjectRecordImportItemResponse(
                     savedRecord.getId(),
-                    buildSubjectLabel(item),
+                    subject.getDisplayTitle(),
                     "IMPORTED",
                     "导入成功"
             ));
@@ -184,13 +191,19 @@ public class UserSubjectRecordService {
                 continue;
             }
 
-            SubjectResolveResult resolveResult = resolveSubjectForRecordImport(
-                    item.getSubjectTitleCn(),
-                    item.getSubjectSubtitle(),
-                    item.getSubjectSeasonIndex(),
-                    item.getSubjectPartIndex(),
-                    item.getSubjectCategory()
-            );
+            SubjectResolveResult resolveResult = resolveSubjectForRecordImport(item);
+
+            if (resolveResult.hasAmbiguousCandidates()) {
+                skippedCount++;
+                items.add(new UserSubjectRecordImportPreviewItemResponse(
+                        buildSubjectLabel(item),
+                        "AMBIGUOUS",
+                        "匹配到多个作品，请在前端选择一个候选作品后再导入",
+                        resolveResult.getCandidates()
+                ));
+                rowNumber++;
+                continue;
+            }
 
             if (resolveResult.hasError()) {
                 skippedCount++;
@@ -208,7 +221,7 @@ public class UserSubjectRecordService {
             if (userSubjectRecordRepository.existsBySubjectId(subject.getId())) {
                 skippedCount++;
                 items.add(new UserSubjectRecordImportPreviewItemResponse(
-                        buildSubjectLabel(item),
+                        subject.getDisplayTitle(),
                         "SKIPPED",
                         "该作品已有正式记录，正式导入时会跳过"
                 ));
@@ -218,7 +231,7 @@ public class UserSubjectRecordService {
 
             canImportCount++;
             items.add(new UserSubjectRecordImportPreviewItemResponse(
-                    buildSubjectLabel(item),
+                    subject.getDisplayTitle(),
                     "CAN_IMPORT",
                     "可以导入正式记录"
             ));
@@ -550,30 +563,44 @@ public class UserSubjectRecordService {
         );
     }
 
-    private SubjectResolveResult resolveSubjectForRecordImport(
-            String titleCn,
-            String subtitle,
-            Integer seasonIndex,
-            Integer partIndex,
-            String category
-    ) {
-        List<Subject> matchedSubjects = subjectRepository.findAllByBusinessUnique(
-                normalizeTextKey(titleCn),
-                normalizeTextKey(subtitle),
-                normalizeNumberKey(seasonIndex),
-                normalizeNumberKey(partIndex),
-                normalizeTextKey(category)
-        );
+    private SubjectResolveResult resolveSubjectForRecordImport(UserSubjectRecordImportItemRequest item) {
+        List<Subject> matchedSubjects = resolveSubjectCandidates(item);
 
         if (matchedSubjects.isEmpty()) {
             return new SubjectResolveResult(null, "作品不存在，请先导入作品库");
         }
 
         if (matchedSubjects.size() > 1) {
-            return new SubjectResolveResult(null, "匹配到多个作品，无法唯一定位，请先清理重复作品");
+            return new SubjectResolveResult(
+                    null,
+                    null,
+                    toCandidateResponses(matchedSubjects)
+            );
         }
 
         return new SubjectResolveResult(matchedSubjects.get(0), null);
+    }
+
+    private List<Subject> resolveSubjectCandidates(UserSubjectRecordImportItemRequest item) {
+        if (item.getSubjectId() != null) {
+            Subject direct = subjectRepository.findById(item.getSubjectId()).orElse(null);
+            return direct == null ? List.of() : List.of(direct);
+        }
+
+        if (hasText(item.getSourceId())) {
+            return subjectRepository.findAllBySourceIdentity(normalizeTextKey(item.getSourceId()));
+        }
+
+        if (!hasText(item.getSubjectTitle())) {
+            return List.of();
+        }
+
+        return subjectRepository.searchAllNormalByTitleKeyword(normalizeTextKey(item.getSubjectTitle())).stream()
+                .filter(subject -> item.getSubjectSeasonIndex() == null
+                        || equalsNumber(subject.getSeasonIndex(), item.getSubjectSeasonIndex()))
+                .filter(subject -> item.getSubjectPartIndex() == null
+                        || equalsNumber(subject.getPartIndex(), item.getSubjectPartIndex()))
+                .toList();
     }
 
     private String normalizeTextKey(String value) {
@@ -583,13 +610,13 @@ public class UserSubjectRecordService {
         return value.trim().toLowerCase();
     }
 
-    private Integer normalizeNumberKey(Integer value) {
-        return value == null ? -1 : value;
-    }
-
     private String validateRecordImportItem(UserSubjectRecordImportItemRequest item) {
         if (item == null) {
             return "字段校验失败：导入行不能为空";
+        }
+
+        if (item.getSubjectId() == null && !hasText(item.getSourceId()) && !hasText(item.getSubjectTitle())) {
+            return "字段校验失败：subjectId、sourceId、subjectTitle 至少提供一个";
         }
 
         Set<ConstraintViolation<UserSubjectRecordImportItemRequest>> violations =
@@ -615,13 +642,27 @@ public class UserSubjectRecordService {
     }
 
     private String buildSubjectLabel(UserSubjectRecordImportItemRequest item) {
-        String title = item.getSubjectTitleCn() == null ? "" : item.getSubjectTitleCn().trim();
-        String subtitle = item.getSubjectSubtitle() == null ? "" : item.getSubjectSubtitle().trim();
-
-        if (!subtitle.isEmpty()) {
-            return title + " / " + subtitle;
+        if (item == null) {
+            return "";
         }
-        return title;
+
+        if (item.getSubjectId() != null) {
+            return "subjectId=" + item.getSubjectId();
+        }
+        if (hasText(item.getSourceId())) {
+            return "sourceId=" + item.getSourceId().trim();
+        }
+        if (hasText(item.getSubjectTitle())) {
+            String title = item.getSubjectTitle().trim();
+            String season = item.getSubjectSeasonIndex() == null ? "" : " S" + item.getSubjectSeasonIndex();
+            String part = item.getSubjectPartIndex() == null ? "" : " P" + item.getSubjectPartIndex();
+            return title + season + part;
+        }
+        return "";
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
     private int normalizePage(Integer page) {
@@ -679,17 +720,54 @@ public class UserSubjectRecordService {
     private static class SubjectResolveResult {
         private final Subject subject;
         private final String errorMessage;
+        private final List<SubjectMatchCandidateResponse> candidates;
 
         private SubjectResolveResult(Subject subject, String errorMessage) {
+            this(subject, errorMessage, List.of());
+        }
+
+        private SubjectResolveResult(Subject subject,
+                                     String errorMessage,
+                                     List<SubjectMatchCandidateResponse> candidates) {
             this.subject = subject;
             this.errorMessage = errorMessage;
+            this.candidates = candidates == null ? List.of() : candidates;
         }
 
         public Subject getSubject() { return subject; }
 
         public String getErrorMessage() { return errorMessage; }
 
+        public List<SubjectMatchCandidateResponse> getCandidates() { return candidates; }
+
+        public boolean hasAmbiguousCandidates() { return !candidates.isEmpty(); }
+
         public boolean hasError() { return errorMessage != null; }
+    }
+
+    private boolean equalsNumber(Number left, Number right) {
+        if (left == null && right == null) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        return left.longValue() == right.longValue();
+    }
+
+    private List<SubjectMatchCandidateResponse> toCandidateResponses(List<Subject> matchedSubjects) {
+        return matchedSubjects.stream()
+                .sorted(Comparator.comparing(Subject::getId))
+                .map(subject -> new SubjectMatchCandidateResponse(
+                        subject.getId(),
+                        subject.getDisplayTitle(),
+                        subject.getSeasonIndex(),
+                        subject.getPartIndex(),
+                        subject.getReleaseYear(),
+                        subject.getReleaseQuarter(),
+                        subject.getCategory()
+                ))
+                .toList();
     }
 
     private UserSubjectRecordResponse toResponse(UserSubjectRecord record) {

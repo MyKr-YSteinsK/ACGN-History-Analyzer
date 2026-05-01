@@ -16,6 +16,7 @@ import com.mykr.acgnhistoryanalyzer.response.UserSubjectCollectionImportPreviewI
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectCollectionImportPreviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectCollectionImportResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectCollectionResponse;
+import com.mykr.acgnhistoryanalyzer.response.SubjectMatchCandidateResponse;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import org.springframework.data.domain.Page;
@@ -146,6 +147,17 @@ public class UserSubjectCollectionService {
             }
 
             SubjectResolveResult resolveResult = resolveSubjectForCollectionImport(item);
+            if (resolveResult.hasAmbiguousCandidates()) {
+                skippedCount++;
+                items.add(new UserSubjectCollectionImportItemResponse(
+                        null,
+                        buildImportSubjectLabel(item, rowNumber),
+                        "SKIPPED",
+                        "匹配到多个作品，请先在预览中选择一个候选作品后再导入"
+                ));
+                rowNumber++;
+                continue;
+            }
             if (resolveResult.hasError()) {
                 skippedCount++;
                 items.add(new UserSubjectCollectionImportItemResponse(
@@ -218,6 +230,17 @@ public class UserSubjectCollectionService {
             }
 
             SubjectResolveResult resolveResult = resolveSubjectForCollectionImport(item);
+            if (resolveResult.hasAmbiguousCandidates()) {
+                skippedCount++;
+                items.add(new UserSubjectCollectionImportPreviewItemResponse(
+                        buildImportSubjectLabel(item, rowNumber),
+                        "AMBIGUOUS",
+                        "匹配到多个作品，请在前端选择一个候选作品后再导入",
+                        resolveResult.getCandidates()
+                ));
+                rowNumber++;
+                continue;
+            }
             if (resolveResult.hasError()) {
                 skippedCount++;
                 items.add(new UserSubjectCollectionImportPreviewItemResponse(
@@ -309,9 +332,8 @@ public class UserSubjectCollectionService {
             return "字段校验失败：collectionType 不能为空";
         }
 
-        if (item.getSubjectId() == null
-                && (!hasText(item.getSubjectTitleCn()) || !hasText(item.getSubjectCategory()))) {
-            return "字段校验失败：subjectId 或作品唯一键必填；作品唯一键至少需要 subjectTitleCn 和 subjectCategory";
+        if (item.getSubjectId() == null && !hasText(item.getSourceId()) && !hasText(item.getSubjectTitle())) {
+            return "字段校验失败：subjectId、sourceId、subjectTitle 至少提供一个";
         }
 
         return null;
@@ -320,30 +342,43 @@ public class UserSubjectCollectionService {
     private SubjectResolveResult resolveSubjectForCollectionImport(
             UserSubjectCollectionImportItemRequest item
     ) {
-        if (item.getSubjectId() != null) {
-            Subject subject = subjectRepository.findById(item.getSubjectId()).orElse(null);
-            return subject == null
-                    ? new SubjectResolveResult(null, "subjectId 对应作品不存在")
-                    : new SubjectResolveResult(subject, null);
-        }
-
-        List<Subject> matchedSubjects = subjectRepository.findAllByBusinessUnique(
-                normalizeTextKey(item.getSubjectTitleCn()),
-                normalizeTextKey(item.getSubjectSubtitle()),
-                normalizeNumberKey(item.getSubjectSeasonIndex()),
-                normalizeNumberKey(item.getSubjectPartIndex()),
-                normalizeTextKey(item.getSubjectCategory())
-        );
+        List<Subject> matchedSubjects = resolveSubjectCandidates(item);
 
         if (matchedSubjects.isEmpty()) {
             return new SubjectResolveResult(null, "作品不存在，请先导入作品库");
         }
 
         if (matchedSubjects.size() > 1) {
-            return new SubjectResolveResult(null, "匹配到多个作品，无法唯一定位，请先清理重复作品");
+            return new SubjectResolveResult(
+                    null,
+                    null,
+                    toCandidateResponses(matchedSubjects)
+            );
         }
 
         return new SubjectResolveResult(matchedSubjects.get(0), null);
+    }
+
+    private List<Subject> resolveSubjectCandidates(UserSubjectCollectionImportItemRequest item) {
+        if (item.getSubjectId() != null) {
+            Subject direct = subjectRepository.findById(item.getSubjectId()).orElse(null);
+            return direct == null ? List.of() : List.of(direct);
+        }
+
+        if (hasText(item.getSourceId())) {
+            return subjectRepository.findAllBySourceIdentity(normalizeTextKey(item.getSourceId()));
+        }
+
+        if (!hasText(item.getSubjectTitle())) {
+            return List.of();
+        }
+
+        return subjectRepository.searchAllNormalByTitleKeyword(normalizeTextKey(item.getSubjectTitle())).stream()
+                .filter(subject -> item.getSubjectSeasonIndex() == null
+                        || equalsNumber(subject.getSeasonIndex(), item.getSubjectSeasonIndex()))
+                .filter(subject -> item.getSubjectPartIndex() == null
+                        || equalsNumber(subject.getPartIndex(), item.getSubjectPartIndex()))
+                .toList();
     }
 
     private String buildImportSubjectLabel(UserSubjectCollectionImportItemRequest item, int rowNumber) {
@@ -353,10 +388,14 @@ public class UserSubjectCollectionService {
         if (item.getSubjectId() != null) {
             return "subjectId=" + item.getSubjectId();
         }
-        if (hasText(item.getSubjectTitleCn())) {
-            String title = item.getSubjectTitleCn().trim();
-            String subtitle = item.getSubjectSubtitle() == null ? "" : item.getSubjectSubtitle().trim();
-            return subtitle.isEmpty() ? title : title + " / " + subtitle;
+        if (hasText(item.getSourceId())) {
+            return "sourceId=" + item.getSourceId().trim();
+        }
+        if (hasText(item.getSubjectTitle())) {
+            String title = item.getSubjectTitle().trim();
+            String season = item.getSubjectSeasonIndex() == null ? "" : " S" + item.getSubjectSeasonIndex();
+            String part = item.getSubjectPartIndex() == null ? "" : " P" + item.getSubjectPartIndex();
+            return title + season + part;
         }
         return "第 " + rowNumber + " 行";
     }
@@ -430,23 +469,55 @@ public class UserSubjectCollectionService {
         return value.trim().toLowerCase();
     }
 
-    private Integer normalizeNumberKey(Integer value) {
-        return value == null ? -1 : value;
-    }
-
     private static class SubjectResolveResult {
         private final Subject subject;
         private final String errorMessage;
+        private final List<SubjectMatchCandidateResponse> candidates;
 
         private SubjectResolveResult(Subject subject, String errorMessage) {
+            this(subject, errorMessage, List.of());
+        }
+
+        private SubjectResolveResult(Subject subject,
+                                     String errorMessage,
+                                     List<SubjectMatchCandidateResponse> candidates) {
             this.subject = subject;
             this.errorMessage = errorMessage;
+            this.candidates = candidates == null ? List.of() : candidates;
         }
 
         public Subject getSubject() { return subject; }
 
         public String getErrorMessage() { return errorMessage; }
 
+        public List<SubjectMatchCandidateResponse> getCandidates() { return candidates; }
+
+        public boolean hasAmbiguousCandidates() { return !candidates.isEmpty(); }
+
         public boolean hasError() { return errorMessage != null; }
+    }
+
+    private boolean equalsNumber(Number left, Number right) {
+        if (left == null && right == null) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        return left.longValue() == right.longValue();
+    }
+
+    private List<SubjectMatchCandidateResponse> toCandidateResponses(List<Subject> matchedSubjects) {
+        return matchedSubjects.stream()
+                .map(subject -> new SubjectMatchCandidateResponse(
+                        subject.getId(),
+                        subject.getDisplayTitle(),
+                        subject.getSeasonIndex(),
+                        subject.getPartIndex(),
+                        subject.getReleaseYear(),
+                        subject.getReleaseQuarter(),
+                        subject.getCategory()
+                ))
+                .toList();
     }
 }
