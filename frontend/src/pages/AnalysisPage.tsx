@@ -510,6 +510,22 @@ function AnalysisPage() {
         setReportHistory([])
     }, [])
 
+    const deleteReportHistoryItem = useCallback((item: HistoryItem) => {
+        setReportHistory((items) => {
+            const nextItems = items.filter((historyItem) => historyItem.id !== item.id)
+            writeReportHistory(nextItems)
+            return nextItems
+        })
+    }, [])
+
+    const pruneInvalidReportHistory = useCallback(() => {
+        setReportHistory((items) => {
+            const nextItems = items.filter((item) => readCachedReport(item.cacheKey, item.analysisType))
+            writeReportHistory(nextItems)
+            return nextItems
+        })
+    }, [])
+
     function handleModeChange(mode: AnalysisMode) {
         setAnalysisMode(mode)
         setError(null)
@@ -651,6 +667,8 @@ function AnalysisPage() {
                     history={reportHistory}
                     activeCategory={selectedCategory}
                     onSelectHistory={restoreHistoryItem}
+                    onDeleteHistory={deleteReportHistoryItem}
+                    onPruneInvalidHistory={pruneInvalidReportHistory}
                     onClearHistory={clearReportHistory}
                 />
             ) : (
@@ -1270,6 +1288,8 @@ type AnalysisReportProps = {
     history: HistoryItem[]
     activeCategory: CategoryFilter
     onSelectHistory: (item: HistoryItem) => void
+    onDeleteHistory: (item: HistoryItem) => void
+    onPruneInvalidHistory: () => void
     onClearHistory: () => void
 }
 
@@ -1278,6 +1298,8 @@ function AnalysisReport({
     history,
     activeCategory,
     onSelectHistory,
+    onDeleteHistory,
+    onPruneInvalidHistory,
     onClearHistory,
 }: AnalysisReportProps) {
     const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
@@ -1426,6 +1448,8 @@ function AnalysisReport({
                 <ReportHistoryPanel
                     items={history}
                     onSelect={onSelectHistory}
+                    onDelete={onDeleteHistory}
+                    onPruneInvalid={onPruneInvalidHistory}
                     onClear={onClearHistory}
                 />
             </div>
@@ -1497,10 +1521,18 @@ function SidePanel({ eyebrow, title, gradient, children }: SidePanelProps) {
 type ReportHistoryPanelProps = {
     items: HistoryItem[]
     onSelect: (item: HistoryItem) => void
+    onDelete: (item: HistoryItem) => void
+    onPruneInvalid: () => void
     onClear: () => void
 }
 
-function ReportHistoryPanel({ items, onSelect, onClear }: ReportHistoryPanelProps) {
+function ReportHistoryPanel({
+    items,
+    onSelect,
+    onDelete,
+    onPruneInvalid,
+    onClear,
+}: ReportHistoryPanelProps) {
     return (
         <SidePanel
             title="分析记录"
@@ -1508,7 +1540,14 @@ function ReportHistoryPanel({ items, onSelect, onClear }: ReportHistoryPanelProp
             gradient="from-white/75 to-violet-50/65"
         >
             {items.length > 0 ? (
-                <div className="mb-3 flex justify-end">
+                <div className="mb-3 flex flex-wrap justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={onPruneInvalid}
+                        className="rounded-full border border-sky-200 bg-white/70 px-3 py-1.5 text-[11px] font-black text-sky-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-50"
+                    >
+                        清理失效
+                    </button>
                     <button
                         type="button"
                         onClick={onClear}
@@ -1520,12 +1559,19 @@ function ReportHistoryPanel({ items, onSelect, onClear }: ReportHistoryPanelProp
             ) : null}
             <div className="space-y-2.5">
                 {items.length > 0 ? (
-                    items.slice(0, 4).map((item, index) => (
-                        <button
+                    items.slice(0, 6).map((item, index) => (
+                        <article
                             key={`${item.id}-${index}`}
-                            type="button"
                             onClick={() => onSelect(item)}
-                            className="w-full rounded-[22px] border border-white/75 bg-white/58 p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/75"
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault()
+                                    onSelect(item)
+                                }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            className="w-full cursor-pointer rounded-[22px] border border-white/75 bg-white/58 p-4 text-left shadow-sm outline-none transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/75 focus:ring-4 focus:ring-violet-100/80"
                         >
                             <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
@@ -1540,14 +1586,26 @@ function ReportHistoryPanel({ items, onSelect, onClear }: ReportHistoryPanelProp
                                     {item.mode}
                                 </span>
                             </div>
-                            <p className="mt-3 text-[11px] font-semibold text-slate-300">
-                                {formatGeneratedAt(item.generatedAt)}
-                            </p>
-                        </button>
+                            <div className="mt-3 flex items-center justify-between gap-2">
+                                <p className="text-[11px] font-semibold text-slate-300">
+                                    {formatGeneratedAt(item.generatedAt)}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        onDelete(item)
+                                    }}
+                                    className="rounded-full border border-rose-100 bg-white/65 px-2.5 py-1 text-[11px] font-black text-rose-500 transition-all duration-200 hover:bg-rose-50"
+                                >
+                                    删除
+                                </button>
+                            </div>
+                        </article>
                     ))
                 ) : (
                     <p className="rounded-[22px] border border-white/75 bg-white/58 p-4 text-sm leading-6 text-slate-400">
-                        生成第一份报告后，这里会显示本次页面会话中的分析记录。
+                        生成第一份报告后，这里会保留最近的本地历史记录。
                     </p>
                 )}
             </div>
