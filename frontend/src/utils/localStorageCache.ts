@@ -46,3 +46,16 @@ export function removeCacheItemsByPrefixes(prefixes: string[]) {
         // Ignore unavailable localStorage.
     }
 }
+
+export function listCacheKeysByPrefixes(prefixes: string[]) {
+    try {
+        return Array.from(
+            { length: window.localStorage.length },
+            (_, index) => window.localStorage.key(index),
+        )
+            .filter((key): key is string => Boolean(key))
+            .filter((key) => prefixes.some((prefix) => key.startsWith(prefix)))
+    } catch {
+        return []
+    }
+}

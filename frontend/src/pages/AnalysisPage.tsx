@@ -31,6 +31,7 @@ import PageHero from '../components/layout/PageHero'
 import { categoryTheme, neutralPanelGradient } from '../theme/acgnTheme'
 import { categoryOrder, getReleaseQuarterLabel, type AcgnCategory, type ReleaseQuarter } from '../types/common'
 import {
+    listCacheKeysByPrefixes,
     readJsonCache,
     removeCacheItem,
     removeCacheItemsByPrefixes,
@@ -86,6 +87,7 @@ type GenerationProgress = {
 type CacheInfo = {
     source: 'cache' | 'fresh'
     cachedAt: string
+    expiresAt: string
 }
 
 const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
@@ -171,6 +173,7 @@ const reportCachePrefix = 'acgn-llm-report-cache'
 const reportCacheVersion = 1
 const reportHistoryStorageKey = 'acgn-llm-report-history'
 const maxReportHistoryCount = 20
+const reportCacheTtlMs = 7 * 24 * 60 * 60 * 1000
 const allAiCachePrefixes = [reportCachePrefix, 'acgn-home-insight-cache']
 
 function AnalysisPage() {
@@ -237,6 +240,19 @@ function AnalysisPage() {
     }, [syncConfigState])
 
     useEffect(() => {
+        const removedCount = pruneExpiredReportCaches()
+        if (removedCount <= 0) {
+            return
+        }
+
+        setReportHistory((items) => {
+            const nextItems = items.filter((item) => readCachedReport(item.cacheKey, item.analysisType))
+            writeReportHistory(nextItems)
+            return nextItems
+        })
+    }, [])
+
+    useEffect(() => {
         if (!loading) {
             progressStartedAt.current = null
             return
@@ -266,6 +282,7 @@ function AnalysisPage() {
             setCacheInfo({
                 source: 'cache',
                 cachedAt: cached.cachedAt,
+                expiresAt: cached.expiresAt,
             })
             setError(null)
             return
@@ -373,6 +390,7 @@ function AnalysisPage() {
             setCacheInfo({
                 source: 'fresh',
                 cachedAt,
+                expiresAt: getReportCacheExpiresAt(cachedAt),
             })
         } catch (generateError) {
             const cached = readCachedReport(reportCacheKey, analysisMode)
@@ -381,6 +399,7 @@ function AnalysisPage() {
                 setCacheInfo({
                     source: 'cache',
                     cachedAt: cached.cachedAt,
+                    expiresAt: cached.expiresAt,
                 })
                 setError(`${getApiErrorMessage(generateError, '智能分析生成失败')}。已回退到本地缓存结果。`)
             } else {
@@ -501,6 +520,7 @@ function AnalysisPage() {
         setCacheInfo({
             source: 'cache',
             cachedAt: cached.cachedAt,
+            expiresAt: cached.expiresAt,
         })
         setError(null)
     }, [])
@@ -525,6 +545,21 @@ function AnalysisPage() {
             return nextItems
         })
     }, [])
+
+    const pruneExpiredReportHistory = useCallback(() => {
+        pruneExpiredReportCaches()
+        setReportHistory((items) => {
+            const nextItems = items.filter((item) => readCachedReport(item.cacheKey, item.analysisType))
+            writeReportHistory(nextItems)
+            return nextItems
+        })
+
+        const cached = readCachedReport(reportCacheKey, analysisMode)
+        if (!cached && cacheInfo?.source === 'cache') {
+            setReport(null)
+            setCacheInfo(null)
+        }
+    }, [analysisMode, cacheInfo, reportCacheKey])
 
     function handleModeChange(mode: AnalysisMode) {
         setAnalysisMode(mode)
@@ -669,6 +704,7 @@ function AnalysisPage() {
                     onSelectHistory={restoreHistoryItem}
                     onDeleteHistory={deleteReportHistoryItem}
                     onPruneInvalidHistory={pruneInvalidReportHistory}
+                    onPruneExpiredHistory={pruneExpiredReportHistory}
                     onClearHistory={clearReportHistory}
                 />
             ) : (
@@ -1251,7 +1287,7 @@ function CacheStatusPanel({
                         {isCache ? '当前显示本地缓存结果' : '当前结果已写入本地缓存'}
                     </h3>
                     <p className="mt-1 text-sm leading-6 text-slate-500">
-                        缓存时间：{formatGeneratedAt(cacheInfo.cachedAt)}。切换回同一分析条件时会优先使用这份结果。
+                        缓存时间：{formatGeneratedAt(cacheInfo.cachedAt)}，有效至 {formatGeneratedAt(cacheInfo.expiresAt)}。切换回同一分析条件时会优先使用这份结果。
                     </p>
                 </div>
 
@@ -1290,6 +1326,7 @@ type AnalysisReportProps = {
     onSelectHistory: (item: HistoryItem) => void
     onDeleteHistory: (item: HistoryItem) => void
     onPruneInvalidHistory: () => void
+    onPruneExpiredHistory: () => void
     onClearHistory: () => void
 }
 
@@ -1300,9 +1337,11 @@ function AnalysisReport({
     onSelectHistory,
     onDeleteHistory,
     onPruneInvalidHistory,
+    onPruneExpiredHistory,
     onClearHistory,
 }: AnalysisReportProps) {
     const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
+    const [downloadStatus, setDownloadStatus] = useState<'idle' | 'success' | 'error'>('idle')
     const visibleWarnings = report.warnings
         .map(polishAnalysisText)
         .filter(Boolean)
@@ -1323,6 +1362,21 @@ function AnalysisReport({
         }
 
         window.setTimeout(() => setCopyStatus('idle'), 2200)
+    }
+
+    function handleDownloadMarkdown() {
+        try {
+            downloadTextFile(
+                formatAnalysisReportMarkdown(report),
+                `${sanitizeFilename(polishAnalysisText(report.title) || '智能分析报告')}.md`,
+                'text/markdown;charset=utf-8',
+            )
+            setDownloadStatus('success')
+        } catch {
+            setDownloadStatus('error')
+        }
+
+        window.setTimeout(() => setDownloadStatus('idle'), 2200)
     }
 
     return (
@@ -1361,6 +1415,17 @@ function AnalysisReport({
                                     : copyStatus === 'error'
                                       ? '复制失败'
                                       : '复制 Markdown'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDownloadMarkdown}
+                                className="rounded-full border border-emerald-200 bg-white/75 px-4 py-2 text-xs font-black text-emerald-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-50"
+                            >
+                                {downloadStatus === 'success'
+                                    ? '已下载'
+                                    : downloadStatus === 'error'
+                                      ? '下载失败'
+                                      : '下载 Markdown'}
                             </button>
                         </div>
                     </div>
@@ -1450,6 +1515,7 @@ function AnalysisReport({
                     onSelect={onSelectHistory}
                     onDelete={onDeleteHistory}
                     onPruneInvalid={onPruneInvalidHistory}
+                    onPruneExpired={onPruneExpiredHistory}
                     onClear={onClearHistory}
                 />
             </div>
@@ -1523,6 +1589,7 @@ type ReportHistoryPanelProps = {
     onSelect: (item: HistoryItem) => void
     onDelete: (item: HistoryItem) => void
     onPruneInvalid: () => void
+    onPruneExpired: () => void
     onClear: () => void
 }
 
@@ -1531,6 +1598,7 @@ function ReportHistoryPanel({
     onSelect,
     onDelete,
     onPruneInvalid,
+    onPruneExpired,
     onClear,
 }: ReportHistoryPanelProps) {
     return (
@@ -1547,6 +1615,13 @@ function ReportHistoryPanel({
                         className="rounded-full border border-sky-200 bg-white/70 px-3 py-1.5 text-[11px] font-black text-sky-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-50"
                     >
                         清理失效
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onPruneExpired}
+                        className="rounded-full border border-amber-200 bg-white/70 px-3 py-1.5 text-[11px] font-black text-amber-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-amber-50"
+                    >
+                        清理过期
                     </button>
                     <button
                         type="button"
@@ -1976,9 +2051,16 @@ function readCachedReport(cacheKey: string, fallbackType: AnalysisMode) {
         return null
     }
 
+    const expiresAt = parsed.expiresAt ?? getReportCacheExpiresAt(parsed.cachedAt)
+    if (isExpiredAt(expiresAt)) {
+        removeCacheItem(cacheKey)
+        return null
+    }
+
     return {
         report: normalizeAnalysisReport(parsed.report, fallbackType),
         cachedAt: parsed.cachedAt,
+        expiresAt,
     }
 }
 
@@ -1990,7 +2072,40 @@ function writeCachedReport(
     writeJsonCache(cacheKey, {
         report,
         cachedAt,
+        expiresAt: getReportCacheExpiresAt(cachedAt),
     })
+}
+
+function getReportCacheExpiresAt(cachedAt: string) {
+    const cachedTime = new Date(cachedAt).getTime()
+    const baseTime = Number.isNaN(cachedTime) ? Date.now() : cachedTime
+    return new Date(baseTime + reportCacheTtlMs).toISOString()
+}
+
+function isExpiredAt(expiresAt: string) {
+    const expiresTime = new Date(expiresAt).getTime()
+    return Number.isNaN(expiresTime) || expiresTime <= Date.now()
+}
+
+function pruneExpiredReportCaches() {
+    let removedCount = 0
+
+    listCacheKeysByPrefixes([reportCachePrefix]).forEach((key) => {
+        const parsed = readJsonCache(key, isCachedReportPayload)
+        if (!parsed) {
+            removeCacheItem(key)
+            removedCount += 1
+            return
+        }
+
+        const expiresAt = parsed.expiresAt ?? getReportCacheExpiresAt(parsed.cachedAt)
+        if (isExpiredAt(expiresAt)) {
+            removeCacheItem(key)
+            removedCount += 1
+        }
+    })
+
+    return removedCount
 }
 
 function readReportHistory() {
@@ -2005,6 +2120,7 @@ function writeReportHistory(items: HistoryItem[]) {
 function isCachedReportPayload(value: unknown): value is {
     report: LlmAnalysisResponse
     cachedAt: string
+    expiresAt?: string
 } {
     if (typeof value !== 'object' || value === null) {
         return false
@@ -2013,11 +2129,13 @@ function isCachedReportPayload(value: unknown): value is {
     const payload = value as {
         report?: unknown
         cachedAt?: unknown
+        expiresAt?: unknown
     }
 
     return typeof payload.report === 'object'
         && payload.report !== null
         && typeof payload.cachedAt === 'string'
+        && (payload.expiresAt === undefined || typeof payload.expiresAt === 'string')
 }
 
 function upsertReportHistory(items: HistoryItem[], item: HistoryItem) {
@@ -2344,6 +2462,29 @@ function formatAnalysisReportMarkdown(report: LlmAnalysisResponse) {
     }
 
     return lines.join('\n').trim()
+}
+
+function downloadTextFile(content: string, filename: string, mimeType: string) {
+    const blob = new Blob([content], { type: mimeType })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+}
+
+function sanitizeFilename(value: string) {
+    const normalized = value
+        .replace(/[\\/:*?"<>|]/g, '-')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+
+    return normalized.slice(0, 60) || '智能分析报告'
 }
 
 function polishAnalysisText(value: string | null | undefined) {
