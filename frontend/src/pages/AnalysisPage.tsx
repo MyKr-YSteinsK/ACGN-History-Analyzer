@@ -147,6 +147,18 @@ const analysisModes: AnalysisModeMeta[] = [
         accent: 'from-rose-100/90 via-white/70 to-amber-50/70',
     },
     {
+        value: 'TYPE_PREFERENCE',
+        label: '类型偏好',
+        description: '按动画、漫画、游戏、小说拆分长期兴趣重心',
+        accent: 'from-fuchsia-100/90 via-white/70 to-sky-50/70',
+    },
+    {
+        value: 'INTEREST_TREND',
+        label: '兴趣趋势',
+        description: '观察近期口味是否在题材、评分和节奏上转向',
+        accent: 'from-lime-100/90 via-white/70 to-cyan-50/70',
+    },
+    {
         value: 'COLLECTION_BACKLOG',
         label: '补坑建议',
         description: '优先整理想看和搁置作品',
@@ -439,7 +451,7 @@ function AnalysisPage() {
                 model: configModel,
                 timeoutSeconds: 30,
                 temperature: 0.4,
-                maxTokens: 1200,
+                maxTokens: 3000,
             })
             syncConfigState(status)
             setConfigApiKey('')
@@ -472,7 +484,7 @@ function AnalysisPage() {
                 model: configModel,
                 timeoutSeconds: 30,
                 temperature: 0.4,
-                maxTokens: 1200,
+                maxTokens: 3000,
             })
             syncConfigState(status)
             setConfigApiKey('')
@@ -1081,6 +1093,11 @@ function AnalysisReport({
     const evidence = report.evidence
         .map(polishAnalysisText)
         .filter(Boolean)
+    const summaryText = getReadableSummary(report)
+    const visibleKeywords = report.keywords
+        .map(polishAnalysisText)
+        .filter((keyword) => keyword && keyword !== '格式兜底' && keyword !== '自然语言报告')
+    const keywords = visibleKeywords.length > 0 ? visibleKeywords : ['可读报告']
     const theme =
         activeCategory === 'ALL'
             ? null
@@ -1130,7 +1147,7 @@ function AnalysisReport({
                                 {polishAnalysisText(report.title)}
                             </h3>
                             <p className="mt-3 text-sm leading-7 text-slate-500">
-                                {polishAnalysisText(report.summary)}
+                                {summaryText}
                             </p>
                         </div>
 
@@ -1164,36 +1181,51 @@ function AnalysisReport({
                     </div>
 
                     <div className="mt-5 flex flex-wrap gap-2">
-                        {report.keywords.map((keyword) => (
+                        {keywords.map((keyword) => (
                             <span
                                 key={keyword}
                                 className="rounded-full border border-white/75 bg-white/65 px-3 py-1.5 text-xs font-semibold text-slate-500"
                             >
-                                #{polishAnalysisText(keyword)}
+                                #{keyword}
                             </span>
                         ))}
                     </div>
 
                     <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                        {report.sections.map((section, index) => (
-                            <article
-                                key={`${section.title}-${index}`}
-                                className={[
-                                    'rounded-[26px] border border-white/75 bg-white/62 p-5 shadow-sm backdrop-blur',
-                                    index === 0 ? 'lg:col-span-2' : '',
-                                ].join(' ')}
-                            >
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">
-                                    insight {String(index + 1).padStart(2, '0')}
-                                </p>
-                                <h4 className="mt-2 text-base font-black text-slate-800">
-                                    {polishAnalysisText(section.title)}
-                                </h4>
-                                <p className="mt-2 text-sm leading-7 text-slate-500">
-                                    {polishAnalysisText(section.content)}
-                                </p>
-                            </article>
-                        ))}
+                        {report.sections.map((section, index) => {
+                            const rawFallbackSection = isRawFallbackSection(section)
+
+                            return (
+                                <article
+                                    key={`${section.title}-${index}`}
+                                    className={[
+                                        'rounded-[26px] border border-white/75 bg-white/62 p-5 shadow-sm backdrop-blur',
+                                        index === 0 ? 'lg:col-span-2' : '',
+                                    ].join(' ')}
+                                >
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">
+                                        insight {String(index + 1).padStart(2, '0')}
+                                    </p>
+                                    <h4 className="mt-2 text-base font-black text-slate-800">
+                                        {rawFallbackSection ? '原始输出已隐藏' : polishAnalysisText(section.title)}
+                                    </h4>
+                                    {rawFallbackSection ? (
+                                        <details className="mt-3 rounded-2xl border border-slate-100 bg-white/58 px-4 py-3">
+                                            <summary className="cursor-pointer text-sm font-black text-slate-500">
+                                                查看模型原始输出
+                                            </summary>
+                                            <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-2xl bg-slate-950/90 p-4 text-xs leading-5 text-slate-100">
+                                                {section.content}
+                                            </pre>
+                                        </details>
+                                    ) : (
+                                        <p className="mt-2 text-sm leading-7 text-slate-500">
+                                            {polishAnalysisText(section.content)}
+                                        </p>
+                                    )}
+                                </article>
+                            )
+                        })}
                     </div>
 
                     {report.recommendations?.length ? (
@@ -1985,13 +2017,17 @@ function formatAnalysisReportMarkdown(report: LlmAnalysisResponse) {
     lines.push('')
     lines.push('## 摘要')
     lines.push('')
-    lines.push(polishAnalysisText(report.summary) || '暂无摘要。')
+    lines.push(getReadableSummary(report))
     lines.push('')
 
     if (report.keywords.length > 0) {
         lines.push('## 关键词')
         lines.push('')
-        lines.push(report.keywords.map((keyword) => `#${polishAnalysisText(keyword)}`).join(' '))
+        lines.push(report.keywords
+            .map(polishAnalysisText)
+            .filter((keyword) => keyword && keyword !== '格式兜底' && keyword !== '自然语言报告')
+            .map((keyword) => `#${keyword}`)
+            .join(' ') || '#可读报告')
         lines.push('')
     }
 
@@ -1999,6 +2035,21 @@ function formatAnalysisReportMarkdown(report: LlmAnalysisResponse) {
         lines.push('## 分析正文')
         lines.push('')
         report.sections.forEach((section, index) => {
+            if (isRawFallbackSection(section)) {
+                lines.push(`### ${index + 1}. 原始输出已隐藏`)
+                lines.push('')
+                lines.push('<details>')
+                lines.push('<summary>查看模型原始输出</summary>')
+                lines.push('')
+                lines.push('```json')
+                lines.push(section.content)
+                lines.push('```')
+                lines.push('')
+                lines.push('</details>')
+                lines.push('')
+                return
+            }
+
             lines.push(`### ${index + 1}. ${polishAnalysisText(section.title)}`)
             lines.push('')
             lines.push(polishAnalysisText(section.content) || '暂无内容。')
@@ -2076,6 +2127,25 @@ function sanitizeFilename(value: string) {
         .replace(/^-|-$/g, '')
 
     return normalized.slice(0, 60) || '智能分析报告'
+}
+
+function getReadableSummary(report: LlmAnalysisResponse) {
+    const summary = polishAnalysisText(report.summary)
+    if (isRawJsonLike(summary)) {
+        return '模型返回了结构化内容，但输出在中途被截断。系统已把原始输出折叠隐藏，请重新生成以获取完整的结构化报告。'
+    }
+
+    return summary || '暂无摘要。'
+}
+
+function isRawFallbackSection(section: LlmAnalysisResponse['sections'][number]) {
+    return polishAnalysisText(section.title).includes('模型原始回答')
+        || isRawJsonLike(section.content)
+}
+
+function isRawJsonLike(value: string | null | undefined) {
+    const text = (value ?? '').trim()
+    return text.startsWith('{') && text.includes('"analysisType"')
 }
 
 function polishAnalysisText(value: string | null | undefined) {

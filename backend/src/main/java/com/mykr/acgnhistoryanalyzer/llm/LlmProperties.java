@@ -21,7 +21,7 @@ public class LlmProperties {
 
     private Double temperature = 0.4;
 
-    private Integer maxTokens = 1200;
+    private Integer maxTokens = 3000;
 
     public boolean isEnabled() {
         return enabled;
@@ -118,7 +118,7 @@ public class LlmProperties {
         this.model = normalizeOrDefault(model, "deepseek-v4-flash");
         this.timeoutSeconds = timeoutSeconds == null ? 30 : timeoutSeconds;
         this.temperature = temperature == null ? 0.4 : temperature;
-        this.maxTokens = maxTokens == null ? 1200 : maxTokens;
+        this.maxTokens = maxTokens == null ? 3000 : maxTokens;
 
         validateForRealClient();
     }

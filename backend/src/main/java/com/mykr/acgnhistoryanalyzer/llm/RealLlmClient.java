@@ -276,27 +276,46 @@ public class RealLlmClient implements LlmClient {
             String content,
             JsonProcessingException parseError
     ) {
-        String text = content == null || content.isBlank()
-                ? "模型返回了非标准结构，且没有可展示的正文。"
-                : content.trim();
-        String summary = abbreviate(text);
-        List<LlmAnalysisSectionResponse> sections = List.of(new LlmAnalysisSectionResponse(
-                "模型原始回答",
-                text
-        ));
-        List<String> evidence = List.of("DeepSeek 已返回内容，但没有严格遵守 JSON 输出格式");
-        List<String> warnings = List.of(
-                "模型输出不是标准 JSON，系统已自动转换为可展示的自然语言报告。",
-                "结构化字段可能不完整，建议稍后重新生成一次。解析错误：" + describeException(parseError)
+        String text = normalizeModelContent(content);
+        boolean looksLikeJson = text.startsWith("{");
+        String title = firstNonBlank(extractStringField(text, "title"), "智能分析报告");
+        String summary = firstNonBlank(
+                extractStringField(text, "summary"),
+                looksLikeJson
+                        ? "模型返回了结构化报告，但内容没有完整闭合。系统已隐藏原始输出，并尽量保留可读的标题、摘要和段落。"
+                        : abbreviate(text)
         );
+        List<String> keywords = extractStringArrayField(text, "keywords");
+        List<LlmAnalysisSectionResponse> sections = extractSectionArrayField(text, "sections");
+        List<LlmRecommendationResponse> recommendations = extractRecommendationArrayField(text, "recommendations");
+        List<String> evidence = extractStringArrayField(text, "evidence");
+        List<String> warnings = new ArrayList<>(extractStringArrayField(text, "warnings"));
+
+        if (keywords.isEmpty()) {
+            keywords = looksLikeJson ? List.of("格式整理", "可读报告") : List.of("自然语言报告");
+        }
+        if (sections.isEmpty()) {
+            sections = List.of(new LlmAnalysisSectionResponse(
+                    looksLikeJson ? "报告内容整理说明" : "模型自然语言回答",
+                    looksLikeJson
+                            ? "DeepSeek 已经返回报告内容，但 JSON 在传输或长度限制处被截断。系统没有把原始 JSON 直接塞进正文，而是保留可解析的摘要和字段；建议重新生成以补齐推荐候选。"
+                            : text
+            ));
+        }
+        if (evidence.isEmpty()) {
+            evidence = List.of("DeepSeek 已返回内容，系统已保留其中可解析、可展示的字段");
+        }
+        warnings.add("模型输出被截断或不是严格 JSON，系统已自动隐藏原始输出并整理为可读报告。");
+        warnings.add("如果推荐候选不完整，请点击重新生成；系统已提高默认输出长度以降低再次截断概率。");
+        warnings.add("解析状态：原始输出没有完整闭合，已保留可解析的正文内容。");
 
         return new LlmAnalysisResponse(
                 request.analysisType(),
-                "智能分析报告",
+                title,
                 summary,
-                List.of("格式兜底", "自然语言报告"),
+                keywords,
                 sections,
-                List.of(),
+                recommendations,
                 evidence,
                 warnings,
                 new LlmAnalysisScopeResponse(null, null, null),
@@ -304,6 +323,165 @@ public class RealLlmClient implements LlmClient {
                 properties.getModel(),
                 LocalDateTime.now()
         );
+    }
+
+    private String normalizeModelContent(String content) {
+        String trimmed = content == null ? "" : content.trim();
+        if (trimmed.startsWith("```")) {
+            trimmed = trimmed
+                    .replaceFirst("^```(?:json)?\\s*", "")
+                    .replaceFirst("\\s*```$", "")
+                    .trim();
+        }
+        return trimmed.isBlank() ? "模型返回了非标准结构，且没有可展示的正文。" : trimmed;
+    }
+
+    private String firstNonBlank(String value, String defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        return value;
+    }
+
+    private String extractStringField(String content, String field) {
+        String marker = "\"" + field + "\"";
+        int fieldIndex = content.indexOf(marker);
+        if (fieldIndex < 0) {
+            return null;
+        }
+
+        int colonIndex = content.indexOf(':', fieldIndex + marker.length());
+        if (colonIndex < 0) {
+            return null;
+        }
+
+        int quoteIndex = content.indexOf('"', colonIndex + 1);
+        if (quoteIndex < 0) {
+            return null;
+        }
+
+        StringBuilder escapedValue = new StringBuilder();
+        boolean escaped = false;
+        for (int index = quoteIndex + 1; index < content.length(); index++) {
+            char current = content.charAt(index);
+            if (escaped) {
+                escapedValue.append('\\').append(current);
+                escaped = false;
+                continue;
+            }
+            if (current == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (current == '"') {
+                return decodeJsonString(escapedValue.toString());
+            }
+            escapedValue.append(current);
+        }
+
+        return null;
+    }
+
+    private String decodeJsonString(String escapedValue) {
+        try {
+            return objectMapper.readValue("\"" + escapedValue + "\"", String.class);
+        } catch (JsonProcessingException error) {
+            return escapedValue;
+        }
+    }
+
+    private List<String> extractStringArrayField(String content, String field) {
+        String arrayPayload = extractCompleteJsonArray(content, field);
+        if (arrayPayload == null) {
+            return List.of();
+        }
+
+        try {
+            JsonNode node = objectMapper.readTree(arrayPayload);
+            List<String> values = new ArrayList<>();
+            if (node.isArray()) {
+                for (JsonNode item : node) {
+                    if (!item.isNull()) {
+                        values.add(item.asText());
+                    }
+                }
+            }
+            return values;
+        } catch (JsonProcessingException error) {
+            return List.of();
+        }
+    }
+
+    private List<LlmAnalysisSectionResponse> extractSectionArrayField(String content, String field) {
+        String arrayPayload = extractCompleteJsonArray(content, field);
+        if (arrayPayload == null) {
+            return List.of();
+        }
+
+        try {
+            return sectionList(objectMapper.readTree(arrayPayload));
+        } catch (JsonProcessingException error) {
+            return List.of();
+        }
+    }
+
+    private List<LlmRecommendationResponse> extractRecommendationArrayField(String content, String field) {
+        String arrayPayload = extractCompleteJsonArray(content, field);
+        if (arrayPayload == null) {
+            return List.of();
+        }
+
+        try {
+            return recommendationList(objectMapper.readTree(arrayPayload));
+        } catch (JsonProcessingException error) {
+            return List.of();
+        }
+    }
+
+    private String extractCompleteJsonArray(String content, String field) {
+        String marker = "\"" + field + "\"";
+        int fieldIndex = content.indexOf(marker);
+        if (fieldIndex < 0) {
+            return null;
+        }
+
+        int colonIndex = content.indexOf(':', fieldIndex + marker.length());
+        int startIndex = colonIndex < 0 ? -1 : content.indexOf('[', colonIndex + 1);
+        if (startIndex < 0) {
+            return null;
+        }
+
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        for (int index = startIndex; index < content.length(); index++) {
+            char current = content.charAt(index);
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (current == '\\') {
+                escaped = inString;
+                continue;
+            }
+            if (current == '"') {
+                inString = !inString;
+                continue;
+            }
+            if (inString) {
+                continue;
+            }
+            if (current == '[') {
+                depth++;
+            } else if (current == ']') {
+                depth--;
+                if (depth == 0) {
+                    return content.substring(startIndex, index + 1);
+                }
+            }
+        }
+
+        return null;
     }
 
     private List<LlmAnalysisSectionResponse> sectionList(JsonNode node) {

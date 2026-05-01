@@ -150,13 +150,14 @@ public class LlmPromptService {
                 但所有判断必须能回到上下文中的记录、标签、评分、收藏或系列线索，并且必须带引用依据。
                 如果数据少，可以写得更谨慎、更像观察笔记；不要为了显得聪明而过度推断。
                 你必须只输出一个合法 JSON 对象，不要输出 markdown，不要输出代码块，不要在 JSON 前后添加解释文字。
+                为避免输出被截断，sections 控制在 3 到 5 段，每段 120 字以内；recommendations 最多 3 个，每个字段简洁完整；必须保证 JSON 完整闭合。
                 JSON 字段必须符合：
                 {
                   "analysisType": "后端传入的 analysisType",
                   "title": "有辨识度但不夸张的报告标题",
                   "summary": "160字以内，有结论、有语气、有边界",
                   "keywords": ["2到6个关键词"],
-                  "sections": [{"title": "有画面感的小标题", "content": "具体分析，必须引用上下文线索"}],
+                  "sections": [{"title": "有画面感的小标题", "content": "120字以内的具体分析，必须引用上下文线索"}],
                   "recommendations": [{
                     "subjectId": null,
                     "title": "候选作品名",
