@@ -10,12 +10,14 @@ import type {
     UserSubjectRecordImportResponse,
 } from '../../api/recordApi'
 import type { SubjectImportPreviewResponse, SubjectImportResponse } from '../../api/subjectApi'
+import type { BangumiSubjectBatchImportRequest } from '../../api/importApi'
 
 export type ImportTarget = 'SUBJECT' | 'COLLECTION' | 'RECORD'
 
 export type ImportMode = 'JSON' | 'CSV' | 'EXCEL' | 'BANGUMI' | 'BACKUP' | 'MANUAL'
 
 export type ParsedPayload =
+    | BangumiSubjectBatchImportRequest
     | UserSubjectCollectionBatchImportRequest
     | UserSubjectRecordBatchImportRequest
 

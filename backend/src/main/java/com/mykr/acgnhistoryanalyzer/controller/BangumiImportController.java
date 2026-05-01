@@ -2,6 +2,7 @@ package com.mykr.acgnhistoryanalyzer.controller;
 
 import com.mykr.acgnhistoryanalyzer.common.response.ApiResponse;
 import com.mykr.acgnhistoryanalyzer.request.BangumiSeasonImportRequest;
+import com.mykr.acgnhistoryanalyzer.request.BangumiSubjectBatchImportRequest;
 import com.mykr.acgnhistoryanalyzer.response.BangumiImportJobStartResponse;
 import com.mykr.acgnhistoryanalyzer.response.BangumiImportJobStatusResponse;
 import com.mykr.acgnhistoryanalyzer.response.SubjectImportPreviewResponse;
@@ -48,6 +49,20 @@ public class BangumiImportController {
             @Valid @RequestBody BangumiSeasonImportRequest request
     ) {
         return ApiResponse.success(bangumiImportJobService.startImportJob(request));
+    }
+
+    @PostMapping("/subject/preview")
+    public ApiResponse<SubjectImportPreviewResponse> previewBySource(
+            @Valid @RequestBody BangumiSubjectBatchImportRequest request
+    ) {
+        return ApiResponse.success(bangumiSeasonImportService.previewSubjectsBySource(request));
+    }
+
+    @PostMapping("/subject/import")
+    public ApiResponse<SubjectImportResponse> importBySource(
+            @Valid @RequestBody BangumiSubjectBatchImportRequest request
+    ) {
+        return ApiResponse.success(bangumiSeasonImportService.importSubjectsBySource(request));
     }
 
     @GetMapping("/season/import-jobs/{jobId}")

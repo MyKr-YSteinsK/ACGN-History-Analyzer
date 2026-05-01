@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+    importBangumiSubject,
     getCollectionImportTemplate,
     getBangumiSeasonImportJobStatus,
     getImportOverview,
+    previewBangumiSubjectImport,
     getRecordImportTemplate,
     getSubjectImportTemplate,
     previewBangumiSeasonImport,
     startBangumiSeasonImportJob,
+    type BangumiSubjectBatchImportRequest,
     type BangumiSeasonImportRequest,
     type BangumiImportJobStatusResponse,
     type ImportOverviewResponse,
@@ -127,7 +130,7 @@ function ImportPage() {
     const activeResult =
         importResult && importResult.target === selectedTarget ? importResult.data : null
     const isBangumiMode = selectedMode === 'BANGUMI'
-    const showTemplateFields = selectedTarget !== 'SUBJECT' && !isBangumiMode
+    const showTemplateFields = !isBangumiMode
     const bangumiSelectedQuarter = bangumiQuarterOptions.find(
         (option) => option.value === bangumiQuarter,
     )
@@ -384,6 +387,14 @@ function ImportPage() {
             }
 
             const payload = parseDraftPayload(draftText, selectedMode, selectedTarget)
+            if (selectedTarget === 'SUBJECT') {
+                const response = await previewBangumiSubjectImport(
+                    payload as BangumiSubjectBatchImportRequest,
+                )
+                setPreview({ target: 'SUBJECT', data: response })
+                setFeedbackMessage('已完成 sourceId 批量预览，可确认写入')
+                return
+            }
 
             if (selectedTarget === 'COLLECTION') {
                 const response = await previewImportCollections(
@@ -439,6 +450,16 @@ function ImportPage() {
             }
 
             const rawPayload = parseDraftPayload(draftText, selectedMode, selectedTarget)
+            if (selectedTarget === 'SUBJECT') {
+                const response = await importBangumiSubject(
+                    rawPayload as BangumiSubjectBatchImportRequest,
+                )
+                setPreview(null)
+                setExcludedPreviewKeys([])
+                setImportResult({ target: 'SUBJECT', data: response })
+                setFeedbackMessage(`已导入 ${response.importedCount} 条作品`)
+                return
+            }
             const payload = buildImportPayloadWithSelections(
                 selectedTarget,
                 rawPayload,

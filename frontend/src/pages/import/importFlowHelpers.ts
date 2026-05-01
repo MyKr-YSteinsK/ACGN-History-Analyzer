@@ -489,7 +489,7 @@ export function pickTemplate(
 
 export function isModeAllowedForTarget(mode: ImportMode, target: ImportTarget) {
     if (target === 'SUBJECT') {
-        return mode === 'BANGUMI'
+        return mode === 'BANGUMI' || mode === 'JSON'
     }
 
     return mode === 'JSON' || mode === 'CSV'

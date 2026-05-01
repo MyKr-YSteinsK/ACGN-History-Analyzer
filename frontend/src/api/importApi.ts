@@ -45,6 +45,16 @@ export type BangumiSeasonImportRequest = {
     excludedSourceIds?: string[]
 }
 
+export type BangumiSubjectImportItemRequest = {
+    sourceId: string
+    releaseYear: number
+    releaseQuarter: ReleaseQuarter
+}
+
+export type BangumiSubjectBatchImportRequest = {
+    subjects: BangumiSubjectImportItemRequest[]
+}
+
 export type BangumiImportJobStartResponse = {
     jobId: string
 }
@@ -98,5 +108,19 @@ export function startBangumiSeasonImportJob(payload: BangumiSeasonImportRequest)
 export function getBangumiSeasonImportJobStatus(jobId: string) {
     return apiGet<BangumiImportJobStatusResponse>(
         `/import/bangumi/season/import-jobs/${jobId}`,
+    )
+}
+
+export function previewBangumiSubjectImport(payload: BangumiSubjectBatchImportRequest) {
+    return apiPost<SubjectImportPreviewResponse, BangumiSubjectBatchImportRequest>(
+        '/import/bangumi/subject/preview',
+        payload,
+    )
+}
+
+export function importBangumiSubject(payload: BangumiSubjectBatchImportRequest) {
+    return apiPost<SubjectImportResponse, BangumiSubjectBatchImportRequest>(
+        '/import/bangumi/subject/import',
+        payload,
     )
 }

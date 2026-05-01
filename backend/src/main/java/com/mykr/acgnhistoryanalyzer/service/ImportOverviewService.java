@@ -12,15 +12,17 @@ public class ImportOverviewService {
     public ImportOverviewResponse getImportOverview() {
         List<String> steps = List.of(
                 "先选择年份和一月/四月/七月/十月档期，使用 Bangumi 自动导入作品库。",
+                "如果个别作品自动导入不到，可在作品库 JSON 模式中仅填写 sourceId + releaseYear + releaseQuarter 手动补入。",
                 "Bangumi 预览会检查重复、字段和候选作品，确认前可以排除不想写入的条目。",
                 "作品库准备完成后，可以导入 collection 想看/搁置。",
                 "最后查看 record 导入模板，预览并正式导入个人记录。"
         );
 
         List<String> notes = List.of(
-                "作品库不再开放手动 JSON/CSV 导入，避免脏数据污染作品本体。",
+                "作品库日常推荐使用 Bangumi 新番自动导入；必要时可用 sourceId 定位 JSON 模式补录漏抓作品。",
                 "subject 唯一性规则仅使用 sourceId（Bangumi subject id）。",
                 "Bangumi 导入按 sourceId 去重，同一批次内也会去重。",
+                "sourceId 定位 JSON 导入会按 sourceId 从 Bangumi 拉取完整作品信息，仅允许手填 releaseYear/releaseQuarter。",
                 "record 与 collection 导入支持 subjectId、sourceId、subjectTitle 三种定位方式。",
                 "标题匹配时会按 titleCn/displayTitle 做关键词检索，并可用 season/part 缩小范围；多候选需前端选择。",
                 "当前系统规则是一作品一记录；如果某个 subject 已经有记录，则新的 record 导入会跳过。",
@@ -57,6 +59,18 @@ public class ImportOverviewService {
                         "GET",
                         "/api/import/bangumi/season/import-jobs/{jobId}",
                         "查询 Bangumi 导入任务的阶段、百分比、当前消息和最终写入结果。"
+                ),
+                new ImportEndpointDocResponse(
+                        "Bangumi sourceId 预览",
+                        "POST",
+                        "/api/import/bangumi/subject/preview",
+                        "按 sourceId 拉取单作品详情并做 subject 导入预览，适合补录漏抓作品。"
+                ),
+                new ImportEndpointDocResponse(
+                        "Bangumi sourceId 导入",
+                        "POST",
+                        "/api/import/bangumi/subject/import",
+                        "按 sourceId 拉取单作品详情并正式导入；releaseYear/releaseQuarter 由请求覆盖。"
                 ),
                 new ImportEndpointDocResponse(
                         "record 导入模板",

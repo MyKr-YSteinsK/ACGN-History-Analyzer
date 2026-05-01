@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.mykr.acgnhistoryanalyzer.common.exception.BangumiImportException;
+import com.mykr.acgnhistoryanalyzer.request.BangumiSubjectBatchImportRequest;
+import com.mykr.acgnhistoryanalyzer.request.BangumiSubjectImportItemRequest;
 import com.mykr.acgnhistoryanalyzer.request.BangumiSeasonImportRequest;
 import com.mykr.acgnhistoryanalyzer.request.SubjectBatchImportRequest;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
@@ -64,6 +66,22 @@ public class BangumiSeasonImportService {
 
     public SubjectImportResponse importSeason(BangumiSeasonImportRequest request) {
         return importSeason(request, null);
+    }
+
+    public SubjectImportPreviewResponse previewSubjectsBySource(BangumiSubjectBatchImportRequest request) {
+        SubjectBatchImportRequest batchRequest = buildSubjectBatchImportRequestFromSource(request);
+        return subjectService.previewImportSubjects(batchRequest);
+    }
+
+    public SubjectImportResponse importSubjectsBySource(BangumiSubjectBatchImportRequest request) {
+        SubjectBatchImportRequest batchRequest = buildSubjectBatchImportRequestFromSource(request);
+        SubjectImportResponse response = subjectService.importSubjects(batchRequest);
+        response.getItems().stream()
+                .filter(item -> "IMPORTED".equals(item.getResult()))
+                .map(SubjectImportItemResponse::getSubjectId)
+                .filter(id -> id != null)
+                .forEach(franchiseAutoLinkService::detectAndLinkForSubject);
+        return response;
     }
 
     private SubjectBatchImportRequest buildSubjectBatchImportRequest(BangumiSeasonImportRequest request) {
@@ -130,6 +148,28 @@ public class BangumiSeasonImportService {
         SubjectBatchImportRequest batchRequest = new SubjectBatchImportRequest();
         batchRequest.setSubjects(subjects);
         return batchRequest;
+    }
+
+    private SubjectBatchImportRequest buildSubjectBatchImportRequestFromSource(
+            BangumiSubjectBatchImportRequest request
+    ) {
+        List<SubjectCreateRequest> subjects = request.getSubjects().stream()
+                .map(this::toSubjectCreateRequestFromSourceItem)
+                .toList();
+        SubjectBatchImportRequest batchRequest = new SubjectBatchImportRequest();
+        batchRequest.setSubjects(subjects);
+        return batchRequest;
+    }
+
+    private SubjectCreateRequest toSubjectCreateRequestFromSourceItem(BangumiSubjectImportItemRequest item) {
+        String sourceId = item.getSourceId().trim();
+        JsonNode subject = fetchBangumiSubjectById(sourceId);
+        BangumiSeasonImportRequest context = new BangumiSeasonImportRequest();
+        context.setYear(item.getReleaseYear());
+        context.setQuarter(item.getReleaseQuarter());
+        context.setIncludeWeb(true);
+        context.setJapaneseOnly(false);
+        return toSubjectCreateRequest(subject, context);
     }
 
     private List<JsonNode> fetchSeasonSubjects(BangumiSeasonImportRequest request) {
@@ -222,10 +262,22 @@ public class BangumiSeasonImportService {
                 + "&sort=rank"
                 + "&limit=" + PAGE_SIZE
                 + "&offset=" + offset;
+        return fetchBangumiJson(url, 20);
+    }
 
+    private JsonNode fetchBangumiSubjectById(String sourceId) {
+        String normalizedSourceId = sourceId == null ? "" : sourceId.trim();
+        if (normalizedSourceId.isBlank()) {
+            throw new BangumiImportException("sourceId 不能为空");
+        }
+        String url = BANGUMI_API_BASE + "/subjects/" + normalizedSourceId;
+        return fetchBangumiJson(url, 20);
+    }
+
+    private JsonNode fetchBangumiJson(String url, int timeoutSeconds) {
         HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(url))
                 .GET()
-                .timeout(Duration.ofSeconds(20))
+                .timeout(Duration.ofSeconds(timeoutSeconds))
                 .header("Accept", "application/json")
                 .header("User-Agent", USER_AGENT)
                 .build();
