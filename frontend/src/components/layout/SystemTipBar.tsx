@@ -55,14 +55,11 @@ function SystemTipBar() {
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">
                 system note
             </p>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <div className="mt-2">
                 <div>
                     <h2 className="text-base font-black text-slate-700">{tip.title}</h2>
                     <p className="mt-1 text-sm leading-6 text-slate-500">{tip.description}</p>
                 </div>
-                <span className="rounded-full border border-sky-100 bg-sky-50/80 px-3 py-1.5 text-xs font-black text-sky-600">
-                    本地数据优先
-                </span>
             </div>
         </div>
     )

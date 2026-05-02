@@ -35,7 +35,10 @@ public class BangumiSeasonImportService {
     private static final String BANGUMI_API_BASE = "https://api.bgm.tv/v0";
     private static final String BANGUMI_SUBJECT_BASE = "https://bangumi.tv/subject/";
     private static final String USER_AGENT = "ACGN-History-Analyzer/1.0 (local season import)";
+    private static final int SUBJECT_TYPE_BOOK = 1;
     private static final int SUBJECT_TYPE_ANIME = 2;
+    private static final int SUBJECT_TYPE_NOVEL = 3;
+    private static final int SUBJECT_TYPE_GAME = 4;
     private static final int ANIME_CATEGORY_TV = 1;
     private static final int ANIME_CATEGORY_WEB = 5;
     private static final int PAGE_SIZE = 50;
@@ -138,7 +141,7 @@ public class BangumiSeasonImportService {
         List<SubjectCreateRequest> subjects = bangumiSubjects.stream()
                 .filter(subject -> shouldKeepSubject(subject, request))
                 .filter(subject -> !isExcludedSubject(subject, request))
-                .map(subject -> toSubjectCreateRequest(subject, request))
+                .map(subject -> toSubjectCreateRequest(subject, request, false))
                 .toList();
 
         if (progressReporter != null) {
@@ -169,7 +172,7 @@ public class BangumiSeasonImportService {
         context.setQuarter(item.getReleaseQuarter());
         context.setIncludeWeb(true);
         context.setJapaneseOnly(false);
-        return toSubjectCreateRequest(subject, context);
+        return toSubjectCreateRequest(subject, context, true);
     }
 
     private List<JsonNode> fetchSeasonSubjects(BangumiSeasonImportRequest request) {
@@ -351,7 +354,9 @@ public class BangumiSeasonImportService {
         return compact.length() <= 160 ? compact : compact.substring(0, 160) + "...";
     }
 
-    private SubjectCreateRequest toSubjectCreateRequest(JsonNode subject, BangumiSeasonImportRequest request) {
+    private SubjectCreateRequest toSubjectCreateRequest(JsonNode subject,
+                                                        BangumiSeasonImportRequest request,
+                                                        boolean mapCategoryByBangumiType) {
         SubjectCreateRequest createRequest = new SubjectCreateRequest();
         String bangumiId = subject.path("id").asText("");
         String name = subject.path("name").asText("");
@@ -367,7 +372,7 @@ public class BangumiSeasonImportService {
         createRequest.setSummary(truncate(subject.path("summary").asText(null), 2000));
         createRequest.setReleaseYear(request.getYear());
         createRequest.setReleaseQuarter(request.getQuarter());
-        createRequest.setCategory("ANIME");
+        createRequest.setCategory(resolveSubjectCategory(subject, mapCategoryByBangumiType, bangumiId));
         createRequest.setStudioName(truncate(resolveStudioName(subject), 255));
         createRequest.setPlatformLink(BANGUMI_SUBJECT_BASE + bangumiId);
         createRequest.setPlatformScore(resolvePlatformScore(subject));
@@ -377,6 +382,22 @@ public class BangumiSeasonImportService {
         createRequest.setSourceId(bangumiId);
         createRequest.setStatus("NORMAL");
         return createRequest;
+    }
+
+    private String resolveSubjectCategory(JsonNode subject, boolean mapCategoryByBangumiType, String bangumiId) {
+        if (!mapCategoryByBangumiType) {
+            return "ANIME";
+        }
+        int bangumiType = subject.path("type").asInt();
+        return switch (bangumiType) {
+            case SUBJECT_TYPE_ANIME -> "ANIME";
+            case SUBJECT_TYPE_BOOK -> "COMIC";
+            case SUBJECT_TYPE_NOVEL -> "NOVEL";
+            case SUBJECT_TYPE_GAME -> "GAME";
+            default -> throw new BangumiImportException(
+                    "sourceId=" + bangumiId + " 的 Bangumi 类型不支持导入，type=" + bangumiType
+            );
+        };
     }
 
     private boolean isExcludedSubject(JsonNode subject, BangumiSeasonImportRequest request) {

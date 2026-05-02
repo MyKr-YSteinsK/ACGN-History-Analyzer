@@ -1,7 +1,7 @@
 import type { SubjectPageSort } from '../../api/subjectApi'
 import type { LibraryStatus, ReleaseQuarter } from '../../types/common'
 
-export const yearOptions = [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019]
+export const yearOptions = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
 
 export type LibrarySortOption = {
     value: SubjectPageSort

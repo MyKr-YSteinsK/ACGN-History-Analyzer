@@ -298,7 +298,7 @@ function AnalysisPage() {
                 cachedAt: cached.cachedAt,
                 expiresAt: cached.expiresAt,
             })
-            setError(null)
+        setError(null)
             return
         }
 
@@ -465,8 +465,8 @@ function AnalysisPage() {
             analysisType: analysisMode,
             modeLabel: activeMode.label,
             scope: scopeText,
-            year: selectedYear,
-            quarter: selectedQuarter,
+                            year: selectedYear,
+                            quarter: selectedQuarter,
             category: selectedCategory,
             question: question.trim(),
             status: 'queued',
@@ -672,22 +672,22 @@ function AnalysisPage() {
                 activeMode={activeMode}
                 analysisModes={analysisModes}
                 analysisMode={analysisMode}
-                loading={loading}
+                            loading={loading}
                 reportReady={Boolean(report)}
-                selectedYear={selectedYear}
-                selectedQuarter={selectedQuarter}
-                selectedCategory={selectedCategory}
-                usesYearFilter={usesYearFilter}
-                usesQuarterFilter={usesQuarterFilter}
+                            selectedYear={selectedYear}
+                            selectedQuarter={selectedQuarter}
+                            selectedCategory={selectedCategory}
+                            usesYearFilter={usesYearFilter}
+                            usesQuarterFilter={usesQuarterFilter}
                 usesQuestionInput={usesQuestionInput}
                 question={question}
                 onModeChange={handleModeChange}
-                onYearChange={setSelectedYear}
-                onQuarterChange={setSelectedQuarter}
-                onCategoryChange={setSelectedCategory}
+                            onYearChange={setSelectedYear}
+                            onQuarterChange={setSelectedQuarter}
+                            onCategoryChange={setSelectedCategory}
                 onQuestionChange={setQuestion}
-                onSubmit={() => void generateReport()}
-            />
+                            onSubmit={() => void generateReport()}
+                        />
 
             <ScopeSummary
                 scopeText={scopeText}
