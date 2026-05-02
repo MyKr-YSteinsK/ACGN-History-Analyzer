@@ -23,18 +23,13 @@ const routeTips: Array<{
     },
     {
         match: (pathname) => pathname.startsWith('/collections'),
-        title: '收藏夹不用一次清空',
-        description: '想看、搁置和优先级会帮助系统判断什么作品适合现在补。',
+        title: '收藏状态管理',
+        description: '这里只维护想看与搁置清单，可按类型和关键词快速整理。',
     },
     {
         match: (pathname) => pathname.startsWith('/import'),
         title: '导入前先预览一眼',
         description: 'Bangumi 数据可能有别名、分季和封面差异，预览能避免把不想要的条目写进本地库。',
-    },
-    {
-        match: (pathname) => pathname.startsWith('/franchises'),
-        title: '系列关系会影响补完建议',
-        description: '把正篇、续作、外传和 Part 关系理顺后，AI 才能给出更像样的补完路线。',
     },
     {
         match: (pathname) => pathname.startsWith('/analysis'),
@@ -49,6 +44,14 @@ function SystemTipBar() {
         () => routeTips.find((item) => item.match(location.pathname)) ?? routeTips[0],
         [location.pathname],
     )
+
+    if (
+        location.pathname.startsWith('/franchises') ||
+        location.pathname.startsWith('/top') ||
+        location.pathname.startsWith('/import')
+    ) {
+        return null
+    }
 
     return (
         <div className="mb-5 rounded-[26px] border border-white/75 bg-white/58 px-5 py-4 shadow-sm backdrop-blur">

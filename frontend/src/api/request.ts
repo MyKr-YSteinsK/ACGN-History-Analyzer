@@ -42,6 +42,7 @@ function getTransportErrorMessage(error: AxiosError<unknown>) {
     const status = error.response?.status
     const url = error.config?.url ?? ''
     const isLlmRequest = url.includes('/llm/')
+    const isImportRequest = url.includes('/import')
 
     if (status === 502 || status === 503 || status === 504) {
         if (isLlmRequest) {
@@ -54,6 +55,9 @@ function getTransportErrorMessage(error: AxiosError<unknown>) {
     if (error.code === 'ECONNABORTED') {
         if (isLlmRequest) {
             return '大模型思考时间太久了。可以重试一次，或先切到预览模式确认页面流程'
+        }
+        if (isImportRequest) {
+            return '导入数据量较大，请求超过等待时长。可稍后重试，或先缩小批次分段导入'
         }
 
         return '请求等得太久了，请确认后端还在运行，数据库连接也没有卡住'

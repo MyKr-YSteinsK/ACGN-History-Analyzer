@@ -11,6 +11,7 @@ import com.mykr.acgnhistoryanalyzer.request.SubjectBatchImportRequest;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.SubjectImportPreviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.SubjectImportItemResponse;
+import com.mykr.acgnhistoryanalyzer.response.SubjectImportPreviewItemResponse;
 import com.mykr.acgnhistoryanalyzer.response.SubjectImportResponse;
 import org.springframework.stereotype.Service;
 
@@ -72,13 +73,62 @@ public class BangumiSeasonImportService {
     }
 
     public SubjectImportPreviewResponse previewSubjectsBySource(BangumiSubjectBatchImportRequest request) {
-        SubjectBatchImportRequest batchRequest = buildSubjectBatchImportRequestFromSource(request);
-        return subjectService.previewImportSubjects(batchRequest);
+        PreparedSourceBatch preparedBatch = prepareSourceBatch(request);
+        if (preparedBatch.validSubjects.isEmpty()) {
+            return new SubjectImportPreviewResponse(
+                    preparedBatch.totalCount,
+                    0,
+                    preparedBatch.errorCount,
+                    0,
+                    preparedBatch.errorPreviewItems
+            );
+        }
+
+        SubjectBatchImportRequest batchRequest = new SubjectBatchImportRequest();
+        batchRequest.setSubjects(preparedBatch.validSubjects);
+        SubjectImportPreviewResponse serviceResponse = subjectService.previewImportSubjects(batchRequest);
+
+        List<SubjectImportPreviewItemResponse> mergedItems = new ArrayList<>(serviceResponse.getItems());
+        mergedItems.addAll(preparedBatch.errorPreviewItems);
+
+        int canImportCount = serviceResponse.getCanImportCount();
+        int updatedCount = serviceResponse.getUpdatedCount();
+        int skippedCount = serviceResponse.getSkippedCount() + preparedBatch.errorCount;
+
+        return new SubjectImportPreviewResponse(
+                preparedBatch.totalCount,
+                canImportCount,
+                skippedCount,
+                updatedCount,
+                mergedItems
+        );
     }
 
     public SubjectImportResponse importSubjectsBySource(BangumiSubjectBatchImportRequest request) {
-        SubjectBatchImportRequest batchRequest = buildSubjectBatchImportRequestFromSource(request);
-        SubjectImportResponse response = subjectService.importSubjects(batchRequest);
+        PreparedSourceBatch preparedBatch = prepareSourceBatch(request);
+        if (preparedBatch.validSubjects.isEmpty()) {
+            return new SubjectImportResponse(
+                    preparedBatch.totalCount,
+                    0,
+                    preparedBatch.errorCount,
+                    preparedBatch.errorImportItems
+            );
+        }
+
+        SubjectBatchImportRequest batchRequest = new SubjectBatchImportRequest();
+        batchRequest.setSubjects(preparedBatch.validSubjects);
+        SubjectImportResponse serviceResponse = subjectService.importSubjects(batchRequest);
+
+        List<SubjectImportItemResponse> mergedItems = new ArrayList<>(serviceResponse.getItems());
+        mergedItems.addAll(preparedBatch.errorImportItems);
+
+        SubjectImportResponse response = new SubjectImportResponse(
+                preparedBatch.totalCount,
+                serviceResponse.getImportedCount(),
+                serviceResponse.getSkippedCount() + preparedBatch.errorCount,
+                mergedItems
+        );
+
         response.getItems().stream()
                 .filter(item -> "IMPORTED".equals(item.getResult()))
                 .map(SubjectImportItemResponse::getSubjectId)
@@ -153,15 +203,39 @@ public class BangumiSeasonImportService {
         return batchRequest;
     }
 
-    private SubjectBatchImportRequest buildSubjectBatchImportRequestFromSource(
-            BangumiSubjectBatchImportRequest request
-    ) {
-        List<SubjectCreateRequest> subjects = request.getSubjects().stream()
-                .map(this::toSubjectCreateRequestFromSourceItem)
-                .toList();
-        SubjectBatchImportRequest batchRequest = new SubjectBatchImportRequest();
-        batchRequest.setSubjects(subjects);
-        return batchRequest;
+    private PreparedSourceBatch prepareSourceBatch(BangumiSubjectBatchImportRequest request) {
+        List<SubjectCreateRequest> validSubjects = new ArrayList<>();
+        List<SubjectImportPreviewItemResponse> errorPreviewItems = new ArrayList<>();
+        List<SubjectImportItemResponse> errorImportItems = new ArrayList<>();
+
+        for (BangumiSubjectImportItemRequest item : request.getSubjects()) {
+            try {
+                validSubjects.add(toSubjectCreateRequestFromSourceItem(item));
+            } catch (Exception ex) {
+                String displayTitle = buildSourceImportDisplayTitle(item);
+                String message = buildSourceImportErrorMessage(ex);
+                errorPreviewItems.add(new SubjectImportPreviewItemResponse(
+                        displayTitle,
+                        "ERROR",
+                        message,
+                        "BANGUMI",
+                        item == null ? null : item.getSourceId()
+                ));
+                errorImportItems.add(new SubjectImportItemResponse(
+                        null,
+                        displayTitle,
+                        "ERROR",
+                        message
+                ));
+            }
+        }
+
+        return new PreparedSourceBatch(
+                request.getSubjects().size(),
+                validSubjects,
+                errorPreviewItems,
+                errorImportItems
+        );
     }
 
     private SubjectCreateRequest toSubjectCreateRequestFromSourceItem(BangumiSubjectImportItemRequest item) {
@@ -173,6 +247,43 @@ public class BangumiSeasonImportService {
         context.setIncludeWeb(true);
         context.setJapaneseOnly(false);
         return toSubjectCreateRequest(subject, context, true);
+    }
+
+    private String buildSourceImportDisplayTitle(BangumiSubjectImportItemRequest item) {
+        if (item == null || item.getSourceId() == null || item.getSourceId().trim().isEmpty()) {
+            return "sourceId 未提供";
+        }
+        return "sourceId=" + item.getSourceId().trim();
+    }
+
+    private String buildSourceImportErrorMessage(Exception ex) {
+        if (ex instanceof BangumiImportException) {
+            return ex.getMessage();
+        }
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            return "读取 Bangumi 条目失败";
+        }
+        return "读取 Bangumi 条目失败：" + message;
+    }
+
+    private static final class PreparedSourceBatch {
+        private final int totalCount;
+        private final int errorCount;
+        private final List<SubjectCreateRequest> validSubjects;
+        private final List<SubjectImportPreviewItemResponse> errorPreviewItems;
+        private final List<SubjectImportItemResponse> errorImportItems;
+
+        private PreparedSourceBatch(int totalCount,
+                                    List<SubjectCreateRequest> validSubjects,
+                                    List<SubjectImportPreviewItemResponse> errorPreviewItems,
+                                    List<SubjectImportItemResponse> errorImportItems) {
+            this.totalCount = totalCount;
+            this.errorCount = errorPreviewItems.size();
+            this.validSubjects = validSubjects;
+            this.errorPreviewItems = errorPreviewItems;
+            this.errorImportItems = errorImportItems;
+        }
     }
 
     private List<JsonNode> fetchSeasonSubjects(BangumiSeasonImportRequest request) {

@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from './request'
+import { apiDelete, apiGet, apiPost, apiPostWithConfig, apiPut } from './request'
 import type { AcgnCategory, ReleaseQuarter } from '../types/common'
 import type { PageQuery, PageResponse } from '../types/api'
 import type { TagResponse } from './tagApi'
@@ -146,6 +146,8 @@ export type UserSubjectRecordImportResponse = {
     items: UserSubjectRecordImportItemResponse[]
 }
 
+const IMPORT_REQUEST_TIMEOUT_MS = 180000
+
 export function createRecord(payload: UserSubjectRecordCreateRequest) {
     return apiPost<UserSubjectRecordResponse, UserSubjectRecordCreateRequest>('/records', payload)
 }
@@ -171,16 +173,17 @@ export function deleteRecord(id: number) {
 }
 
 export function previewImportRecords(payload: UserSubjectRecordBatchImportRequest) {
-    return apiPost<
+    return apiPostWithConfig<
         UserSubjectRecordImportPreviewResponse,
         UserSubjectRecordBatchImportRequest
-    >('/records/import/preview', payload)
+    >('/records/import/preview', payload, { timeout: IMPORT_REQUEST_TIMEOUT_MS })
 }
 
 export function importRecords(payload: UserSubjectRecordBatchImportRequest) {
-    return apiPost<UserSubjectRecordImportResponse, UserSubjectRecordBatchImportRequest>(
+    return apiPostWithConfig<UserSubjectRecordImportResponse, UserSubjectRecordBatchImportRequest>(
         '/records/import',
         payload,
+        { timeout: IMPORT_REQUEST_TIMEOUT_MS },
     )
 }
 

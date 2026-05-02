@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from './request'
+import { apiDelete, apiGet, apiPost, apiPostWithConfig, apiPut } from './request'
 import type { AcgnCategory, CollectionType, ReleaseQuarter } from '../types/common'
 import type { PageQuery, PageResponse } from '../types/api'
 import type { SubjectMatchCandidateResponse } from './recordApi'
@@ -77,6 +77,8 @@ export type UserSubjectCollectionImportResponse = {
     items: UserSubjectCollectionImportItemResponse[]
 }
 
+const IMPORT_REQUEST_TIMEOUT_MS = 180000
+
 export function createOrMoveCollection(payload: UserSubjectCollectionCreateRequest) {
     return apiPost<UserSubjectCollectionResponse, UserSubjectCollectionCreateRequest>(
         '/collections',
@@ -115,15 +117,15 @@ export function deleteCollection(id: number) {
 }
 
 export function previewImportCollections(payload: UserSubjectCollectionBatchImportRequest) {
-    return apiPost<
+    return apiPostWithConfig<
         UserSubjectCollectionImportPreviewResponse,
         UserSubjectCollectionBatchImportRequest
-    >('/collections/import/preview', payload)
+    >('/collections/import/preview', payload, { timeout: IMPORT_REQUEST_TIMEOUT_MS })
 }
 
 export function importCollections(payload: UserSubjectCollectionBatchImportRequest) {
-    return apiPost<
+    return apiPostWithConfig<
         UserSubjectCollectionImportResponse,
         UserSubjectCollectionBatchImportRequest
-    >('/collections/import', payload)
+    >('/collections/import', payload, { timeout: IMPORT_REQUEST_TIMEOUT_MS })
 }

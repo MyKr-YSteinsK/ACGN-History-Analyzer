@@ -5,6 +5,8 @@ import type {
     SubjectImportResponse,
 } from './subjectApi'
 
+const IMPORT_REQUEST_TIMEOUT_MS = 180000
+
 export type ImportEndpointDocResponse = {
     name: string
     method: string
@@ -94,7 +96,7 @@ export function previewBangumiSeasonImport(payload: BangumiSeasonImportRequest) 
         method: 'POST',
         url: '/import/bangumi/season/preview',
         data: payload,
-        timeout: 45000,
+        timeout: IMPORT_REQUEST_TIMEOUT_MS,
     })
 }
 
@@ -112,15 +114,19 @@ export function getBangumiSeasonImportJobStatus(jobId: string) {
 }
 
 export function previewBangumiSubjectImport(payload: BangumiSubjectBatchImportRequest) {
-    return apiPost<SubjectImportPreviewResponse, BangumiSubjectBatchImportRequest>(
-        '/import/bangumi/subject/preview',
-        payload,
-    )
+    return apiRequest<SubjectImportPreviewResponse>({
+        method: 'POST',
+        url: '/import/bangumi/subject/preview',
+        data: payload,
+        timeout: IMPORT_REQUEST_TIMEOUT_MS,
+    })
 }
 
 export function importBangumiSubject(payload: BangumiSubjectBatchImportRequest) {
-    return apiPost<SubjectImportResponse, BangumiSubjectBatchImportRequest>(
-        '/import/bangumi/subject/import',
-        payload,
-    )
+    return apiRequest<SubjectImportResponse>({
+        method: 'POST',
+        url: '/import/bangumi/subject/import',
+        data: payload,
+        timeout: IMPORT_REQUEST_TIMEOUT_MS,
+    })
 }

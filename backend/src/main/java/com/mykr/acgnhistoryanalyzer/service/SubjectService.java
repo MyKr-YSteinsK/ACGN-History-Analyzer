@@ -320,106 +320,117 @@ public class SubjectService {
                 );
             }
 
-            String validationMessage = validateSubjectImportItem(item);
-            if (validationMessage != null) {
+            try {
+                String validationMessage = validateSubjectImportItem(item);
+                if (validationMessage != null) {
+                    skippedCount++;
+                    items.add(new SubjectImportItemResponse(
+                            null,
+                            buildSubjectImportLabel(item, rowNumber),
+                            "ERROR",
+                            validationMessage
+                    ));
+                    rowNumber++;
+                    continue;
+                }
+
+                String sourceUniqueKey = buildSourceUniqueKey(item);
+                if (sourceUniqueKey != null && !batchSourceKeys.add(sourceUniqueKey)) {
+                    skippedCount++;
+                    items.add(new SubjectImportItemResponse(
+                            null,
+                            item.getDisplayTitle(),
+                            "SKIPPED",
+                            "同一批次内来源作品重复，已跳过"
+                    ));
+                    rowNumber++;
+                    continue;
+                }
+
+                Long resolvedFranchiseId = resolveFranchiseIdForUpdate(item);
+
+                if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
+                    skippedCount++;
+                    items.add(new SubjectImportItemResponse(
+                            null,
+                            item.getDisplayTitle(),
+                            "SKIPPED",
+                            "franchiseId 对应的系列不存在，已跳过"
+                    ));
+                    rowNumber++;
+                    continue;
+                }
+
+                List<Subject> matchedSubjects = findImportMatches(item);
+                Subject existingSubject = chooseImportTarget(matchedSubjects);
+                if (existingSubject != null) {
+                    if (hasSubjectChanged(existingSubject, item, resolvedFranchiseId)) {
+                        Subject updatedSubject = applyImportUpdate(existingSubject, item, resolvedFranchiseId);
+                        tagService.syncSubjectTags(updatedSubject, tagService.resolveAllowedSubjectTagNames(item.getTagNames()));
+                        Subject savedSubject = subjectRepository.save(updatedSubject);
+                        int mergedDuplicateCount = removeUnreferencedDuplicateMatches(matchedSubjects, savedSubject.getId());
+                        importedCount++;
+
+                        items.add(new SubjectImportItemResponse(
+                                savedSubject.getId(),
+                                savedSubject.getDisplayTitle(),
+                                "UPDATED",
+                                appendDuplicateMergeMessage(
+                                        buildSubjectImportUpdateMessage(
+                                                item,
+                                                resolvedFranchiseId,
+                                                buildSubjectPreviewChangeSummary(existingSubject, item, resolvedFranchiseId)
+                                        ),
+                                        mergedDuplicateCount
+                                )
+                        ));
+                    } else {
+                        int mergedDuplicateCount = removeUnreferencedDuplicateMatches(matchedSubjects, existingSubject.getId());
+                        if (mergedDuplicateCount > 0) {
+                            importedCount++;
+                            items.add(new SubjectImportItemResponse(
+                                    existingSubject.getId(),
+                                    existingSubject.getDisplayTitle(),
+                                    "UPDATED",
+                                    appendDuplicateMergeMessage("作品已存在且字段一致", mergedDuplicateCount)
+                            ));
+                            rowNumber++;
+                            continue;
+                        }
+                        skippedCount++;
+                        items.add(new SubjectImportItemResponse(
+                                existingSubject.getId(),
+                                existingSubject.getDisplayTitle(),
+                                "SKIPPED",
+                                "作品已存在且标签、评分、集数一致，已跳过"
+                        ));
+                    }
+                    rowNumber++;
+                    continue;
+                }
+
+                Subject subject = buildSubjectFromRequest(item, resolvedFranchiseId);
+                tagService.syncSubjectTags(subject, tagService.resolveAllowedSubjectTagNames(item.getTagNames()));
+                Subject savedSubject = subjectRepository.save(subject);
+                importedCount++;
+
+                items.add(new SubjectImportItemResponse(
+                        savedSubject.getId(),
+                        savedSubject.getDisplayTitle(),
+                        "IMPORTED",
+                        buildSubjectImportSuccessMessage(item, resolvedFranchiseId)
+                ));
+                rowNumber++;
+            } catch (Exception ex) {
                 skippedCount++;
                 items.add(new SubjectImportItemResponse(
                         null,
                         buildSubjectImportLabel(item, rowNumber),
                         "ERROR",
-                        validationMessage
+                        buildUnexpectedImportErrorMessage(ex)
                 ));
                 rowNumber++;
-                continue;
             }
-
-            String sourceUniqueKey = buildSourceUniqueKey(item);
-            if (sourceUniqueKey != null && !batchSourceKeys.add(sourceUniqueKey)) {
-                skippedCount++;
-                items.add(new SubjectImportItemResponse(
-                        null,
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "同一批次内来源作品重复，已跳过"
-                ));
-                rowNumber++;
-                continue;
-            }
-
-            Long resolvedFranchiseId = resolveFranchiseIdForUpdate(item);
-
-            if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
-                skippedCount++;
-                items.add(new SubjectImportItemResponse(
-                        null,
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "franchiseId 对应的系列不存在，已跳过"
-                ));
-                rowNumber++;
-                continue;
-            }
-
-            List<Subject> matchedSubjects = findImportMatches(item);
-            Subject existingSubject = chooseImportTarget(matchedSubjects);
-            if (existingSubject != null) {
-                if (hasSubjectChanged(existingSubject, item, resolvedFranchiseId)) {
-                    Subject updatedSubject = applyImportUpdate(existingSubject, item, resolvedFranchiseId);
-                    tagService.syncSubjectTags(updatedSubject, tagService.resolveAllowedSubjectTagNames(item.getTagNames()));
-                    Subject savedSubject = subjectRepository.save(updatedSubject);
-                    int mergedDuplicateCount = removeUnreferencedDuplicateMatches(matchedSubjects, savedSubject.getId());
-                    importedCount++;
-
-                    items.add(new SubjectImportItemResponse(
-                            savedSubject.getId(),
-                            savedSubject.getDisplayTitle(),
-                            "UPDATED",
-                            appendDuplicateMergeMessage(
-                                    buildSubjectImportUpdateMessage(
-                                            item,
-                                            resolvedFranchiseId,
-                                            buildSubjectPreviewChangeSummary(existingSubject, item, resolvedFranchiseId)
-                                    ),
-                                    mergedDuplicateCount
-                            )
-                    ));
-                } else {
-                    int mergedDuplicateCount = removeUnreferencedDuplicateMatches(matchedSubjects, existingSubject.getId());
-                    if (mergedDuplicateCount > 0) {
-                        importedCount++;
-                        items.add(new SubjectImportItemResponse(
-                                existingSubject.getId(),
-                                existingSubject.getDisplayTitle(),
-                                "UPDATED",
-                                appendDuplicateMergeMessage("作品已存在且字段一致", mergedDuplicateCount)
-                        ));
-                        rowNumber++;
-                        continue;
-                    }
-                    skippedCount++;
-                    items.add(new SubjectImportItemResponse(
-                            existingSubject.getId(),
-                            existingSubject.getDisplayTitle(),
-                            "SKIPPED",
-                            "作品已存在且标签、评分、集数一致，已跳过"
-                    ));
-                }
-                rowNumber++;
-                continue;
-            }
-
-            Subject subject = buildSubjectFromRequest(item, resolvedFranchiseId);
-            tagService.syncSubjectTags(subject, tagService.resolveAllowedSubjectTagNames(item.getTagNames()));
-            Subject savedSubject = subjectRepository.save(subject);
-            importedCount++;
-
-            items.add(new SubjectImportItemResponse(
-                    savedSubject.getId(),
-                    savedSubject.getDisplayTitle(),
-                    "IMPORTED",
-                    buildSubjectImportSuccessMessage(item, resolvedFranchiseId)
-            ));
-            rowNumber++;
         }
 
         return new SubjectImportResponse(
@@ -440,93 +451,105 @@ public class SubjectService {
 
         int rowNumber = 1;
         for (SubjectCreateRequest item : request.getSubjects()) {
-            String validationMessage = validateSubjectImportItem(item);
-            if (validationMessage != null) {
-                skippedCount++;
-                items.add(new SubjectImportPreviewItemResponse(
-                        buildSubjectImportLabel(item, rowNumber),
-                        "ERROR",
-                        validationMessage,
-                        item == null ? null : item.getSourcePlatform(),
-                        item == null ? null : item.getSourceId()
-                ));
-                rowNumber++;
-                continue;
-            }
-
-            String sourceUniqueKey = buildSourceUniqueKey(item);
-            if (sourceUniqueKey != null && !batchSourceKeys.add(sourceUniqueKey)) {
-                skippedCount++;
-                items.add(new SubjectImportPreviewItemResponse(
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "同一批次内来源作品重复，已跳过",
-                        item.getSourcePlatform(),
-                        item.getSourceId()
-                ));
-                rowNumber++;
-                continue;
-            }
-
-            if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
-                skippedCount++;
-                items.add(new SubjectImportPreviewItemResponse(
-                        item.getDisplayTitle(),
-                        "SKIPPED",
-                        "franchiseId 对应的系列不存在，正式导入时会跳过",
-                        item.getSourcePlatform(),
-                        item.getSourceId()
-                ));
-                rowNumber++;
-                continue;
-            }
-
-            List<Subject> matchedSubjects = findImportMatches(item);
-            Subject existingSubject = chooseImportTarget(matchedSubjects);
-            Long resolvedFranchiseId = resolveFranchiseIdForUpdate(item);
-            if (existingSubject != null) {
-                if (hasSubjectChanged(existingSubject, item, resolvedFranchiseId)) {
-                    updatedCount++;
+            try {
+                String validationMessage = validateSubjectImportItem(item);
+                if (validationMessage != null) {
+                    skippedCount++;
                     items.add(new SubjectImportPreviewItemResponse(
-                            item.getDisplayTitle(),
-                            "UPDATED",
-                            buildSubjectImportUpdatePreviewMessage(item, resolvedFranchiseId),
-                            item.getSourcePlatform(),
-                            item.getSourceId(),
-                            appendDuplicatePreviewSummary(
-                                    buildSubjectPreviewChangeSummary(existingSubject, item, resolvedFranchiseId),
-                                    matchedSubjects,
-                                    existingSubject
-                            )
+                            buildSubjectImportLabel(item, rowNumber),
+                            "ERROR",
+                            validationMessage,
+                            item == null ? null : item.getSourcePlatform(),
+                            item == null ? null : item.getSourceId()
                     ));
-                } else {
+                    rowNumber++;
+                    continue;
+                }
+
+                String sourceUniqueKey = buildSourceUniqueKey(item);
+                if (sourceUniqueKey != null && !batchSourceKeys.add(sourceUniqueKey)) {
                     skippedCount++;
                     items.add(new SubjectImportPreviewItemResponse(
                             item.getDisplayTitle(),
                             "SKIPPED",
-                            "作品已存在且标签、评分、集数一致，正式导入时会跳过",
+                            "同一批次内来源作品重复，已跳过",
                             item.getSourcePlatform(),
-                            item.getSourceId(),
-                            appendDuplicatePreviewSummary(
-                                    "标签、评分、集数均无变化",
-                                    matchedSubjects,
-                                    existingSubject
-                            )
+                            item.getSourceId()
                     ));
+                    rowNumber++;
+                    continue;
                 }
-                rowNumber++;
-                continue;
-            }
 
-            canImportCount++;
-            items.add(new SubjectImportPreviewItemResponse(
-                    item.getDisplayTitle(),
-                    "CAN_IMPORT",
-                    buildSubjectImportPreviewMessage(item, resolvedFranchiseId),
-                    item.getSourcePlatform(),
-                    item.getSourceId()
-            ));
-            rowNumber++;
+                if (item.getFranchiseId() != null && !franchiseRepository.existsById(item.getFranchiseId())) {
+                    skippedCount++;
+                    items.add(new SubjectImportPreviewItemResponse(
+                            item.getDisplayTitle(),
+                            "SKIPPED",
+                            "franchiseId 对应的系列不存在，正式导入时会跳过",
+                            item.getSourcePlatform(),
+                            item.getSourceId()
+                    ));
+                    rowNumber++;
+                    continue;
+                }
+
+                List<Subject> matchedSubjects = findImportMatches(item);
+                Subject existingSubject = chooseImportTarget(matchedSubjects);
+                Long resolvedFranchiseId = resolveFranchiseIdForUpdate(item);
+                if (existingSubject != null) {
+                    if (hasSubjectChanged(existingSubject, item, resolvedFranchiseId)) {
+                        updatedCount++;
+                        items.add(new SubjectImportPreviewItemResponse(
+                                item.getDisplayTitle(),
+                                "UPDATED",
+                                buildSubjectImportUpdatePreviewMessage(item, resolvedFranchiseId),
+                                item.getSourcePlatform(),
+                                item.getSourceId(),
+                                appendDuplicatePreviewSummary(
+                                        buildSubjectPreviewChangeSummary(existingSubject, item, resolvedFranchiseId),
+                                        matchedSubjects,
+                                        existingSubject
+                                )
+                        ));
+                    } else {
+                        skippedCount++;
+                        items.add(new SubjectImportPreviewItemResponse(
+                                item.getDisplayTitle(),
+                                "SKIPPED",
+                                "作品已存在且标签、评分、集数一致，正式导入时会跳过",
+                                item.getSourcePlatform(),
+                                item.getSourceId(),
+                                appendDuplicatePreviewSummary(
+                                        "标签、评分、集数均无变化",
+                                        matchedSubjects,
+                                        existingSubject
+                                )
+                        ));
+                    }
+                    rowNumber++;
+                    continue;
+                }
+
+                canImportCount++;
+                items.add(new SubjectImportPreviewItemResponse(
+                        item.getDisplayTitle(),
+                        "CAN_IMPORT",
+                        buildSubjectImportPreviewMessage(item, resolvedFranchiseId),
+                        item.getSourcePlatform(),
+                        item.getSourceId()
+                ));
+                rowNumber++;
+            } catch (Exception ex) {
+                skippedCount++;
+                items.add(new SubjectImportPreviewItemResponse(
+                        buildSubjectImportLabel(item, rowNumber),
+                        "ERROR",
+                        buildUnexpectedImportErrorMessage(ex),
+                        item == null ? null : item.getSourcePlatform(),
+                        item == null ? null : item.getSourceId()
+                ));
+                rowNumber++;
+            }
         }
 
         return new SubjectImportPreviewResponse(
@@ -818,6 +841,14 @@ public class SubjectService {
             return item.getTitleCn().trim();
         }
         return "第 " + rowNumber + " 行";
+    }
+
+    private String buildUnexpectedImportErrorMessage(Exception ex) {
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            return "导入该行时发生未知异常，已自动跳过";
+        }
+        return "导入该行时发生异常，已自动跳过：" + message;
     }
 
     private String buildSourceUniqueKey(SubjectCreateRequest request) {

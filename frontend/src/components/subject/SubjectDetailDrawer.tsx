@@ -64,6 +64,7 @@ function SubjectDetailDrawer({
     const noneDisabled =
         subject.libraryStatus === 'NONE' || statusAction !== null || deleteAction !== null
     const actionDisabled = statusAction !== null || deleteAction !== null
+    const platformDomain = extractPlatformDomain(subject.platformLink)
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -394,7 +395,7 @@ function SubjectDetailDrawer({
                         <p className="text-xs leading-5 text-slate-400">
                             {detailLoading
                                 ? '正在加载后端完整详情...'
-                                : '详情、记录和收藏状态已接入后端接口。'}
+                                : `来源域名：${platformDomain ?? '暂无'}`}
                         </p>
 
                         {subject.platformLink ? (
@@ -420,6 +421,19 @@ function SubjectDetailDrawer({
             </section>
         </div>
     )
+}
+
+function extractPlatformDomain(platformLink?: string | null) {
+    if (!platformLink || !platformLink.trim()) {
+        return null
+    }
+
+    try {
+        const url = new URL(platformLink.trim())
+        return url.hostname.replace(/^www\./i, '')
+    } catch {
+        return null
+    }
 }
 
 type InfoRowProps = {
