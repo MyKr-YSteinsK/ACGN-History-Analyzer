@@ -5,6 +5,7 @@ import com.mykr.acgnhistoryanalyzer.entity.Tag;
 import com.mykr.acgnhistoryanalyzer.repository.TagRepository;
 import com.mykr.acgnhistoryanalyzer.response.TagResponse;
 import com.mykr.acgnhistoryanalyzer.response.TagWhitelistCleanupResponse;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,7 @@ public class TagService {
         this.tagRepository = tagRepository;
     }
 
+    @Cacheable(cacheNames = "tagList", key = "#keyword == null ? '' : #keyword")
     public List<TagResponse> getTags(String keyword) {
         List<Tag> tags;
         if (keyword == null || keyword.trim().isEmpty()) {

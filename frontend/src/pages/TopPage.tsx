@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { getRecordPage, type UserSubjectRecordResponse } from '../api/recordApi'
 import { getApiErrorMessage } from '../api/request'
 import { getSubjectById } from '../api/subjectApi'
@@ -21,6 +22,7 @@ import {
 import type { AcgnCategory } from '../types/common'
 import type { SubjectCardView } from '../types/subject'
 import { formatRecordRelease, sortRecordsByScoreDesc } from '../utils/recordDisplay'
+import { queryKeys } from '../query/queryKeys'
 
 const rankingFetchSize = 200
 
@@ -85,25 +87,13 @@ function applyTopRule(records: UserSubjectRecordResponse[]) {
 
 function TopPage() {
     const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
-    const [rankingRecords, setRankingRecords] = useState<UserSubjectRecordResponse[]>([])
-    const [scoreBands, setScoreBands] = useState<ScoreBand[]>(
-        scoreBandConfig.map((band) => ({ ...band, count: 0 })),
-    )
-    const [loading, setLoading] = useState(false)
     const [detailLoading, setDetailLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+    const [detailError, setDetailError] = useState<string | null>(null)
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
 
-    const selectedTheme = categoryTheme[selectedCategory]
-    const displayRecords = useMemo(() => applyTopRule(rankingRecords), [rankingRecords])
-    const featuredRecords = displayRecords.slice(0, 3)
-    const resultAnimationKey = `${selectedCategory}-${displayRecords.length}`
-
-    const loadTopData = useCallback(async () => {
-        setLoading(true)
-        setError(null)
-
-        try {
+    const topQuery = useQuery({
+        queryKey: queryKeys.topPage(selectedCategory),
+        queryFn: async () => {
             const [rankingResponse, ...bandResponses] = await Promise.all([
                 getRecordPage({
                     category: selectedCategory,
@@ -123,37 +113,38 @@ function TopPage() {
                 ),
             ])
 
-            setRankingRecords(sortRecordsByScoreDesc(rankingResponse.content))
-            setScoreBands(
-                scoreBandConfig.map((band, index) => ({
+            const bundle: import('../query/queryKeys').TopPageBundle = {
+                rankingRecords: sortRecordsByScoreDesc(rankingResponse.content),
+                scoreBands: scoreBandConfig.map((band, index) => ({
                     ...band,
                     count: bandResponses[index]?.totalElements ?? 0,
                 })),
-            )
-        } catch (loadError) {
-            setRankingRecords([])
-            setScoreBands(scoreBandConfig.map((band) => ({ ...band, count: 0 })))
-            setError(getApiErrorMessage(loadError))
-        } finally {
-            setLoading(false)
-        }
-    }, [selectedCategory])
+            }
+            return bundle
+        },
+        placeholderData: (previousData) => previousData,
+    })
 
-    useEffect(() => {
-        // TOP 页按类型读取正式记录，前端按既定榜单规则截取展示范围。
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        void loadTopData()
-    }, [loadTopData])
+    const rankingRecords = topQuery.data?.rankingRecords ?? []
+    const scoreBands = topQuery.data?.scoreBands ?? scoreBandConfig.map((band) => ({ ...band, count: 0 }))
+    const loading = topQuery.isPending && !topQuery.data
+    const rankingLoadError = topQuery.isError ? getApiErrorMessage(topQuery.error) : null
+
+    const selectedTheme = categoryTheme[selectedCategory]
+    const displayRecords = useMemo(() => applyTopRule(rankingRecords), [rankingRecords])
+    const featuredRecords = displayRecords.slice(0, 3)
+    const resultAnimationKey = `${selectedCategory}-${displayRecords.length}`
+    const bannerError = detailError ?? rankingLoadError
 
     async function handleOpenDetail(record: UserSubjectRecordResponse) {
         setDetailLoading(true)
-        setError(null)
+        setDetailError(null)
 
         try {
             const detail = await getSubjectById(record.subjectId)
             setSelectedSubject(mapSubjectDetailToCardView(detail))
-        } catch (detailError) {
-            setError(getApiErrorMessage(detailError))
+        } catch (openError) {
+            setDetailError(getApiErrorMessage(openError))
         } finally {
             setDetailLoading(false)
         }
@@ -173,8 +164,8 @@ function TopPage() {
                     onChange={setSelectedCategory}
                 />
 
-                {error ? (
-                    <FeedbackBanner tone="error">{error}</FeedbackBanner>
+                {bannerError ? (
+                    <FeedbackBanner tone="error">{bannerError}</FeedbackBanner>
                 ) : null}
 
                 <GlassCard className="overflow-hidden">

@@ -4,6 +4,7 @@ import com.mykr.acgnhistoryanalyzer.common.enums.CollectionType;
 import com.mykr.acgnhistoryanalyzer.entity.Subject;
 import com.mykr.acgnhistoryanalyzer.entity.UserSubjectCollection;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
+import com.mykr.acgnhistoryanalyzer.config.CacheInvalidationService;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectCollectionRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectCollectionBatchImportRequest;
@@ -37,17 +38,20 @@ public class UserSubjectCollectionService {
     private final SubjectRepository subjectRepository;
     private final ImportSubjectMatchService importSubjectMatchService;
     private final Validator validator;
+    private final CacheInvalidationService cacheInvalidationService;
 
     public UserSubjectCollectionService(UserSubjectCollectionRepository collectionRepository,
                                         UserSubjectRecordRepository recordRepository,
                                         SubjectRepository subjectRepository,
                                         ImportSubjectMatchService importSubjectMatchService,
-                                        Validator validator) {
+                                        Validator validator,
+                                        CacheInvalidationService cacheInvalidationService) {
         this.collectionRepository = collectionRepository;
         this.recordRepository = recordRepository;
         this.subjectRepository = subjectRepository;
         this.importSubjectMatchService = importSubjectMatchService;
         this.validator = validator;
+        this.cacheInvalidationService = cacheInvalidationService;
     }
 
     public boolean subjectExists(Long subjectId) {
@@ -79,6 +83,7 @@ public class UserSubjectCollectionService {
         collection.setNote(request.getNote());
 
         UserSubjectCollection saved = collectionRepository.save(collection);
+        cacheInvalidationService.invalidateAfterDataMutation();
         return toResponse(saved);
     }
 
@@ -201,12 +206,14 @@ public class UserSubjectCollectionService {
             rowNumber++;
         }
 
-        return new UserSubjectCollectionImportResponse(
+        UserSubjectCollectionImportResponse response = new UserSubjectCollectionImportResponse(
                 request.getCollections().size(),
                 importedCount,
                 skippedCount,
                 items
         );
+        cacheInvalidationService.invalidateAfterDataMutation();
+        return response;
     }
 
     public UserSubjectCollectionImportPreviewResponse previewImportCollections(
@@ -296,6 +303,7 @@ public class UserSubjectCollectionService {
         collection.setNote(request.getNote());
 
         UserSubjectCollection saved = collectionRepository.save(collection);
+        cacheInvalidationService.invalidateAfterDataMutation();
         return toResponse(saved);
     }
 
@@ -305,6 +313,7 @@ public class UserSubjectCollectionService {
             return false;
         }
         collectionRepository.deleteById(id);
+        cacheInvalidationService.invalidateAfterDataMutation();
         return true;
     }
 
@@ -312,6 +321,7 @@ public class UserSubjectCollectionService {
     public void removeCollectionBySubjectId(Long subjectId) {
         if (subjectId != null && collectionRepository.existsBySubjectId(subjectId)) {
             collectionRepository.deleteBySubjectId(subjectId);
+            cacheInvalidationService.invalidateAfterDataMutation();
         }
     }
 

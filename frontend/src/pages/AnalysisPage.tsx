@@ -3,29 +3,13 @@ import {
     getHighScoreRecords,
     type UserSubjectRecordResponse,
 } from '../api/recordApi'
+import { getLlmStatus, testLlmConnection, updateLlmConfig, type LlmAnalysisResponse, type LlmQuestionAnswerResponse, type LlmRecommendationResponse, type LlmStatusResponse } from '../api/llmApi'
 import {
-    getCollectionBacklogAnalysis,
-    getComprehensiveReportAnalysis,
-    getLlmStatus,
-    getFranchiseCompletionAnalysis,
-    getInterestTrendAnalysis,
-    getPreferenceContradictionAnalysis,
-    getQuestionAnswerAnalysis,
-    getQuarterlyAnalysis,
-    getRecommendationAnalysis,
-    getScoreStructureAnalysis,
-    getTagPreferenceAnalysis,
-    getTasteProfileAnalysis,
-    testLlmConnection,
-    getTypePreferenceAnalysis,
-    getYearlyAnalysis,
-    updateLlmConfig,
-    type LlmAnalysisResponse,
-    type LlmQuestionAnswerResponse,
-    type LlmRecommendationResponse,
-    type LlmStatusResponse,
-} from '../api/llmApi'
-import { getApiErrorMessage } from '../api/request'
+    enqueueBackgroundJob,
+    registerBackgroundJobUi,
+    waitForBackgroundJob,
+} from '../api/jobApi'
+import { ApiRequestError, getApiErrorMessage } from '../api/request'
 import {
     EmptyState,
 } from '../components/common/FeedbackState'
@@ -752,72 +736,80 @@ function AnalysisPage() {
     )
 }
 
-async function requestAnalysisResponse(job: GenerationJob) {
+function buildLlmJobPayload(job: GenerationJob): Record<string, unknown> {
     const category = job.category === 'ALL' ? undefined : job.category
 
-    if (job.analysisType === 'QUESTION_ANSWER') {
-        return toQuestionAnswerReport(await getQuestionAnswerAnalysis({
-            question: job.question,
-        }))
+    switch (job.analysisType) {
+        case 'QUESTION_ANSWER':
+            return { llmKind: 'QUESTION_ANSWER', question: job.question }
+        case 'QUARTERLY':
+            return {
+                llmKind: 'QUARTERLY',
+                year: job.year,
+                quarter: job.quarter,
+                category,
+            }
+        case 'TYPE_PREFERENCE':
+            return {
+                llmKind: 'TYPE_PREFERENCE',
+                category: job.category === 'ALL' ? 'ANIME' : job.category,
+            }
+        case 'SCORE_STRUCTURE':
+            return { llmKind: 'SCORE_STRUCTURE', category }
+        case 'TAG_PREFERENCE':
+            return { llmKind: 'TAG_PREFERENCE', category }
+        case 'RECOMMENDATION':
+            return { llmKind: 'RECOMMENDATION', category }
+        case 'COLLECTION_BACKLOG':
+            return { llmKind: 'COLLECTION_BACKLOG', category }
+        case 'TASTE_PROFILE':
+            return { llmKind: 'TASTE_PROFILE', category }
+        case 'PREFERENCE_CONTRADICTION':
+            return { llmKind: 'PREFERENCE_CONTRADICTION', category }
+        case 'INTEREST_TREND':
+            return { llmKind: 'INTEREST_TREND', category }
+        case 'FRANCHISE_COMPLETION':
+            return { llmKind: 'FRANCHISE_COMPLETION', category }
+        case 'COMPREHENSIVE_REPORT':
+            return { llmKind: 'COMPREHENSIVE_REPORT', year: job.year, category }
+        case 'YEARLY':
+            return { llmKind: 'YEARLY', year: job.year, category }
+        default:
+            return { llmKind: 'YEARLY', year: job.year, category }
+    }
+}
+
+function parseLlmBackgroundJobResult(
+    resultJson: string | null,
+    analysisType: AnalysisMode,
+): LlmAnalysisResponse {
+    const root = JSON.parse(resultJson ?? '{}') as Record<string, unknown>
+
+    if (analysisType === 'QUESTION_ANSWER') {
+        return toQuestionAnswerReport(root.llmQuestionAnswer as LlmQuestionAnswerResponse)
     }
 
-    if (job.analysisType === 'QUARTERLY') {
-        return getQuarterlyAnalysis({
-            year: job.year,
-            quarter: job.quarter,
-            category,
-        })
-    }
+    return normalizeAnalysisReport(root.llmAnalysis as LlmAnalysisResponse, analysisType)
+}
 
-    if (job.analysisType === 'TYPE_PREFERENCE') {
-        return getTypePreferenceAnalysis({
-            category: job.category === 'ALL' ? 'ANIME' : job.category,
-        })
-    }
-
-    if (job.analysisType === 'SCORE_STRUCTURE') {
-        return getScoreStructureAnalysis({ category })
-    }
-
-    if (job.analysisType === 'TAG_PREFERENCE') {
-        return getTagPreferenceAnalysis({ category })
-    }
-
-    if (job.analysisType === 'RECOMMENDATION') {
-        return getRecommendationAnalysis({ category })
-    }
-
-    if (job.analysisType === 'COLLECTION_BACKLOG') {
-        return getCollectionBacklogAnalysis({ category })
-    }
-
-    if (job.analysisType === 'TASTE_PROFILE') {
-        return getTasteProfileAnalysis({ category })
-    }
-
-    if (job.analysisType === 'PREFERENCE_CONTRADICTION') {
-        return getPreferenceContradictionAnalysis({ category })
-    }
-
-    if (job.analysisType === 'INTEREST_TREND') {
-        return getInterestTrendAnalysis({ category })
-    }
-
-    if (job.analysisType === 'FRANCHISE_COMPLETION') {
-        return getFranchiseCompletionAnalysis({ category })
-    }
-
-    if (job.analysisType === 'COMPREHENSIVE_REPORT') {
-        return getComprehensiveReportAnalysis({
-            year: job.year,
-            category,
-        })
-    }
-
-    return getYearlyAnalysis({
-        year: job.year,
-        category,
+async function requestAnalysisResponse(job: GenerationJob) {
+    const payload = buildLlmJobPayload(job)
+    const { jobId } = await enqueueBackgroundJob({
+        jobType: 'LLM_ANALYSIS',
+        payload,
     })
+    registerBackgroundJobUi(jobId, {
+        silent: false,
+        title: `${job.modeLabel} · ${job.scope}`,
+        href: '/analysis',
+    })
+    const res = await waitForBackgroundJob(jobId)
+
+    if (res.status === 'FAILED') {
+        throw new ApiRequestError(res.errorMessage || '生成失败')
+    }
+
+    return parseLlmBackgroundJobResult(res.resultJson, job.analysisType)
 }
 
 function trimFinishedGenerationJobs(jobs: GenerationJob[]) {

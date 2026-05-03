@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     getHomeInsightAnalysis,
@@ -36,6 +37,7 @@ import {
     writeJsonCache,
 } from '../utils/localStorageCache'
 import { formatRecordRelease, sortRecordsByScoreDesc } from '../utils/recordDisplay'
+import { queryKeys } from '../query/queryKeys'
 
 type CategoryCount = {
     category: AcgnCategory
@@ -194,9 +196,7 @@ function HomePage() {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
     const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(getCurrentReleaseQuarter())
     const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
-    const [records, setRecords] = useState<UserSubjectRecordResponse[]>([])
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
-    const [loading, setLoading] = useState(false)
     const [detailLoading, setDetailLoading] = useState(false)
     const [insightLoading, setInsightLoading] = useState(false)
     const [homeInsight, setHomeInsight] = useState<LlmAnalysisResponse | null>(null)
@@ -214,37 +214,37 @@ function HomePage() {
         [selectedCategory, selectedQuarter, selectedYear],
     )
 
-    const loadRecords = useCallback(async () => {
-        setLoading(true)
-        setError(null)
+    const recordsQuery = useQuery({
+        queryKey: queryKeys.recordsList(),
+        queryFn: () => getRecords(),
+    })
 
-        try {
-            const response = await getRecords()
-            setRecords(response)
-
-            if (!latestSelectionApplied.current) {
-                const latestPosition = getLatestRecordPosition(response)
-
-                if (latestPosition) {
-                    setSelectedYear(latestPosition.year)
-                    setSelectedQuarter(latestPosition.quarter)
-                }
-
-                latestSelectionApplied.current = true
-            }
-        } catch (loadError) {
-            setRecords([])
-            setError(getApiErrorMessage(loadError))
-        } finally {
-            setLoading(false)
-        }
-    }, [])
+    const records = recordsQuery.data ?? []
 
     useEffect(() => {
-    // 首页默认定位到已有正式记录中的最新年份和月份档期。
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        void loadRecords()
-    }, [loadRecords])
+        if (!records.length || latestSelectionApplied.current) {
+            return
+        }
+
+        const latestPosition = getLatestRecordPosition(records)
+
+        if (latestPosition) {
+            setSelectedYear(latestPosition.year)
+            setSelectedQuarter(latestPosition.quarter)
+        }
+
+        latestSelectionApplied.current = true
+    }, [records])
+
+    useEffect(() => {
+        if (recordsQuery.isError) {
+            setError(getApiErrorMessage(recordsQuery.error))
+        } else {
+            setError(null)
+        }
+    }, [recordsQuery.error, recordsQuery.isError])
+
+    const listBlocking = recordsQuery.isPending && !recordsQuery.data
 
     const loadHomeInsight = useCallback(async (forceRefresh = false) => {
         const cached = forceRefresh ? null : readHomeInsightCache(homeInsightCacheKey)
@@ -573,7 +573,7 @@ function HomePage() {
                             />
 
                             <TopScorePreview
-                                loading={loading}
+                                loading={listBlocking}
                                 records={topRecords}
                                 category={selectedCategory}
                                 onOpenDetail={handleOpenDetail}

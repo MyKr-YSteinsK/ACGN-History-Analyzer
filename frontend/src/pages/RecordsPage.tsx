@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
     deleteRecord,
     getRecords,
@@ -37,6 +38,8 @@ import {
     type ReleaseQuarter,
 } from '../types/common'
 import type { SubjectCardView } from '../types/subject'
+import { invalidateLibraryRelatedQueries } from '../query/invalidateDataCaches'
+import { queryKeys } from '../query/queryKeys'
 
 type SortOption = {
     value: RecordPageSort
@@ -103,9 +106,8 @@ function getReleaseMonthText(record: UserSubjectRecordResponse) {
 }
 
 function RecordsPage() {
-    const [records, setRecords] = useState<UserSubjectRecordResponse[]>([])
-    const [loading, setLoading] = useState(false)
-    const [listError, setListError] = useState<string | null>(null)
+    const queryClient = useQueryClient()
+    const selectionSeeded = useRef(false)
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
@@ -120,39 +122,37 @@ function RecordsPage() {
         useState<SubjectCardView | null>(null)
     const [recordDeleting, setRecordDeleting] = useState(false)
 
-    const loadRecords = useCallback(async () => {
-        setLoading(true)
-        setListError(null)
-
-        try {
+    const recordsQuery = useQuery({
+        queryKey: queryKeys.recordsList(),
+        queryFn: async () => {
             const response = await getRecords()
-            const sortedRecords = [...response].sort((first, second) =>
+            return [...response].sort((first, second) =>
                 compareRecordsBySort(first, second, 'RECORD_TIME_DESC'),
             )
-            setRecords(sortedRecords)
+        },
+    })
 
-            const firstAnimeRecord =
-                sortedRecords.find((record) => record.subjectCategory === 'ANIME') ??
-                sortedRecords[0]
+    const records = recordsQuery.data ?? []
 
-            if (firstAnimeRecord) {
-                setSelectedCategory(firstAnimeRecord.subjectCategory ?? 'ANIME')
-                setSelectedYear(firstAnimeRecord.recordYear)
-                setSelectedQuarter(firstAnimeRecord.recordQuarter)
-            }
-        } catch (loadError) {
-            setRecords([])
-            setListError(getApiErrorMessage(loadError))
-        } finally {
-            setLoading(false)
-        }
-    }, [])
+    const listError = recordsQuery.isError ? getApiErrorMessage(recordsQuery.error) : null
+    const listBlocking = recordsQuery.isPending && !recordsQuery.data
 
     useEffect(() => {
-        // 页面打开时同步正式记录列表，筛选和排序在前端完成。
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        void loadRecords()
-    }, [loadRecords])
+        if (!records.length || selectionSeeded.current) {
+            return
+        }
+
+        const firstAnimeRecord =
+            records.find((record) => record.subjectCategory === 'ANIME') ?? records[0]
+
+        if (firstAnimeRecord) {
+            setSelectedCategory(firstAnimeRecord.subjectCategory ?? 'ANIME')
+            setSelectedYear(firstAnimeRecord.recordYear)
+            setSelectedQuarter(firstAnimeRecord.recordQuarter)
+        }
+
+        selectionSeeded.current = true
+    }, [records])
 
     const yearOptions = useMemo(() => {
         return Array.from(new Set(records.map((record) => record.recordYear))).sort(
@@ -246,11 +246,7 @@ function RecordsPage() {
                 note: payload.note || null,
             })
 
-            setRecords((current) =>
-                current.map((record) =>
-                    record.id === updatedRecord.id ? updatedRecord : record,
-                ),
-            )
+            invalidateLibraryRelatedQueries(queryClient)
             setSelectedCategory(updatedRecord.subjectCategory ?? selectedCategory)
             setSelectedYear(updatedRecord.recordYear)
             setSelectedQuarter(updatedRecord.recordQuarter)
@@ -296,9 +292,7 @@ function RecordsPage() {
 
         try {
             await deleteRecord(recordId)
-            setRecords((current) =>
-                current.filter((record) => record.id !== recordId),
-            )
+            invalidateLibraryRelatedQueries(queryClient)
             setSelectedSubject((current) =>
                 current?.id === subjectToDelete.id ? null : current,
             )
@@ -432,13 +426,13 @@ function RecordsPage() {
                         </div>
 
                         <div className="mt-5">
-                            {loading ? (
+                            {listBlocking ? (
                                 <LoadingGrid />
                             ) : listError ? (
                                 <ErrorState
                                     title="记录加载失败"
                                     message={listError}
-                                    onRetry={() => void loadRecords()}
+                                    onRetry={() => void recordsQuery.refetch()}
                                 />
                             ) : filteredRecords.length > 0 ? (
                                 <div className="subject-grid">

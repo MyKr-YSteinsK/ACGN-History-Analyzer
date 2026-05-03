@@ -8,6 +8,7 @@ import com.mykr.acgnhistoryanalyzer.response.HomeSearchResponse;
 import com.mykr.acgnhistoryanalyzer.response.RecordQuarterOverviewResponse;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
 import com.mykr.acgnhistoryanalyzer.response.UserSubjectRecordResponse;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -26,6 +27,10 @@ public class HomeService {
         this.subjectService = subjectService;
     }
 
+    @Cacheable(
+            cacheNames = "homeQuarterDashboard",
+            key = "#year + '_' + #quarter + '_' + #category + '_' + #status + '_' + #keyword + '_' + #recordSort + '_' + #librarySort"
+    )
     public HomeQuarterDashboardResponse getQuarterDashboard(Integer year, Integer quarter,
                                                             String category, String status,
                                                             String keyword, String recordSort,
@@ -84,6 +89,10 @@ public class HomeService {
         );
     }
 
+    @Cacheable(
+            cacheNames = "homeSearch",
+            key = "#year + '_' + #quarter + '_' + #category + '_' + #keyword + '_' + #scope"
+    )
     public HomeSearchResponse searchHomeData(Integer year, Integer quarter,
                                              String category, String keyword, HomeSearchScope scope) {
         String effectiveCategory = normalizeCategory(category);

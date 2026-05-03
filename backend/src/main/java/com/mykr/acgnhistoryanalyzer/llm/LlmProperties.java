@@ -23,6 +23,10 @@ public class LlmProperties {
 
     private Integer maxTokens = 3000;
 
+    private String cacheContentVersion = "1";
+
+    private int resultCacheDays = 14;
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -85,6 +89,22 @@ public class LlmProperties {
 
     public void setMaxTokens(Integer maxTokens) {
         this.maxTokens = maxTokens;
+    }
+
+    public String getCacheContentVersion() {
+        return cacheContentVersion;
+    }
+
+    public void setCacheContentVersion(String cacheContentVersion) {
+        this.cacheContentVersion = cacheContentVersion;
+    }
+
+    public int getResultCacheDays() {
+        return resultCacheDays;
+    }
+
+    public void setResultCacheDays(int resultCacheDays) {
+        this.resultCacheDays = resultCacheDays;
     }
 
     public boolean isMockMode() {

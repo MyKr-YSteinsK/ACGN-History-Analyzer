@@ -7,11 +7,13 @@ import com.mykr.acgnhistoryanalyzer.entity.Subject;
 import com.mykr.acgnhistoryanalyzer.repository.FranchiseRepository;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectCollectionRepository;
+import com.mykr.acgnhistoryanalyzer.config.CacheInvalidationService;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.FranchiseCreateRequest;
 import com.mykr.acgnhistoryanalyzer.response.FranchiseDetailResponse;
 import com.mykr.acgnhistoryanalyzer.response.FranchiseResponse;
 import com.mykr.acgnhistoryanalyzer.response.SubjectResponse;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,17 +28,20 @@ public class FranchiseService {
     private final UserSubjectRecordRepository userSubjectRecordRepository;
     private final UserSubjectCollectionRepository userSubjectCollectionRepository;
     private final TagService tagService;
+    private final CacheInvalidationService cacheInvalidationService;
 
     public FranchiseService(FranchiseRepository franchiseRepository,
                             SubjectRepository subjectRepository,
                             UserSubjectRecordRepository userSubjectRecordRepository,
                             UserSubjectCollectionRepository userSubjectCollectionRepository,
-                            TagService tagService) {
+                            TagService tagService,
+                            CacheInvalidationService cacheInvalidationService) {
         this.franchiseRepository = franchiseRepository;
         this.subjectRepository = subjectRepository;
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectCollectionRepository = userSubjectCollectionRepository;
         this.tagService = tagService;
+        this.cacheInvalidationService = cacheInvalidationService;
     }
 
     public FranchiseResponse createFranchise(FranchiseCreateRequest request) {
@@ -48,9 +53,11 @@ public class FranchiseService {
         );
 
         Franchise savedFranchise = franchiseRepository.save(franchise);
+        cacheInvalidationService.invalidateAfterDataMutation();
         return toResponse(savedFranchise);
     }
 
+    @Cacheable(cacheNames = "franchiseList")
     public List<FranchiseResponse> getFranchises() {
         return franchiseRepository.findAll(Sort.by("id").ascending())
                 .stream()
@@ -95,6 +102,7 @@ public class FranchiseService {
         franchise.setStatus(request.getStatus().trim());
 
         Franchise updatedFranchise = franchiseRepository.save(franchise);
+        cacheInvalidationService.invalidateAfterDataMutation();
         return toResponse(updatedFranchise);
     }
 
@@ -112,6 +120,7 @@ public class FranchiseService {
         subjects.forEach(subject -> subject.setFranchiseId(null));
         subjectRepository.saveAll(subjects);
         franchiseRepository.deleteById(id);
+        cacheInvalidationService.invalidateAfterDataMutation();
     }
 
     @Transactional
@@ -124,6 +133,7 @@ public class FranchiseService {
 
         subject.setFranchiseId(null);
         subjectRepository.save(subject);
+        cacheInvalidationService.invalidateAfterDataMutation();
         return true;
     }
 

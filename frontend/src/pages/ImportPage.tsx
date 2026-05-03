@@ -1,34 +1,33 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
-    importBangumiSubject,
     getCollectionImportTemplate,
     getBangumiSeasonImportJobStatus,
     getImportOverview,
-    previewBangumiSubjectImport,
     getRecordImportTemplate,
     getSubjectImportTemplate,
     previewBangumiSeasonImport,
     startBangumiSeasonImportJob,
-    type BangumiSubjectBatchImportRequest,
     type BangumiSeasonImportRequest,
     type BangumiImportJobStatusResponse,
     type ImportOverviewResponse,
     type ImportTemplateResponse,
 } from '../api/importApi'
 import {
-    importCollections,
-    previewImportCollections,
-    type UserSubjectCollectionBatchImportRequest,
+    enqueueBackgroundJob,
+    registerBackgroundJobUi,
+    waitForBackgroundJob,
+} from '../api/jobApi'
+import {
+    type UserSubjectCollectionImportPreviewResponse,
     type UserSubjectCollectionImportResponse,
 } from '../api/collectionApi'
 import {
-    importRecords,
-    previewImportRecords,
-    type UserSubjectRecordBatchImportRequest,
+    type UserSubjectRecordImportPreviewResponse,
     type UserSubjectRecordImportResponse,
 } from '../api/recordApi'
 import { getApiErrorMessage } from '../api/request'
-import { type SubjectImportResponse } from '../api/subjectApi'
 import {
     bangumiQuarterOptions,
     buildCsvTemplate,
@@ -62,8 +61,101 @@ import GlassCard from '../components/common/GlassCard'
 import PageHero from '../components/layout/PageHero'
 import { quarterTheme } from '../theme/acgnTheme'
 import type { ReleaseQuarter } from '../types/common'
+import { invalidateLibraryRelatedQueries } from '../query/invalidateDataCaches'
+import type { BackgroundJobResponse } from '../api/jobApi'
+import type { SubjectImportPreviewResponse, SubjectImportResponse } from '../api/subjectApi'
+
+function applyImportJobSnapshot(
+    res: BackgroundJobResponse,
+    actions: {
+        setSelectedTarget: (target: ImportTarget) => void
+        setPreview: Dispatch<SetStateAction<PreviewState | null>>
+        setImportResult: Dispatch<SetStateAction<ImportResultState | null>>
+        setExcludedPreviewKeys: Dispatch<SetStateAction<string[]>>
+        setPreviewSelections: Dispatch<SetStateAction<Record<number, number | 'SKIP'>>>
+        setFeedbackMessage: (message: string | null) => void
+    },
+) {
+    if (!res.resultJson) {
+        return
+    }
+
+    const root = JSON.parse(res.resultJson) as Record<string, unknown>
+
+    switch (res.jobType) {
+        case 'BANGUMI_SUBJECT_PREVIEW': {
+            actions.setSelectedTarget('SUBJECT')
+            actions.setPreview({
+                target: 'SUBJECT',
+                data: root.subjectImportPreview as SubjectImportPreviewResponse,
+            })
+            actions.setFeedbackMessage('已完成 sourceId 批量预览，可确认写入')
+            break
+        }
+        case 'COLLECTION_IMPORT_PREVIEW': {
+            actions.setPreview({
+                target: 'COLLECTION',
+                data: root.collectionImportPreview as UserSubjectCollectionImportPreviewResponse,
+            })
+            actions.setFeedbackMessage('收藏导入预览完成')
+            break
+        }
+        case 'RECORD_IMPORT_PREVIEW': {
+            actions.setPreview({
+                target: 'RECORD',
+                data: root.recordImportPreview as UserSubjectRecordImportPreviewResponse,
+            })
+            actions.setFeedbackMessage('记录导入预览完成')
+            break
+        }
+        case 'BANGUMI_SUBJECT_IMPORT': {
+            actions.setSelectedTarget('SUBJECT')
+            actions.setPreview(null)
+            actions.setExcludedPreviewKeys([])
+            actions.setPreviewSelections({})
+            actions.setImportResult({
+                target: 'SUBJECT',
+                data: root.subjectImport as SubjectImportResponse,
+            })
+            actions.setFeedbackMessage(
+                `已导入 ${(root.subjectImport as { importedCount?: number })?.importedCount ?? 0} 条作品`,
+            )
+            break
+        }
+        case 'COLLECTION_IMPORT': {
+            actions.setPreview(null)
+            actions.setExcludedPreviewKeys([])
+            actions.setPreviewSelections({})
+            actions.setImportResult({
+                target: 'COLLECTION',
+                data: root.collectionImport as UserSubjectCollectionImportResponse,
+            })
+            actions.setFeedbackMessage(
+                `已导入 ${(root.collectionImport as { importedCount?: number })?.importedCount ?? 0} 条收藏`,
+            )
+            break
+        }
+        case 'RECORD_IMPORT': {
+            actions.setPreview(null)
+            actions.setExcludedPreviewKeys([])
+            actions.setPreviewSelections({})
+            actions.setImportResult({
+                target: 'RECORD',
+                data: root.recordImport as UserSubjectRecordImportResponse,
+            })
+            actions.setFeedbackMessage(
+                `已导入 ${(root.recordImport as { importedCount?: number })?.importedCount ?? 0} 条记录`,
+            )
+            break
+        }
+        default:
+            break
+    }
+}
 
 function ImportPage() {
+    const queryClient = useQueryClient()
+    const [searchParams, setSearchParams] = useSearchParams()
     const [overview, setOverview] = useState<ImportOverviewResponse | null>(null)
     const [subjectTemplate, setSubjectTemplate] = useState<ImportTemplateResponse | null>(null)
     const [collectionTemplate, setCollectionTemplate] =
@@ -226,6 +318,58 @@ function ImportPage() {
         void loadDocs()
     }, [loadDocs])
 
+    const jobIdFromUrl = searchParams.get('jobId')
+
+    useEffect(() => {
+        if (!jobIdFromUrl) {
+            return undefined
+        }
+
+        let cancelled = false
+
+        void (async () => {
+            try {
+                const res = await waitForBackgroundJob(jobIdFromUrl)
+                if (cancelled) {
+                    return
+                }
+
+                if (res.status === 'FAILED') {
+                    setFeedbackMessage(res.errorMessage || '任务失败')
+                } else {
+                    applyImportJobSnapshot(res, {
+                        setSelectedTarget,
+                        setPreview,
+                        setImportResult,
+                        setExcludedPreviewKeys,
+                        setPreviewSelections,
+                        setFeedbackMessage,
+                    })
+                    invalidateLibraryRelatedQueries(queryClient)
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setFeedbackMessage(getApiErrorMessage(error))
+                }
+            } finally {
+                if (!cancelled) {
+                    setSearchParams(
+                        (prev) => {
+                            const next = new URLSearchParams(prev)
+                            next.delete('jobId')
+                            return next
+                        },
+                        { replace: true },
+                    )
+                }
+            }
+        })()
+
+        return () => {
+            cancelled = true
+        }
+    }, [jobIdFromUrl, queryClient, setSearchParams])
+
     function resetResultState() {
         setPreview(null)
         setExcludedPreviewKeys([])
@@ -253,6 +397,7 @@ function ImportPage() {
                     setExcludedPreviewKeys([])
                     setFeedbackMessage('Bangumi 导入完成')
                 }
+                invalidateLibraryRelatedQueries(queryClient)
                 return
             }
 
@@ -400,25 +545,70 @@ function ImportPage() {
             }
 
             const payload = parseDraftPayload(draftText, selectedMode, selectedTarget)
+            const serializedPayload = JSON.parse(
+                JSON.stringify(payload),
+            ) as Record<string, unknown>
+
             if (selectedTarget === 'SUBJECT') {
-                const response = await previewBangumiSubjectImport(
-                    payload as BangumiSubjectBatchImportRequest,
-                )
-                setPreview({ target: 'SUBJECT', data: response })
-                setFeedbackMessage('已完成 sourceId 批量预览，可确认写入')
+                const { jobId } = await enqueueBackgroundJob({
+                    jobType: 'BANGUMI_SUBJECT_PREVIEW',
+                    payload: serializedPayload,
+                })
+                registerBackgroundJobUi(jobId, { silent: true, title: 'Bangumi sourceId 预览' })
+                const response = await waitForBackgroundJob(jobId)
+                if (response.status === 'FAILED') {
+                    throw new Error(response.errorMessage || '预览失败')
+                }
+
+                applyImportJobSnapshot(response, {
+                    setSelectedTarget,
+                    setPreview,
+                    setImportResult,
+                    setExcludedPreviewKeys,
+                    setPreviewSelections,
+                    setFeedbackMessage,
+                })
                 return
             }
 
             if (selectedTarget === 'COLLECTION') {
-                const response = await previewImportCollections(
-                    payload as UserSubjectCollectionBatchImportRequest,
-                )
-                setPreview({ target: 'COLLECTION', data: response })
+                const { jobId } = await enqueueBackgroundJob({
+                    jobType: 'COLLECTION_IMPORT_PREVIEW',
+                    payload: serializedPayload,
+                })
+                registerBackgroundJobUi(jobId, { silent: true, title: '收藏导入预览' })
+                const response = await waitForBackgroundJob(jobId)
+                if (response.status === 'FAILED') {
+                    throw new Error(response.errorMessage || '预览失败')
+                }
+
+                applyImportJobSnapshot(response, {
+                    setSelectedTarget,
+                    setPreview,
+                    setImportResult,
+                    setExcludedPreviewKeys,
+                    setPreviewSelections,
+                    setFeedbackMessage,
+                })
             } else {
-                const response = await previewImportRecords(
-                    payload as UserSubjectRecordBatchImportRequest,
-                )
-                setPreview({ target: 'RECORD', data: response })
+                const { jobId } = await enqueueBackgroundJob({
+                    jobType: 'RECORD_IMPORT_PREVIEW',
+                    payload: serializedPayload,
+                })
+                registerBackgroundJobUi(jobId, { silent: true, title: '记录导入预览' })
+                const response = await waitForBackgroundJob(jobId)
+                if (response.status === 'FAILED') {
+                    throw new Error(response.errorMessage || '预览失败')
+                }
+
+                applyImportJobSnapshot(response, {
+                    setSelectedTarget,
+                    setPreview,
+                    setImportResult,
+                    setExcludedPreviewKeys,
+                    setPreviewSelections,
+                    setFeedbackMessage,
+                })
             }
         } catch (error) {
             if (previewTimer !== undefined) {
@@ -463,16 +653,34 @@ function ImportPage() {
             }
 
             const rawPayload = parseDraftPayload(draftText, selectedMode, selectedTarget)
+
             if (selectedTarget === 'SUBJECT') {
-                const response = await importBangumiSubject(
-                    rawPayload as BangumiSubjectBatchImportRequest,
-                )
-                setPreview(null)
-                setExcludedPreviewKeys([])
-                setImportResult({ target: 'SUBJECT', data: response })
-                setFeedbackMessage(`已导入 ${response.importedCount} 条作品`)
+                const { jobId } = await enqueueBackgroundJob({
+                    jobType: 'BANGUMI_SUBJECT_IMPORT',
+                    payload: JSON.parse(JSON.stringify(rawPayload)) as Record<string, unknown>,
+                })
+                registerBackgroundJobUi(jobId, {
+                    silent: false,
+                    title: 'Bangumi 作品批量写入',
+                    href: `/import?jobId=${encodeURIComponent(jobId)}`,
+                })
+                const response = await waitForBackgroundJob(jobId)
+                if (response.status === 'FAILED') {
+                    throw new Error(response.errorMessage || '导入失败')
+                }
+
+                applyImportJobSnapshot(response, {
+                    setSelectedTarget,
+                    setPreview,
+                    setImportResult,
+                    setExcludedPreviewKeys,
+                    setPreviewSelections,
+                    setFeedbackMessage,
+                })
+                invalidateLibraryRelatedQueries(queryClient)
                 return
             }
+
             const payload = buildImportPayloadWithSelections(
                 selectedTarget,
                 rawPayload,
@@ -480,24 +688,57 @@ function ImportPage() {
                 previewSelections,
                 excludedPreviewKeys,
             )
+            const serializedPayload = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>
 
             if (selectedTarget === 'COLLECTION') {
-                const response = await importCollections(
-                    payload as UserSubjectCollectionBatchImportRequest,
-                )
-                setPreview(null)
-                setExcludedPreviewKeys([])
-                setImportResult({ target: 'COLLECTION', data: response })
-                setFeedbackMessage(`已导入 ${response.importedCount} 条收藏`)
+                const { jobId } = await enqueueBackgroundJob({
+                    jobType: 'COLLECTION_IMPORT',
+                    payload: serializedPayload,
+                })
+                registerBackgroundJobUi(jobId, {
+                    silent: false,
+                    title: '收藏批量写入',
+                    href: `/import?jobId=${encodeURIComponent(jobId)}`,
+                })
+                const response = await waitForBackgroundJob(jobId)
+                if (response.status === 'FAILED') {
+                    throw new Error(response.errorMessage || '导入失败')
+                }
+
+                applyImportJobSnapshot(response, {
+                    setSelectedTarget,
+                    setPreview,
+                    setImportResult,
+                    setExcludedPreviewKeys,
+                    setPreviewSelections,
+                    setFeedbackMessage,
+                })
             } else {
-                const response = await importRecords(
-                    payload as UserSubjectRecordBatchImportRequest,
-                )
-                setPreview(null)
-                setExcludedPreviewKeys([])
-                setImportResult({ target: 'RECORD', data: response })
-                setFeedbackMessage(`已导入 ${response.importedCount} 条记录`)
+                const { jobId } = await enqueueBackgroundJob({
+                    jobType: 'RECORD_IMPORT',
+                    payload: serializedPayload,
+                })
+                registerBackgroundJobUi(jobId, {
+                    silent: false,
+                    title: '观看记录批量写入',
+                    href: `/import?jobId=${encodeURIComponent(jobId)}`,
+                })
+                const response = await waitForBackgroundJob(jobId)
+                if (response.status === 'FAILED') {
+                    throw new Error(response.errorMessage || '导入失败')
+                }
+
+                applyImportJobSnapshot(response, {
+                    setSelectedTarget,
+                    setPreview,
+                    setImportResult,
+                    setExcludedPreviewKeys,
+                    setPreviewSelections,
+                    setFeedbackMessage,
+                })
             }
+
+            invalidateLibraryRelatedQueries(queryClient)
         } catch (error) {
             setFeedbackMessage(getApiErrorMessage(error))
         } finally {

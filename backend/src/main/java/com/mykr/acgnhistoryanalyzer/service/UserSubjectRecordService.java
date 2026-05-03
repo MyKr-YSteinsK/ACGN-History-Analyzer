@@ -5,6 +5,7 @@ import com.mykr.acgnhistoryanalyzer.entity.Subject;
 import com.mykr.acgnhistoryanalyzer.entity.UserSubjectRecord;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectCollectionRepository;
+import com.mykr.acgnhistoryanalyzer.config.CacheInvalidationService;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordBatchImportRequest;
 import com.mykr.acgnhistoryanalyzer.request.UserSubjectRecordCreateRequest;
@@ -17,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +38,7 @@ public class UserSubjectRecordService {
     private final FranchiseAutoLinkService franchiseAutoLinkService;
     private final ImportSubjectMatchService importSubjectMatchService;
     private final Validator validator;
+    private final CacheInvalidationService cacheInvalidationService;
 
     public UserSubjectRecordService(UserSubjectRecordRepository userSubjectRecordRepository,
                                     UserSubjectCollectionRepository userSubjectCollectionRepository,
@@ -43,7 +46,8 @@ public class UserSubjectRecordService {
                                     TagService tagService,
                                     FranchiseAutoLinkService franchiseAutoLinkService,
                                     ImportSubjectMatchService importSubjectMatchService,
-                                    Validator validator) {
+                                    Validator validator,
+                                    CacheInvalidationService cacheInvalidationService) {
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectCollectionRepository = userSubjectCollectionRepository;
         this.subjectRepository = subjectRepository;
@@ -51,6 +55,7 @@ public class UserSubjectRecordService {
         this.franchiseAutoLinkService = franchiseAutoLinkService;
         this.importSubjectMatchService = importSubjectMatchService;
         this.validator = validator;
+        this.cacheInvalidationService = cacheInvalidationService;
     }
 
     public boolean subjectExists(Long subjectId) {
@@ -82,6 +87,7 @@ public class UserSubjectRecordService {
 
         franchiseAutoLinkService.detectAndLinkForRecordedSubject(subject.getId());
 
+        cacheInvalidationService.invalidateAfterDataMutation();
         return toResponse(savedRecord);
     }
 
@@ -166,12 +172,14 @@ public class UserSubjectRecordService {
             rowNumber++;
         }
 
-        return new UserSubjectRecordImportResponse(
+        UserSubjectRecordImportResponse response = new UserSubjectRecordImportResponse(
                 request.getRecords().size(),
                 importedCount,
                 skippedCount,
                 items
         );
+        cacheInvalidationService.invalidateAfterDataMutation();
+        return response;
     }
 
     public UserSubjectRecordImportPreviewResponse previewImportRecords(UserSubjectRecordBatchImportRequest request) {
@@ -269,6 +277,10 @@ public class UserSubjectRecordService {
                 .toList();
     }
 
+    @Cacheable(
+            cacheNames = "recordPage",
+            key = "#year + '_' + #quarter + '_' + #minScore + '_' + #maxScore + '_' + #category + '_' + #keyword + '_' + #page + '_' + #size + '_' + #sortType"
+    )
     public PageResponse<UserSubjectRecordResponse> getRecordPage(Integer year, Integer quarter,
                                                                  Integer minScore, Integer maxScore,
                                                                  String category, String keyword,
@@ -544,6 +556,7 @@ public class UserSubjectRecordService {
             userSubjectCollectionRepository.deleteBySubjectId(subject.getId());
         }
 
+        cacheInvalidationService.invalidateAfterDataMutation();
         return toResponse(updatedRecord);
     }
 
@@ -553,6 +566,7 @@ public class UserSubjectRecordService {
         }
 
         userSubjectRecordRepository.deleteById(id);
+        cacheInvalidationService.invalidateAfterDataMutation();
         return true;
     }
 

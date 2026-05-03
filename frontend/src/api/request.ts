@@ -42,7 +42,7 @@ function getTransportErrorMessage(error: AxiosError<unknown>) {
     const status = error.response?.status
     const url = error.config?.url ?? ''
     const isLlmRequest = url.includes('/llm/')
-    const isImportRequest = url.includes('/import')
+    const isImportRequest = url.includes('/import') || url.includes('/jobs')
 
     if (status === 502 || status === 503 || status === 504) {
         if (isLlmRequest) {

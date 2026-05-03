@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
     deleteCollection,
     getCollections,
@@ -37,6 +38,8 @@ import {
 } from '../types/common'
 import type { PageResponse } from '../types/api'
 import type { SubjectCardView } from '../types/subject'
+import { invalidateLibraryRelatedQueries } from '../query/invalidateDataCaches'
+import { queryKeys } from '../query/queryKeys'
 
 type CollectionPageState = Pick<
     PageResponse<unknown>,
@@ -110,15 +113,12 @@ function formatCollectionDate(value?: string | null) {
 }
 
 function CollectionsPage() {
-    const [collections, setCollections] = useState<UserSubjectCollectionResponse[]>([])
-    const [pageInfo, setPageInfo] = useState<CollectionPageState>(initialPageState)
+    const queryClient = useQueryClient()
     const [selectedType, setSelectedType] = useState<CollectionType>('WANT')
     const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
     const [keyword, setKeyword] = useState('')
     const [currentPage, setCurrentPage] = useState(0)
-    const [loading, setLoading] = useState(false)
     const [actionLoading, setActionLoading] = useState(false)
-    const [listError, setListError] = useState<string | null>(null)
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [openMenuId, setOpenMenuId] = useState<number | null>(null)
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
@@ -137,42 +137,46 @@ function CollectionsPage() {
         currentPage,
     ].join('-')
 
-    const loadCollections = useCallback(async () => {
-        setLoading(true)
-        setListError(null)
+    const collectionQueryParams = useMemo(
+        () => ({
+            type: selectedType,
+            category: selectedCategory,
+            keyword: keyword.trim() || undefined,
+            page: currentPage,
+            size: GRID_PAGE_SIZE,
+        }),
+        [currentPage, keyword, selectedCategory, selectedType],
+    )
 
-        try {
-            const response = await getCollections({
-                type: selectedType,
-                category: selectedCategory,
-                keyword: keyword.trim() || undefined,
-                page: currentPage,
-                size: GRID_PAGE_SIZE,
-            })
+    const collectionsQuery = useQuery({
+        queryKey: queryKeys.collections(collectionQueryParams),
+        queryFn: () => getCollections(collectionQueryParams),
+        placeholderData: (previousData) => previousData,
+    })
 
-            setCollections(response.content)
-            setPageInfo({
-                page: response.page,
-                size: response.size,
-                totalElements: response.totalElements,
-                totalPages: response.totalPages,
-                first: response.first,
-                last: response.last,
-            })
-        } catch (error) {
-            setCollections([])
-            setPageInfo(initialPageState)
-            setListError(getApiErrorMessage(error))
-        } finally {
-            setLoading(false)
+    const collections = collectionsQuery.data?.content ?? []
+
+    const pageInfo = useMemo<CollectionPageState>(() => {
+        if (!collectionsQuery.data) {
+            return initialPageState
         }
-    }, [currentPage, keyword, selectedCategory, selectedType])
 
-    useEffect(() => {
-        // 收藏夹页只展示想看 / 搁置，切换筛选或分页时重新请求后端分页。
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        void loadCollections()
-    }, [loadCollections])
+        const response = collectionsQuery.data
+        return {
+            page: response.page,
+            size: response.size,
+            totalElements: response.totalElements,
+            totalPages: response.totalPages,
+            first: response.first,
+            last: response.last,
+        }
+    }, [collectionsQuery.data])
+
+    const listError = collectionsQuery.isError
+        ? getApiErrorMessage(collectionsQuery.error)
+        : null
+    const listBlocking = collectionsQuery.isPending && !collectionsQuery.data
+    const listFetching = collectionsQuery.isFetching
 
     function resetPage() {
         setCurrentPage(0)
@@ -241,7 +245,7 @@ function CollectionsPage() {
                 collectionType: targetType,
                 note: collection.note,
             })
-            await loadCollections()
+            invalidateLibraryRelatedQueries(queryClient)
             setFeedbackMessage(targetType === 'WANT' ? '已移至想看' : '已移至搁置')
         } catch (error) {
             setFeedbackMessage(getApiErrorMessage(error))
@@ -260,7 +264,7 @@ function CollectionsPage() {
 
         try {
             await deleteCollection(pendingDelete.id)
-            await loadCollections()
+            invalidateLibraryRelatedQueries(queryClient)
             setPendingDelete(null)
             setFeedbackMessage('已删除收藏')
         } catch (error) {
@@ -282,7 +286,7 @@ function CollectionsPage() {
                 scoreValue: payload.scoreValue,
                 note: payload.note || null,
             })
-            await loadCollections()
+            invalidateLibraryRelatedQueries(queryClient)
             setAddRecordSubject(null)
             setSelectedSubject(await loadSubjectForAction(subject.id))
             setFeedbackMessage('已添加正式记录，作品已从收藏夹移出')
@@ -391,13 +395,13 @@ function CollectionsPage() {
                         </div>
 
                         <div key={resultAnimationKey} className="content-enter">
-                            {loading ? (
+                            {listBlocking ? (
                                 <LoadingGrid cardClassName="h-[410px]" />
                             ) : listError ? (
                                 <ErrorState
                                     title="收藏夹加载失败"
                                     message={listError}
-                                    onRetry={() => void loadCollections()}
+                                    onRetry={() => void collectionsQuery.refetch()}
                                 />
                             ) : collections.length > 0 ? (
                                 <div className="subject-grid">
@@ -437,11 +441,11 @@ function CollectionsPage() {
                             <div className="flex gap-2">
                                 <button
                                     type="button"
-                                    disabled={pageInfo.first || loading}
+                                    disabled={pageInfo.first || listFetching}
                                     onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
                                     className={[
                                         'rounded-2xl border px-4 py-2.5 text-sm font-semibold transition',
-                                        pageInfo.first || loading
+                                        pageInfo.first || listFetching
                                             ? 'cursor-not-allowed border-white/50 bg-white/35 text-slate-300'
                                             : 'border-white/80 bg-white/70 text-slate-600 hover:-translate-y-0.5 hover:bg-white',
                                     ].join(' ')}
@@ -451,7 +455,7 @@ function CollectionsPage() {
 
                                 <button
                                     type="button"
-                                    disabled={pageInfo.last || loading || pageInfo.totalPages === 0}
+                                    disabled={pageInfo.last || listFetching || pageInfo.totalPages === 0}
                                     onClick={() =>
                                         setCurrentPage((page) =>
                                             Math.min(pageInfo.totalPages - 1, page + 1),
@@ -459,7 +463,7 @@ function CollectionsPage() {
                                     }
                                     className={[
                                         'rounded-2xl border px-4 py-2.5 text-sm font-semibold transition',
-                                        pageInfo.last || loading || pageInfo.totalPages === 0
+                                        pageInfo.last || listFetching || pageInfo.totalPages === 0
                                             ? 'cursor-not-allowed border-white/50 bg-white/35 text-slate-300'
                                             : 'border-white/80 bg-white/70 text-slate-600 hover:-translate-y-0.5 hover:bg-white',
                                     ].join(' ')}

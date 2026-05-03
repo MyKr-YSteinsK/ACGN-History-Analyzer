@@ -11,6 +11,7 @@ import com.mykr.acgnhistoryanalyzer.entity.UserSubjectRecord;
 import com.mykr.acgnhistoryanalyzer.repository.FranchiseRepository;
 import com.mykr.acgnhistoryanalyzer.repository.SubjectRepository;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectCollectionRepository;
+import com.mykr.acgnhistoryanalyzer.config.CacheInvalidationService;
 import com.mykr.acgnhistoryanalyzer.repository.UserSubjectRecordRepository;
 import com.mykr.acgnhistoryanalyzer.request.SubjectBatchImportRequest;
 import com.mykr.acgnhistoryanalyzer.request.SubjectCreateRequest;
@@ -24,6 +25,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
@@ -53,6 +55,7 @@ public class SubjectService {
     private final TagService tagService;
     private final CoverStorageService coverStorageService;
     private final Validator validator;
+    private final CacheInvalidationService cacheInvalidationService;
 
     public SubjectService(SubjectRepository subjectRepository,
                           UserSubjectRecordRepository userSubjectRecordRepository,
@@ -62,7 +65,8 @@ public class SubjectService {
                           FranchiseRepository franchiseRepository,
                           TagService tagService,
                           CoverStorageService coverStorageService,
-                          Validator validator) {
+                          Validator validator,
+                          CacheInvalidationService cacheInvalidationService) {
         this.subjectRepository = subjectRepository;
         this.userSubjectRecordRepository = userSubjectRecordRepository;
         this.userSubjectCollectionRepository = userSubjectCollectionRepository;
@@ -72,12 +76,14 @@ public class SubjectService {
         this.tagService = tagService;
         this.coverStorageService = coverStorageService;
         this.validator = validator;
+        this.cacheInvalidationService = cacheInvalidationService;
     }
 
     public SubjectResponse createSubject(SubjectCreateRequest request) {
         Subject subject = buildSubjectFromRequest(request, resolveFranchiseIdForUpdate(request));
         tagService.syncSubjectTags(subject, tagService.resolveAllowedSubjectTagNames(request.getTagNames()));
         Subject savedSubject = subjectRepository.save(subject);
+        cacheInvalidationService.invalidateAfterDataMutation();
         return toResponse(savedSubject);
     }
 
@@ -92,6 +98,10 @@ public class SubjectService {
         return getSubjects(year, quarter, category, keyword, status, sortType, null);
     }
 
+    @Cacheable(
+            cacheNames = "subjectList",
+            key = "#year + '_' + #quarter + '_' + #category + '_' + #keyword + '_' + #status + '_' + #sortType + '_' + #tagName"
+    )
     public List<SubjectResponse> getSubjects(Integer year, Integer quarter,
                                              String category, String keyword,
                                              String status, String sortType,
@@ -118,6 +128,10 @@ public class SubjectService {
         return getSubjectPage(year, quarter, category, keyword, status, page, size, sortType, null);
     }
 
+    @Cacheable(
+            cacheNames = "subjectPage",
+            key = "#year + '_' + #quarter + '_' + #category + '_' + #keyword + '_' + #status + '_' + #page + '_' + #size + '_' + #sortType + '_' + #tagName"
+    )
     public PageResponse<SubjectResponse> getSubjectPage(Integer year, Integer quarter,
                                                         String category, String keyword,
                                                         String status, Integer page,
@@ -281,6 +295,7 @@ public class SubjectService {
         existingSubject.setStatus(request.getStatus());
 
         Subject updatedSubject = subjectRepository.save(existingSubject);
+        cacheInvalidationService.invalidateAfterDataMutation();
         return toResponse(updatedSubject);
     }
 
@@ -295,6 +310,7 @@ public class SubjectService {
 
     public void deleteSubject(Long id) {
         subjectRepository.deleteById(id);
+        cacheInvalidationService.invalidateAfterDataMutation();
     }
 
     public SubjectImportResponse importSubjects(SubjectBatchImportRequest request) {
@@ -433,12 +449,14 @@ public class SubjectService {
             }
         }
 
-        return new SubjectImportResponse(
+        SubjectImportResponse response = new SubjectImportResponse(
                 request.getSubjects().size(),
                 importedCount,
                 skippedCount,
                 items
         );
+        cacheInvalidationService.invalidateAfterDataMutation();
+        return response;
     }
 
     public SubjectImportPreviewResponse previewImportSubjects(SubjectBatchImportRequest request) {

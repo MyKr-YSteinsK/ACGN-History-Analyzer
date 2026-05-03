@@ -5,6 +5,7 @@ import com.mykr.acgnhistoryanalyzer.llm.LlmContextBuilder;
 import com.mykr.acgnhistoryanalyzer.llm.LlmGenerateRequest;
 import com.mykr.acgnhistoryanalyzer.llm.LlmProperties;
 import com.mykr.acgnhistoryanalyzer.llm.LlmPromptService;
+import com.mykr.acgnhistoryanalyzer.llm.cache.LlmAnalysisResultCacheService;
 import com.mykr.acgnhistoryanalyzer.response.LlmAnalysisResponse;
 import com.mykr.acgnhistoryanalyzer.response.LlmConnectionTestResponse;
 import com.mykr.acgnhistoryanalyzer.response.LlmQuestionAnswerResponse;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.function.Supplier;
 
 @Service
 public class LlmAnalysisService {
@@ -21,194 +23,166 @@ public class LlmAnalysisService {
     private final LlmProperties llmProperties;
     private final LlmPromptService llmPromptService;
     private final LlmContextBuilder llmContextBuilder;
+    private final LlmAnalysisResultCacheService llmAnalysisResultCacheService;
 
     public LlmAnalysisService(
             LlmClient llmClient,
             LlmProperties llmProperties,
             LlmPromptService llmPromptService,
-            LlmContextBuilder llmContextBuilder
+            LlmContextBuilder llmContextBuilder,
+            LlmAnalysisResultCacheService llmAnalysisResultCacheService
     ) {
         this.llmClient = llmClient;
         this.llmProperties = llmProperties;
         this.llmPromptService = llmPromptService;
         this.llmContextBuilder = llmContextBuilder;
+        this.llmAnalysisResultCacheService = llmAnalysisResultCacheService;
     }
 
     public LlmAnalysisResponse generateYearlySummary(Integer year, String category) {
         Integer effectiveYear = year == null ? LocalDate.now().getYear() : year;
         String normalizedCategory = normalizeBlankToNull(category);
-        String prompt = llmPromptService.buildYearlySummaryPrompt(effectiveYear, normalizedCategory);
-
-        Map<String, Object> context = llmContextBuilder.buildYearlyContext(effectiveYear, normalizedCategory);
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "YEARLY",
-                prompt,
-                context
-        ));
+        String logicalKey = "YEARLY|" + effectiveYear + "|" + normalizedCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildYearlySummaryPrompt(effectiveYear, normalizedCategory);
+            Map<String, Object> context = llmContextBuilder.buildYearlyContext(effectiveYear, normalizedCategory);
+            return llmClient.generate(new LlmGenerateRequest("YEARLY", prompt, context));
+        });
     }
 
     public LlmAnalysisResponse generateQuarterlySummary(Integer year, Integer quarter, String category) {
         Integer effectiveYear = year == null ? LocalDate.now().getYear() : year;
         Integer effectiveQuarter = normalizeQuarter(quarter);
         String normalizedCategory = normalizeBlankToNull(category);
-        String prompt = llmPromptService.buildQuarterlySummaryPrompt(
-                effectiveYear,
-                effectiveQuarter,
-                normalizedCategory
-        );
-
-        Map<String, Object> context = llmContextBuilder.buildQuarterlyContext(
-                effectiveYear,
-                effectiveQuarter,
-                normalizedCategory
-        );
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "QUARTERLY",
-                prompt,
-                context
-        ));
+        String logicalKey = "QUARTERLY|" + effectiveYear + "|" + effectiveQuarter + "|" + normalizedCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildQuarterlySummaryPrompt(
+                    effectiveYear,
+                    effectiveQuarter,
+                    normalizedCategory
+            );
+            Map<String, Object> context = llmContextBuilder.buildQuarterlyContext(
+                    effectiveYear,
+                    effectiveQuarter,
+                    normalizedCategory
+            );
+            return llmClient.generate(new LlmGenerateRequest("QUARTERLY", prompt, context));
+        });
     }
 
     public LlmAnalysisResponse generateTypePreference(String category) {
         String normalizedCategory = normalizeBlankToNull(category);
-        if (normalizedCategory == null) {
-            normalizedCategory = "ANIME";
-        }
-
-        String prompt = llmPromptService.buildTypePreferencePrompt(normalizedCategory);
-        Map<String, Object> context = llmContextBuilder.buildTypePreferenceContext(normalizedCategory);
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "TYPE_PREFERENCE",
-                prompt,
-                context
-        ));
+        String effectiveCategory = normalizedCategory == null ? "ANIME" : normalizedCategory;
+        String logicalKey = "TYPE_PREFERENCE|" + effectiveCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildTypePreferencePrompt(effectiveCategory);
+            Map<String, Object> context = llmContextBuilder.buildTypePreferenceContext(effectiveCategory);
+            return llmClient.generate(new LlmGenerateRequest("TYPE_PREFERENCE", prompt, context));
+        });
     }
 
     public LlmAnalysisResponse generateScoreStructure(String category) {
         String normalizedCategory = normalizeBlankToNull(category);
-        String prompt = llmPromptService.buildScoreStructurePrompt(normalizedCategory);
-        Map<String, Object> context = llmContextBuilder.buildScoreStructureContext(normalizedCategory);
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "SCORE_STRUCTURE",
-                prompt,
-                context
-        ));
+        String logicalKey = "SCORE_STRUCTURE|" + normalizedCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildScoreStructurePrompt(normalizedCategory);
+            Map<String, Object> context = llmContextBuilder.buildScoreStructureContext(normalizedCategory);
+            return llmClient.generate(new LlmGenerateRequest("SCORE_STRUCTURE", prompt, context));
+        });
     }
 
     public LlmAnalysisResponse generateTagPreference(String category) {
         String normalizedCategory = normalizeBlankToNull(category);
-        String prompt = llmPromptService.buildTagPreferencePrompt(normalizedCategory);
-        Map<String, Object> context = llmContextBuilder.buildTagPreferenceContext(normalizedCategory);
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "TAG_PREFERENCE",
-                prompt,
-                context
-        ));
+        String logicalKey = "TAG_PREFERENCE|" + normalizedCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildTagPreferencePrompt(normalizedCategory);
+            Map<String, Object> context = llmContextBuilder.buildTagPreferenceContext(normalizedCategory);
+            return llmClient.generate(new LlmGenerateRequest("TAG_PREFERENCE", prompt, context));
+        });
     }
 
     public LlmAnalysisResponse generateRecommendations(String category) {
         String normalizedCategory = normalizeBlankToNull(category);
-        String prompt = llmPromptService.buildRecommendationPrompt(normalizedCategory);
-        Map<String, Object> context = llmContextBuilder.buildRecommendationContext(normalizedCategory);
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "RECOMMENDATION",
-                prompt,
-                context
-        ));
+        String logicalKey = "RECOMMENDATION|" + normalizedCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildRecommendationPrompt(normalizedCategory);
+            Map<String, Object> context = llmContextBuilder.buildRecommendationContext(normalizedCategory);
+            return llmClient.generate(new LlmGenerateRequest("RECOMMENDATION", prompt, context));
+        });
     }
 
     public LlmAnalysisResponse generateCollectionBacklog(String category) {
         String normalizedCategory = normalizeBlankToNull(category);
-        String prompt = llmPromptService.buildCollectionBacklogPrompt(normalizedCategory);
-        Map<String, Object> context = llmContextBuilder.buildCollectionBacklogContext(normalizedCategory);
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "COLLECTION_BACKLOG",
-                prompt,
-                context
-        ));
+        String logicalKey = "COLLECTION_BACKLOG|" + normalizedCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildCollectionBacklogPrompt(normalizedCategory);
+            Map<String, Object> context = llmContextBuilder.buildCollectionBacklogContext(normalizedCategory);
+            return llmClient.generate(new LlmGenerateRequest("COLLECTION_BACKLOG", prompt, context));
+        });
     }
 
     public LlmAnalysisResponse generateTasteProfile(String category) {
         String normalizedCategory = normalizeBlankToNull(category);
-        String prompt = llmPromptService.buildTasteProfilePrompt(normalizedCategory);
-        Map<String, Object> context = llmContextBuilder.buildTasteProfileContext(normalizedCategory);
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "TASTE_PROFILE",
-                prompt,
-                context
-        ));
+        String logicalKey = "TASTE_PROFILE|" + normalizedCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildTasteProfilePrompt(normalizedCategory);
+            Map<String, Object> context = llmContextBuilder.buildTasteProfileContext(normalizedCategory);
+            return llmClient.generate(new LlmGenerateRequest("TASTE_PROFILE", prompt, context));
+        });
     }
 
     public LlmAnalysisResponse generatePreferenceContradictions(String category) {
         String normalizedCategory = normalizeBlankToNull(category);
-        String prompt = llmPromptService.buildPreferenceContradictionPrompt(normalizedCategory);
-        Map<String, Object> context = llmContextBuilder.buildPreferenceContradictionContext(normalizedCategory);
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "PREFERENCE_CONTRADICTION",
-                prompt,
-                context
-        ));
+        String logicalKey = "PREFERENCE_CONTRADICTION|" + normalizedCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildPreferenceContradictionPrompt(normalizedCategory);
+            Map<String, Object> context = llmContextBuilder.buildPreferenceContradictionContext(normalizedCategory);
+            return llmClient.generate(new LlmGenerateRequest("PREFERENCE_CONTRADICTION", prompt, context));
+        });
     }
 
     public LlmAnalysisResponse generateInterestTrend(String category) {
         String normalizedCategory = normalizeBlankToNull(category);
-        String prompt = llmPromptService.buildInterestTrendPrompt(normalizedCategory);
-        Map<String, Object> context = llmContextBuilder.buildInterestTrendContext(normalizedCategory);
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "INTEREST_TREND",
-                prompt,
-                context
-        ));
+        String logicalKey = "INTEREST_TREND|" + normalizedCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildInterestTrendPrompt(normalizedCategory);
+            Map<String, Object> context = llmContextBuilder.buildInterestTrendContext(normalizedCategory);
+            return llmClient.generate(new LlmGenerateRequest("INTEREST_TREND", prompt, context));
+        });
     }
 
     public LlmAnalysisResponse generateFranchiseCompletion(String category) {
         String normalizedCategory = normalizeBlankToNull(category);
-        String prompt = llmPromptService.buildFranchiseCompletionPrompt(normalizedCategory);
-        Map<String, Object> context = llmContextBuilder.buildFranchiseCompletionContext(normalizedCategory);
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "FRANCHISE_COMPLETION",
-                prompt,
-                context
-        ));
+        String logicalKey = "FRANCHISE_COMPLETION|" + normalizedCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildFranchiseCompletionPrompt(normalizedCategory);
+            Map<String, Object> context = llmContextBuilder.buildFranchiseCompletionContext(normalizedCategory);
+            return llmClient.generate(new LlmGenerateRequest("FRANCHISE_COMPLETION", prompt, context));
+        });
     }
 
     public LlmAnalysisResponse generateComprehensiveReport(Integer year, String category) {
         Integer effectiveYear = year == null ? LocalDate.now().getYear() : year;
         String normalizedCategory = normalizeBlankToNull(category);
-        String prompt = llmPromptService.buildComprehensiveReportPrompt(effectiveYear, normalizedCategory);
-        Map<String, Object> context = llmContextBuilder.buildComprehensiveReportContext(
-                effectiveYear,
-                normalizedCategory
-        );
-
-        return llmClient.generate(new LlmGenerateRequest(
-                "COMPREHENSIVE_REPORT",
-                prompt,
-                context
-        ));
+        String logicalKey = "COMPREHENSIVE_REPORT|" + effectiveYear + "|" + normalizedCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildComprehensiveReportPrompt(effectiveYear, normalizedCategory);
+            Map<String, Object> context = llmContextBuilder.buildComprehensiveReportContext(
+                    effectiveYear,
+                    normalizedCategory
+            );
+            return llmClient.generate(new LlmGenerateRequest("COMPREHENSIVE_REPORT", prompt, context));
+        });
     }
 
     public LlmQuestionAnswerResponse answerQuestion(String question) {
         String normalizedQuestion = question == null ? "" : question.trim();
-        String prompt = llmPromptService.buildQuestionAnswerPrompt(normalizedQuestion);
-        Map<String, Object> context = llmContextBuilder.buildQuestionAnswerContext(normalizedQuestion);
-
-        return llmClient.answer(new LlmGenerateRequest(
-                "QUESTION_ANSWER",
-                prompt,
-                context
-        ));
+        String logicalKey = "QA|" + normalizedQuestion.substring(0, Math.min(500, normalizedQuestion.length()));
+        return withQaCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildQuestionAnswerPrompt(normalizedQuestion);
+            Map<String, Object> context = llmContextBuilder.buildQuestionAnswerContext(normalizedQuestion);
+            return llmClient.answer(new LlmGenerateRequest("QUESTION_ANSWER", prompt, context));
+        });
     }
 
     public LlmConnectionTestResponse testConnection() {
@@ -227,26 +201,37 @@ public class LlmAnalysisService {
         Integer effectiveYear = year == null ? LocalDate.now().getYear() : year;
         Integer effectiveQuarter = normalizeQuarter(quarter);
         String normalizedCategory = normalizeBlankToNull(category);
-        if (normalizedCategory == null) {
-            normalizedCategory = "ANIME";
-        }
+        String effectiveCategory = normalizedCategory == null ? "ANIME" : normalizedCategory;
+        String logicalKey = "HOME_INSIGHT|" + effectiveYear + "|" + effectiveQuarter + "|" + effectiveCategory;
+        return withAnalysisCache(logicalKey, () -> {
+            String prompt = llmPromptService.buildHomeInsightPrompt(
+                    effectiveYear,
+                    effectiveQuarter,
+                    effectiveCategory
+            );
+            Map<String, Object> context = llmContextBuilder.buildHomeInsightContext(
+                    effectiveYear,
+                    effectiveQuarter,
+                    effectiveCategory
+            );
+            return llmClient.generate(new LlmGenerateRequest("HOME_INSIGHT", prompt, context));
+        });
+    }
 
-        String prompt = llmPromptService.buildHomeInsightPrompt(
-                effectiveYear,
-                effectiveQuarter,
-                normalizedCategory
-        );
-        Map<String, Object> context = llmContextBuilder.buildHomeInsightContext(
-                effectiveYear,
-                effectiveQuarter,
-                normalizedCategory
-        );
+    private LlmAnalysisResponse withAnalysisCache(String logicalKey, Supplier<LlmAnalysisResponse> supplier) {
+        return llmAnalysisResultCacheService.getAnalysis(logicalKey).orElseGet(() -> {
+            LlmAnalysisResponse response = supplier.get();
+            llmAnalysisResultCacheService.putAnalysis(logicalKey, response);
+            return response;
+        });
+    }
 
-        return llmClient.generate(new LlmGenerateRequest(
-                "HOME_INSIGHT",
-                prompt,
-                context
-        ));
+    private LlmQuestionAnswerResponse withQaCache(String logicalKey, Supplier<LlmQuestionAnswerResponse> supplier) {
+        return llmAnalysisResultCacheService.getQuestionAnswer(logicalKey).orElseGet(() -> {
+            LlmQuestionAnswerResponse response = supplier.get();
+            llmAnalysisResultCacheService.putQuestionAnswer(logicalKey, response);
+            return response;
+        });
     }
 
     private String normalizeBlankToNull(String value) {

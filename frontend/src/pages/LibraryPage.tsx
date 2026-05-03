@@ -1,3 +1,4 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { addToPaused, addToWant, deleteCollection } from '../api/collectionApi'
 import { createRecord, deleteRecord, updateRecord } from '../api/recordApi'
@@ -7,8 +8,9 @@ import {
     getSubjectById,
     getSubjectPage,
     type SubjectPageSort,
+    type SubjectStatus,
 } from '../api/subjectApi'
-import { getTags, type TagResponse } from '../api/tagApi'
+import { getTags } from '../api/tagApi'
 import CategorySelector from '../components/common/CategorySelector'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import {
@@ -46,6 +48,8 @@ import {
 } from './library/libraryConstants'
 import type { PendingStatusChange, SubjectPageState, StatusTarget } from './library/libraryTypes'
 import TagFilterBar from './library/TagFilterBar'
+import { invalidateLibraryRelatedQueries } from '../query/invalidateDataCaches'
+import { queryKeys } from '../query/queryKeys'
 
 const initialPageState: SubjectPageState = {
     page: 0,
@@ -57,19 +61,88 @@ const initialPageState: SubjectPageState = {
 }
 
 function LibraryPage() {
-    const [subjects, setSubjects] = useState<SubjectCardView[]>([])
-    const [pageInfo, setPageInfo] = useState<SubjectPageState>(initialPageState)
+    const queryClient = useQueryClient()
     const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
     const [keyword, setKeyword] = useState('')
     const [selectedStatus, setSelectedStatus] = useState<LibraryStatus | 'ALL'>('ALL')
     const [selectedTagName, setSelectedTagName] = useState<string | 'ALL'>('ALL')
-    const [availableTags, setAvailableTags] = useState<TagResponse[]>([])
     const [selectedYear, setSelectedYear] = useState<number | 'ALL'>('ALL')
     const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter | 'ALL'>('ALL')
     const [sort, setSort] = useState<SubjectPageSort>('TITLE_ASC')
     const [currentPage, setCurrentPage] = useState(0)
-    const [listLoading, setListLoading] = useState(false)
-    const [listError, setListError] = useState<string | null>(null)
+    const subjectQueryParams = useMemo(() => {
+        const normalizedKeyword = keyword.trim()
+        const useGlobalKeywordSearch = normalizedKeyword.length > 0
+        const pageStatus: SubjectStatus | LibraryStatus =
+            selectedStatus === 'ALL' ? 'NORMAL' : selectedStatus
+
+        return {
+            category: useGlobalKeywordSearch ? undefined : selectedCategory,
+            keyword: normalizedKeyword || undefined,
+            year:
+                useGlobalKeywordSearch || selectedYear === 'ALL'
+                    ? undefined
+                    : selectedYear,
+            quarter:
+                useGlobalKeywordSearch || selectedQuarter === 'ALL'
+                    ? undefined
+                    : selectedQuarter,
+            status: pageStatus,
+            tagName: selectedTagName === 'ALL' ? undefined : selectedTagName,
+            page: currentPage,
+            size: GRID_PAGE_SIZE,
+            sort,
+        }
+    }, [
+        currentPage,
+        keyword,
+        selectedCategory,
+        selectedQuarter,
+        selectedStatus,
+        selectedTagName,
+        selectedYear,
+        sort,
+    ])
+
+    const subjectsQuery = useQuery({
+        queryKey: queryKeys.subjectPage(subjectQueryParams),
+        queryFn: () => getSubjectPage(subjectQueryParams),
+        placeholderData: (previousData) => previousData,
+    })
+
+    const tagsQuery = useQuery({
+        queryKey: queryKeys.tags(),
+        queryFn: () => getTags(),
+    })
+
+    const subjects = useMemo(
+        () => subjectsQuery.data?.content.map(mapSubjectResponseToCardView) ?? [],
+        [subjectsQuery.data],
+    )
+
+    const pageInfo = useMemo<SubjectPageState>(() => {
+        if (!subjectsQuery.data) {
+            return initialPageState
+        }
+
+        const response = subjectsQuery.data
+        return {
+            page: response.page,
+            size: response.size,
+            totalElements: response.totalElements,
+            totalPages: response.totalPages,
+            first: response.first,
+            last: response.last,
+        }
+    }, [subjectsQuery.data])
+
+    const listError = subjectsQuery.isError
+        ? getApiErrorMessage(subjectsQuery.error)
+        : null
+    const listBlocking = subjectsQuery.isPending && !subjectsQuery.data
+    const listFetching = subjectsQuery.isFetching
+    const availableTags = tagsQuery.data ?? []
+
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
     const [addRecordSubject, setAddRecordSubject] = useState<SubjectCardView | null>(null)
@@ -99,96 +172,32 @@ function LibraryPage() {
         currentPage,
     ].join('-')
 
-    const updateSubjectEverywhere = useCallback((updatedSubject: SubjectCardView) => {
-        setSubjects((current) =>
-            current.map((item) =>
-                item.id === updatedSubject.id ? { ...item, ...updatedSubject } : item,
-            ),
-        )
+    const updateSubjectEverywhere = useCallback(
+        (updatedSubject: SubjectCardView) => {
+            void queryClient.invalidateQueries({ queryKey: ['subjectPage'] })
 
-        setSelectedSubject((current) =>
-            current?.id === updatedSubject.id
-                ? { ...current, ...updatedSubject }
-                : current,
-        )
+            setSelectedSubject((current) =>
+                current?.id === updatedSubject.id
+                    ? { ...current, ...updatedSubject }
+                    : current,
+            )
 
-        setAddRecordSubject((current) =>
-            current?.id === updatedSubject.id
-                ? { ...current, ...updatedSubject }
-                : current,
-        )
-    }, [])
-
-    const loadSubjects = useCallback(async () => {
-        setListLoading(true)
-        setListError(null)
-        const normalizedKeyword = keyword.trim()
-        const useGlobalKeywordSearch = normalizedKeyword.length > 0
-
-        try {
-            const response = await getSubjectPage({
-                category: useGlobalKeywordSearch ? undefined : selectedCategory,
-                keyword: normalizedKeyword || undefined,
-                year:
-                    useGlobalKeywordSearch || selectedYear === 'ALL'
-                        ? undefined
-                        : selectedYear,
-                quarter:
-                    useGlobalKeywordSearch || selectedQuarter === 'ALL'
-                        ? undefined
-                        : selectedQuarter,
-                status: selectedStatus === 'ALL' ? 'NORMAL' : selectedStatus,
-                tagName: selectedTagName === 'ALL' ? undefined : selectedTagName,
-                page: currentPage,
-                size: GRID_PAGE_SIZE,
-                sort,
-            })
-
-            setSubjects(response.content.map(mapSubjectResponseToCardView))
-            setPageInfo({
-                page: response.page,
-                size: response.size,
-                totalElements: response.totalElements,
-                totalPages: response.totalPages,
-                first: response.first,
-                last: response.last,
-            })
-        } catch (error) {
-            setSubjects([])
-            setPageInfo(initialPageState)
-            setListError(getApiErrorMessage(error))
-        } finally {
-            setListLoading(false)
-        }
-    }, [
-        currentPage,
-        keyword,
-        selectedCategory,
-        selectedQuarter,
-        selectedStatus,
-        selectedTagName,
-        selectedYear,
-        sort,
-    ])
+            setAddRecordSubject((current) =>
+                current?.id === updatedSubject.id
+                    ? { ...current, ...updatedSubject }
+                    : current,
+            )
+        },
+        [queryClient],
+    )
 
     useEffect(() => {
-        // 筛选条件或分页变化时，需要同步后端作品分页数据。
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        void loadSubjects()
-    }, [loadSubjects])
-
-    useEffect(() => {
-        async function loadTags() {
-            try {
-                setAvailableTags(await getTags())
-            } catch (error) {
-                setFeedbackMessage(getApiErrorMessage(error, '标签列表加载失败'))
-            }
+        if (!tagsQuery.isError) {
+            return
         }
 
-        // 页面进入时读取标签库，供作品库筛选使用。
-        void loadTags()
-    }, [])
+        setFeedbackMessage(getApiErrorMessage(tagsQuery.error, '标签列表加载失败'))
+    }, [tagsQuery.error, tagsQuery.isError])
 
     const loadSubjectDetail = useCallback(
         async (subjectId: number, showLoading = true) => {
@@ -290,7 +299,7 @@ function LibraryPage() {
             }
 
             await loadSubjectDetail(subject.id, false)
-            await loadSubjects()
+            invalidateLibraryRelatedQueries(queryClient)
             setAddRecordSubject(null)
             setFeedbackMessage(
                 subject.recordId ? '已保存记录修改' : '已添加正式记录，收藏状态已自动更新',
@@ -356,7 +365,7 @@ function LibraryPage() {
             }
 
             await loadSubjectDetail(subject.id, false)
-            await loadSubjects()
+            invalidateLibraryRelatedQueries(queryClient)
 
             if (target === 'NONE') {
                 setFeedbackMessage(
@@ -436,9 +445,6 @@ function LibraryPage() {
 
         try {
             await deleteSubject(subjectToDelete.id)
-            setSubjects((current) =>
-                current.filter((subject) => subject.id !== subjectToDelete.id),
-            )
             setSelectedSubject((current) =>
                 current?.id === subjectToDelete.id ? null : current,
             )
@@ -447,7 +453,7 @@ function LibraryPage() {
             )
             setPendingSubjectDelete(null)
             setFeedbackMessage(`已删除作品《${subjectToDelete.displayTitle}》`)
-            await loadSubjects()
+            invalidateLibraryRelatedQueries(queryClient)
         } catch (error) {
             setFeedbackMessage(getApiErrorMessage(error))
         } finally {
@@ -631,13 +637,13 @@ function LibraryPage() {
                         </div>
 
                         <div key={resultAnimationKey} className="content-enter">
-                            {listLoading ? (
+                            {listBlocking ? (
                                 <LoadingGrid />
                             ) : listError ? (
                                 <ErrorState
                                     title="作品列表加载失败"
                                     message={listError}
-                                    onRetry={() => void loadSubjects()}
+                                    onRetry={() => void subjectsQuery.refetch()}
                                 />
                             ) : subjects.length > 0 ? (
                                 <div className="subject-grid">
@@ -663,11 +669,11 @@ function LibraryPage() {
                             <div className="flex gap-2">
                                 <button
                                     type="button"
-                                    disabled={pageInfo.first || listLoading}
+                                    disabled={pageInfo.first || listFetching}
                                     onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
                                     className={[
                                         'rounded-2xl border px-4 py-2.5 text-sm font-semibold transition',
-                                        pageInfo.first || listLoading
+                                        pageInfo.first || listFetching
                                             ? 'cursor-not-allowed border-white/50 bg-white/35 text-slate-300'
                                             : 'border-white/80 bg-white/70 text-slate-600 hover:-translate-y-0.5 hover:bg-white',
                                     ].join(' ')}
@@ -677,7 +683,7 @@ function LibraryPage() {
 
                                 <button
                                     type="button"
-                                    disabled={pageInfo.last || listLoading || pageInfo.totalPages === 0}
+                                    disabled={pageInfo.last || listFetching || pageInfo.totalPages === 0}
                                     onClick={() =>
                                         setCurrentPage((page) =>
                                             Math.min(pageInfo.totalPages - 1, page + 1),
@@ -685,7 +691,7 @@ function LibraryPage() {
                                     }
                                     className={[
                                         'rounded-2xl border px-4 py-2.5 text-sm font-semibold transition',
-                                        pageInfo.last || listLoading || pageInfo.totalPages === 0
+                                        pageInfo.last || listFetching || pageInfo.totalPages === 0
                                             ? 'cursor-not-allowed border-white/50 bg-white/35 text-slate-300'
                                             : 'border-white/80 bg-white/70 text-slate-600 hover:-translate-y-0.5 hover:bg-white',
                                     ].join(' ')}

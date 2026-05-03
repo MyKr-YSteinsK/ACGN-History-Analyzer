@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
 import {
     getFranchiseById,
     getFranchises,
@@ -31,6 +32,7 @@ import {
     type LibraryStatus,
 } from '../types/common'
 import type { SubjectCardView } from '../types/subject'
+import { queryKeys } from '../query/queryKeys'
 
 type CategoryScope = AcgnCategory | 'ALL'
 
@@ -177,15 +179,42 @@ function sortSubjectsForTimeline(subjects: SubjectCardView[]) {
 }
 
 function FranchisesPage() {
-    const [franchises, setFranchises] = useState<FranchiseDetailResponse[]>([])
     const [selectedFranchiseId, setSelectedFranchiseId] = useState<number | null>(null)
     const [selectedScope, setSelectedScope] = useState<CategoryScope>('ALL')
     const [keyword, setKeyword] = useState('')
-    const [loading, setLoading] = useState(false)
     const [detailLoading, setDetailLoading] = useState(false)
-    const [listError, setListError] = useState<string | null>(null)
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
+
+    const franchisesQuery = useQuery({
+        queryKey: queryKeys.franchisesOverview(),
+        queryFn: async () => {
+            const list = await getFranchises()
+            return Promise.all(list.map((franchise) => getFranchiseById(franchise.id)))
+        },
+    })
+
+    const franchises = franchisesQuery.data ?? []
+    const loading = franchisesQuery.isPending && !franchisesQuery.data
+    const listError = franchisesQuery.isError ? getApiErrorMessage(franchisesQuery.error) : null
+
+    useEffect(() => {
+        const details = franchisesQuery.data
+        if (!details) {
+            return
+        }
+
+        if (details.length === 0) {
+            setSelectedFranchiseId(null)
+            return
+        }
+
+        setSelectedFranchiseId((currentId) =>
+            details.some((franchise) => franchise.id === currentId)
+                ? currentId
+                : details[0]?.id ?? null,
+        )
+    }, [franchisesQuery.data])
 
     const selectedFranchise = useMemo(
         () =>
@@ -271,37 +300,6 @@ function FranchisesPage() {
         [franchises],
     )
 
-    const loadFranchises = useCallback(async () => {
-        setLoading(true)
-        setListError(null)
-
-        try {
-            const list = await getFranchises()
-            const details = await Promise.all(
-                list.map((franchise) => getFranchiseById(franchise.id)),
-            )
-
-            setFranchises(details)
-            setSelectedFranchiseId((currentId) =>
-                details.some((franchise) => franchise.id === currentId)
-                    ? currentId
-                    : details[0]?.id ?? null,
-            )
-        } catch (error) {
-            setFranchises([])
-            setSelectedFranchiseId(null)
-            setListError(getApiErrorMessage(error))
-        } finally {
-            setLoading(false)
-        }
-    }, [])
-
-    useEffect(() => {
-        // 系列页进入时需要从后端拉取列表和详情，再把结果写入页面状态。
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        void loadFranchises()
-    }, [loadFranchises])
-
     async function handleOpenSubject(subject: SubjectCardView) {
         setDetailLoading(true)
         setFeedbackMessage(null)
@@ -310,7 +308,7 @@ function FranchisesPage() {
             const detail = await getSubjectById(subject.id)
             setSelectedSubject(mapSubjectDetailToCardView(detail))
         } catch (error) {
-            setListError(getApiErrorMessage(error))
+            setFeedbackMessage(getApiErrorMessage(error))
         } finally {
             setDetailLoading(false)
         }
@@ -682,7 +680,7 @@ function FranchisesPage() {
                                 <ErrorState
                                     title="系列数据加载失败"
                                     message={listError}
-                                    onRetry={() => void loadFranchises()}
+                                    onRetry={() => void franchisesQuery.refetch()}
                                 />
                             ) : (
                                 <EmptyState
