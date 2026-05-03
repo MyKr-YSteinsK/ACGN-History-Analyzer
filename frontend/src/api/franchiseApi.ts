@@ -32,6 +32,10 @@ export function getFranchises() {
     return apiGet<FranchiseResponse[]>('/franchises')
 }
 
+export function getFranchisesOverview() {
+    return apiGet<FranchiseDetailResponse[]>('/franchises/overview')
+}
+
 export function getFranchiseById(id: number) {
     return apiGet<FranchiseDetailResponse>(`/franchises/${id}`)
 }

@@ -42,6 +42,11 @@ public class FranchiseController {
         return ApiResponse.success(franchises);
     }
 
+    @GetMapping("/overview")
+    public ApiResponse<List<FranchiseDetailResponse>> getFranchisesOverview() {
+        return ApiResponse.success(franchiseService.getAllFranchiseDetailsWithSubjects());
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<?> getFranchiseById(@PathVariable Long id) {
         FranchiseDetailResponse franchise = franchiseService.getFranchiseDetailById(id);

@@ -3,7 +3,15 @@ import {
     getHighScoreRecords,
     type UserSubjectRecordResponse,
 } from '../api/recordApi'
-import { getLlmStatus, testLlmConnection, updateLlmConfig, type LlmAnalysisResponse, type LlmQuestionAnswerResponse, type LlmRecommendationResponse, type LlmStatusResponse } from '../api/llmApi'
+import {
+    getLlmStatus,
+    testLlmConnection,
+    updateLlmConfig,
+    type LlmAnalysisResponse,
+    type LlmAnalysisType,
+    type LlmQuestionAnswerResponse,
+    type LlmStatusResponse,
+} from '../api/llmApi'
 import {
     enqueueBackgroundJob,
     registerBackgroundJobUi,
@@ -25,7 +33,7 @@ import GenerationQueuePanel from '../components/analysis/GenerationQueuePanel'
 import PageHero from '../components/layout/PageHero'
 import { HOME_INSIGHT_CACHE_PREFIX } from '../constants/cacheKeys'
 import { categoryTheme, neutralPanelGradient } from '../theme/acgnTheme'
-import { categoryOrder, getReleaseQuarterLabel, type AcgnCategory, type ReleaseQuarter } from '../types/common'
+import { getReleaseQuarterLabel, type ReleaseQuarter } from '../types/common'
 import type {
     AnalysisMode,
     AnalysisModeMeta,
@@ -41,6 +49,7 @@ import {
     writeJsonCache,
 } from '../utils/localStorageCache'
 import { polishAnalysisText } from '../utils/llmReportFormat'
+import { isAcgnCategory, normalizeLlmAnalysisReport } from '../utils/llmAnalysisNormalize'
 
 type GenerationProgress = {
     percent: number
@@ -338,7 +347,11 @@ function AnalysisPage() {
 
         try {
             const response = await requestAnalysisResponse(job)
-            const normalizedReport = normalizeAnalysisReport(response, job.analysisType)
+            const normalizedReport = normalizeLlmAnalysisReport(
+                response,
+                job.analysisType as LlmAnalysisType,
+                analysisModes.find((item) => item.value === job.analysisType)?.label,
+            )
             const cachedAt = new Date().toISOString()
             writeCachedReport(job.cacheKey, normalizedReport, cachedAt)
             setReportHistory((items) => upsertReportHistory(items, {
@@ -789,7 +802,11 @@ function parseLlmBackgroundJobResult(
         return toQuestionAnswerReport(root.llmQuestionAnswer as LlmQuestionAnswerResponse)
     }
 
-    return normalizeAnalysisReport(root.llmAnalysis as LlmAnalysisResponse, analysisType)
+    return normalizeLlmAnalysisReport(
+        root.llmAnalysis as LlmAnalysisResponse,
+        analysisType as LlmAnalysisType,
+        analysisModes.find((item) => item.value === analysisType)?.label,
+    )
 }
 
 async function requestAnalysisResponse(job: GenerationJob) {
@@ -805,8 +822,10 @@ async function requestAnalysisResponse(job: GenerationJob) {
     })
     const res = await waitForBackgroundJob(jobId)
 
-    if (res.status === 'FAILED') {
-        throw new ApiRequestError(res.errorMessage || '生成失败')
+    if (res.status === 'FAILED' || res.status === 'CANCELLED') {
+        throw new ApiRequestError(
+            res.status === 'CANCELLED' ? '任务已取消' : (res.errorMessage || '生成失败'),
+        )
     }
 
     return parseLlmBackgroundJobResult(res.resultJson, job.analysisType)
@@ -906,7 +925,11 @@ function readCachedReport(cacheKey: string, fallbackType: AnalysisMode) {
     }
 
     return {
-        report: normalizeAnalysisReport(parsed.report, fallbackType),
+        report: normalizeLlmAnalysisReport(
+            parsed.report,
+            fallbackType as LlmAnalysisType,
+            analysisModes.find((item) => item.value === fallbackType)?.label,
+        ),
         cachedAt: parsed.cachedAt,
         expiresAt,
     }
@@ -1018,109 +1041,6 @@ function isHistoryItem(value: unknown): value is ReportHistoryItem {
 
 function isHistoryItemArray(value: unknown): value is ReportHistoryItem[] {
     return Array.isArray(value) && value.every(isHistoryItem)
-}
-
-function normalizeAnalysisReport(
-    report: LlmAnalysisResponse,
-    fallbackType: AnalysisMode,
-): LlmAnalysisResponse {
-    const title = polishAnalysisText(report.title) || analysisModes.find((item) => item.value === fallbackType)?.label || '智能分析报告'
-    const summary = polishAnalysisText(report.summary) || '模型没有返回摘要，系统已保留可用字段并提示重新生成。'
-    const scope = report.scope ?? {
-        year: null,
-        quarter: null,
-        category: null,
-    }
-
-    return {
-        analysisType: report.analysisType || fallbackType,
-        title,
-        summary,
-        keywords: normalizeTextArray(report.keywords, ['智能分析']),
-        sections: normalizeSections(report.sections, summary),
-        recommendations: normalizeRecommendations(report.recommendations),
-        evidence: normalizeTextArray(report.evidence, ['本结果基于系统内结构化数据生成']),
-        warnings: normalizeTextArray(report.warnings, ['模型输出已做前端格式兜底，若结果不完整可重试生成']),
-        scope: {
-            year: scope.year ?? null,
-            quarter: scope.quarter ?? null,
-            category: isAcgnCategory(scope.category) ? scope.category : null,
-        },
-        mockMode: Boolean(report.mockMode),
-        modelName: report.modelName || 'deepseek-v4-flash',
-        generatedAt: report.generatedAt || new Date().toISOString(),
-    }
-}
-
-function normalizeTextArray(value: unknown, fallback: string[]) {
-    if (!Array.isArray(value)) {
-        return fallback
-    }
-
-    const normalized = value
-        .map((item) => polishAnalysisText(String(item ?? '')))
-        .filter(Boolean)
-
-    return normalized.length > 0 ? normalized : fallback
-}
-
-function normalizeSections(value: unknown, summary: string) {
-    if (!Array.isArray(value)) {
-        return [
-            {
-                title: '分析摘要',
-                content: summary,
-            },
-        ]
-    }
-
-    const sections = value
-        .map((item, index) => {
-            const section = item as Partial<LlmAnalysisResponse['sections'][number]>
-            return {
-                title: polishAnalysisText(section.title) || `分析段落 ${index + 1}`,
-                content: polishAnalysisText(section.content) || summary,
-            }
-        })
-        .filter((item) => item.title || item.content)
-
-    return sections.length > 0
-        ? sections
-        : [
-              {
-                  title: '分析摘要',
-                  content: summary,
-              },
-          ]
-}
-
-function normalizeRecommendations(value: unknown): LlmRecommendationResponse[] {
-    if (!Array.isArray(value)) {
-        return []
-    }
-
-    return value
-        .map((item) => item as Partial<LlmRecommendationResponse>)
-        .filter((item) => Boolean(item.title))
-        .map((item) => ({
-            subjectId: item.subjectId ?? null,
-            title: polishAnalysisText(item.title) || '未命名候选',
-            coverUrl: item.coverUrl ?? null,
-            category: isAcgnCategory(item.category) ? item.category : 'ANIME',
-            tags: normalizeTextArray(item.tags, []),
-            franchiseName: polishAnalysisText(item.franchiseName) || null,
-            source: item.source === 'WANT' || item.source === 'PAUSED' ? item.source : 'LIBRARY',
-            reason: polishAnalysisText(item.reason) || '模型未返回推荐理由。',
-            risk: polishAnalysisText(item.risk) || '暂无额外风险提示。',
-            evidence: polishAnalysisText(item.evidence) || '暂无引用依据。',
-            priority: item.priority === 'HIGH' || item.priority === 'MEDIUM' ? item.priority : 'LOW',
-            matchScore: item.matchScore ?? null,
-            platformScore: item.platformScore ?? null,
-        }))
-}
-
-function isAcgnCategory(value: unknown): value is AcgnCategory {
-    return typeof value === 'string' && categoryOrder.includes(value as AcgnCategory)
 }
 
 function toQuestionAnswerReport(response: LlmQuestionAnswerResponse): LlmAnalysisResponse {

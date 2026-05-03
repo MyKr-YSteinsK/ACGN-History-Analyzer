@@ -4,5 +4,6 @@ public enum BackgroundJobStatus {
     PENDING,
     RUNNING,
     SUCCEEDED,
-    FAILED
+    FAILED,
+    CANCELLED
 }

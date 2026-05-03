@@ -16,6 +16,7 @@ public class CacheInvalidationService {
             "homeQuarterDashboard",
             "homeSearch",
             "franchiseList",
+            "franchiseOverview",
             "recordPage",
             "tagList"
     );

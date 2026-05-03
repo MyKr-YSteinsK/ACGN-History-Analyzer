@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-    getHomeInsightAnalysis,
-    type LlmAnalysisResponse,
-} from '../api/llmApi'
-import { getApiErrorMessage } from '../api/request'
+    enqueueBackgroundJob,
+    registerBackgroundJobUi,
+    waitForBackgroundJob,
+} from '../api/jobApi'
+import type { LlmAnalysisResponse } from '../api/llmApi'
+import { ApiRequestError, getApiErrorMessage } from '../api/request'
 import {
     getRecords,
     type UserSubjectRecordResponse,
@@ -38,6 +40,7 @@ import {
 } from '../utils/localStorageCache'
 import { formatRecordRelease, sortRecordsByScoreDesc } from '../utils/recordDisplay'
 import { queryKeys } from '../query/queryKeys'
+import { normalizeLlmAnalysisReport } from '../utils/llmAnalysisNormalize'
 
 type CategoryCount = {
     category: AcgnCategory
@@ -262,14 +265,31 @@ function HomePage() {
         setInsightError(null)
 
         try {
-            const response = await getHomeInsightAnalysis({
-                year: selectedYear,
-                quarter: selectedQuarter,
-                category: selectedCategory,
+            const { jobId } = await enqueueBackgroundJob({
+                jobType: 'LLM_ANALYSIS',
+                payload: {
+                    llmKind: 'HOME_INSIGHT',
+                    year: selectedYear,
+                    quarter: selectedQuarter,
+                    category: selectedCategory,
+                },
             })
+            registerBackgroundJobUi(jobId, { silent: true, title: '首页智能洞察' })
+            const res = await waitForBackgroundJob(jobId)
+            if (res.status === 'FAILED' || res.status === 'CANCELLED') {
+                throw new ApiRequestError(
+                    res.status === 'CANCELLED' ? '任务已取消' : (res.errorMessage || '生成失败'),
+                )
+            }
+            const root = JSON.parse(res.resultJson ?? '{}') as { llmAnalysis?: unknown }
+            const normalized = normalizeLlmAnalysisReport(
+                root.llmAnalysis as LlmAnalysisResponse,
+                'HOME_INSIGHT',
+                '首页智能洞察',
+            )
             const cachedAt = new Date().toISOString()
-            writeHomeInsightCache(homeInsightCacheKey, response, cachedAt)
-            setHomeInsight(response)
+            writeHomeInsightCache(homeInsightCacheKey, normalized, cachedAt)
+            setHomeInsight(normalized)
             setInsightCacheInfo({
                 source: 'fresh',
                 cachedAt,

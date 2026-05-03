@@ -33,4 +33,20 @@ public class BackgroundJobService {
                 .map(BackgroundJobResponse::fromEntity)
                 .orElse(null);
     }
+
+    @Transactional
+    public boolean cancelPending(String id) {
+        return backgroundJobRepository.findById(id)
+                .map(job -> {
+                    if (job.getStatus() != BackgroundJobStatus.PENDING) {
+                        return false;
+                    }
+                    job.setStatus(BackgroundJobStatus.CANCELLED);
+                    job.setMessage("已取消");
+                    job.setProgress(0);
+                    backgroundJobRepository.save(job);
+                    return true;
+                })
+                .orElse(false);
+    }
 }

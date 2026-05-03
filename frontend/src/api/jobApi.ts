@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './request'
+import { apiDelete, apiGet, apiPost } from './request'
 
 export type BackgroundJobType =
     | 'BANGUMI_SUBJECT_PREVIEW'
@@ -9,7 +9,12 @@ export type BackgroundJobType =
     | 'RECORD_IMPORT'
     | 'LLM_ANALYSIS'
 
-export type BackgroundJobStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'
+export type BackgroundJobStatus =
+    | 'PENDING'
+    | 'RUNNING'
+    | 'SUCCEEDED'
+    | 'FAILED'
+    | 'CANCELLED'
 
 export type BackgroundJobResponse = {
     id: string
@@ -60,6 +65,10 @@ export async function getBackgroundJob(jobId: string): Promise<BackgroundJobResp
     return apiGet<BackgroundJobResponse>(`/jobs/${jobId}`)
 }
 
+export async function cancelBackgroundJob(jobId: string): Promise<void> {
+    await apiDelete<string>(`/jobs/${jobId}`)
+}
+
 function dispatchJobSettled(
     jobId: string,
     status: BackgroundJobStatus,
@@ -68,7 +77,7 @@ function dispatchJobSettled(
     const meta = uiMetaByJobId.get(jobId)
     uiMetaByJobId.delete(jobId)
 
-    if (!meta || meta.silent) {
+    if (!meta || meta.silent || status === 'CANCELLED') {
         return
     }
 
@@ -88,7 +97,11 @@ function dispatchJobSettled(
 async function pollUntilTerminal(jobId: string): Promise<BackgroundJobResponse> {
     for (;;) {
         const snapshot = await getBackgroundJob(jobId)
-        if (snapshot.status === 'SUCCEEDED' || snapshot.status === 'FAILED') {
+        if (
+            snapshot.status === 'SUCCEEDED'
+            || snapshot.status === 'FAILED'
+            || snapshot.status === 'CANCELLED'
+        ) {
             dispatchJobSettled(jobId, snapshot.status, snapshot.errorMessage)
             return snapshot
         }

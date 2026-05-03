@@ -1,10 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import {
-    getFranchiseById,
-    getFranchises,
-    type FranchiseDetailResponse,
-} from '../api/franchiseApi'
+import { getFranchisesOverview, type FranchiseDetailResponse } from '../api/franchiseApi'
 import { getApiErrorMessage } from '../api/request'
 import { getSubjectById } from '../api/subjectApi'
 import CoverImage from '../components/common/CoverImage'
@@ -188,10 +184,7 @@ function FranchisesPage() {
 
     const franchisesQuery = useQuery({
         queryKey: queryKeys.franchisesOverview(),
-        queryFn: async () => {
-            const list = await getFranchises()
-            return Promise.all(list.map((franchise) => getFranchiseById(franchise.id)))
-        },
+        queryFn: () => getFranchisesOverview(),
     })
 
     const franchises = franchisesQuery.data ?? []

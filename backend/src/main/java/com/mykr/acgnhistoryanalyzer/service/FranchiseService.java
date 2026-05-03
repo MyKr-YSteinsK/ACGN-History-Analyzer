@@ -18,7 +18,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class FranchiseService {
@@ -63,6 +66,47 @@ public class FranchiseService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * All franchises with subjects in two queries (list + subjects by franchise id in).
+     */
+    @Cacheable(cacheNames = "franchiseOverview")
+    public List<FranchiseDetailResponse> getAllFranchiseDetailsWithSubjects() {
+        List<Franchise> franchises = franchiseRepository.findAll(Sort.by("id").ascending());
+        if (franchises.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> franchiseIds = franchises.stream().map(Franchise::getId).toList();
+        List<Subject> allSubjects = subjectRepository.findByFranchiseIdIn(franchiseIds);
+        Map<Long, List<Subject>> subjectsByFranchiseId = new HashMap<>();
+        for (Subject subject : allSubjects) {
+            Long fid = subject.getFranchiseId();
+            if (fid == null) {
+                continue;
+            }
+            subjectsByFranchiseId.computeIfAbsent(fid, key -> new ArrayList<>()).add(subject);
+        }
+
+        return franchises.stream().map(franchise -> {
+            List<SubjectResponse> subjects = subjectsByFranchiseId
+                    .getOrDefault(franchise.getId(), List.of())
+                    .stream()
+                    .map(this::toSubjectResponse)
+                    .toList();
+
+            return new FranchiseDetailResponse(
+                    franchise.getId(),
+                    franchise.getName(),
+                    franchise.getNameCn(),
+                    franchise.getDescription(),
+                    franchise.getStatus(),
+                    franchise.getCreatedAt(),
+                    franchise.getUpdatedAt(),
+                    subjects
+            );
+        }).toList();
     }
 
     public FranchiseDetailResponse getFranchiseDetailById(Long id) {
