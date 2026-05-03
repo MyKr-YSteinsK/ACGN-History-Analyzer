@@ -32,3 +32,4 @@ Thumbs.db
 uploads/
 /sql/cleanup_duplicate_subjects.sql
 /docs/thesis-demo-route.md
+/backend/src/main/resources/db/indexes.sql
