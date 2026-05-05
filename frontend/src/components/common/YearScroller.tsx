@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 type YearScrollerProps = {
     years: number[]
@@ -10,6 +10,22 @@ const visibleCount = 4
 
 function YearScroller({ years, value, onChange }: YearScrollerProps) {
     const [startIndex, setStartIndex] = useState(0)
+
+    useEffect(() => {
+        if (value === 'ALL') {
+            return
+        }
+        const idx = years.indexOf(value)
+        if (idx < 0) {
+            return
+        }
+        const maxStart = Math.max(0, years.length - visibleCount)
+        const next = Math.min(
+            maxStart,
+            Math.max(0, idx - Math.floor(visibleCount / 2)),
+        )
+        setStartIndex(next)
+    }, [value, years])
 
     const visibleYears = useMemo(() => {
         return years.slice(startIndex, startIndex + visibleCount)

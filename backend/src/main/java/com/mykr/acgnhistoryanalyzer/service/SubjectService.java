@@ -89,20 +89,26 @@ public class SubjectService {
 
     public List<SubjectResponse> getSubjects(Integer year, Integer quarter,
                                              String category, String keyword, String status) {
-        return getSubjects(year, quarter, category, keyword, status, null);
+        return getSubjects(year, null, quarter, category, keyword, status, null, null);
     }
 
     public List<SubjectResponse> getSubjects(Integer year, Integer quarter,
                                              String category, String keyword,
                                              String status, String sortType) {
-        return getSubjects(year, quarter, category, keyword, status, sortType, null);
+        return getSubjects(year, null, quarter, category, keyword, status, sortType, null);
+    }
+
+    public List<SubjectResponse> getSubjects(Integer year, Integer quarter,
+                                             String category, String keyword,
+                                             String status, String sortType, String tagName) {
+        return getSubjects(year, null, quarter, category, keyword, status, sortType, tagName);
     }
 
     @Cacheable(
             cacheNames = "subjectList",
-            key = "#year + '_' + #quarter + '_' + #category + '_' + #keyword + '_' + #status + '_' + #sortType + '_' + #tagName"
+            key = "#year + '_' + #releaseYearBefore + '_' + #quarter + '_' + #category + '_' + #keyword + '_' + #status + '_' + #sortType + '_' + #tagName"
     )
-    public List<SubjectResponse> getSubjects(Integer year, Integer quarter,
+    public List<SubjectResponse> getSubjects(Integer year, Integer releaseYearBefore, Integer quarter,
                                              String category, String keyword,
                                              String status, String sortType,
                                              String tagName) {
@@ -110,7 +116,7 @@ public class SubjectService {
         LibraryStatus libraryStatus = parseLibraryStatus(status);
 
         Specification<Subject> specification =
-                buildSubjectSpecification(year, quarter, category, keyword, subjectStatus, tagName);
+                buildSubjectSpecification(year, releaseYearBefore, quarter, category, keyword, subjectStatus, tagName);
 
         HomeLibrarySortType effectiveSortType = normalizeLibrarySort(sortType);
         Sort sort = buildHomeSubjectSort(effectiveSortType);
@@ -125,14 +131,22 @@ public class SubjectService {
                                                         String category, String keyword,
                                                         String status, Integer page,
                                                         Integer size, String sortType) {
-        return getSubjectPage(year, quarter, category, keyword, status, page, size, sortType, null);
+        return getSubjectPage(year, null, quarter, category, keyword, status, page, size, sortType, null);
+    }
+
+    public PageResponse<SubjectResponse> getSubjectPage(Integer year, Integer quarter,
+                                                        String category, String keyword,
+                                                        String status, Integer page,
+                                                        Integer size, String sortType,
+                                                        String tagName) {
+        return getSubjectPage(year, null, quarter, category, keyword, status, page, size, sortType, tagName);
     }
 
     @Cacheable(
             cacheNames = "subjectPage",
-            key = "#year + '_' + #quarter + '_' + #category + '_' + #keyword + '_' + #status + '_' + #page + '_' + #size + '_' + #sortType + '_' + #tagName"
+            key = "#year + '_' + #releaseYearBefore + '_' + #quarter + '_' + #category + '_' + #keyword + '_' + #status + '_' + #page + '_' + #size + '_' + #sortType + '_' + #tagName"
     )
-    public PageResponse<SubjectResponse> getSubjectPage(Integer year, Integer quarter,
+    public PageResponse<SubjectResponse> getSubjectPage(Integer year, Integer releaseYearBefore, Integer quarter,
                                                         String category, String keyword,
                                                         String status, Integer page,
                                                         Integer size, String sortType,
@@ -144,7 +158,7 @@ public class SubjectService {
         String subjectStatus = isLibraryStatus(status) ? "NORMAL" : status;
 
         Specification<Subject> specification =
-                buildSubjectSpecification(year, quarter, category, keyword, subjectStatus, tagName);
+                buildSubjectSpecification(year, releaseYearBefore, quarter, category, keyword, subjectStatus, tagName);
         Specification<Subject> querySpecification = usesPlatformScoreSort(effectiveSortType)
                 ? specification.and(buildPlatformScoreOrderSpecification(effectiveSortType))
                 : specification;
@@ -1001,11 +1015,14 @@ public class SubjectService {
         };
     }
 
-    private Specification<Subject> buildSubjectSpecification(Integer year, Integer quarter,
+    private Specification<Subject> buildSubjectSpecification(Integer year, Integer releaseYearBefore,
+                                                             Integer quarter,
                                                              String category, String keyword,
                                                              String status, String tagName) {
         return Specification.allOf(
-                SubjectSpecifications.hasReleaseYear(year),
+                releaseYearBefore != null
+                        ? SubjectSpecifications.releaseYearStrictlyBefore(releaseYearBefore)
+                        : SubjectSpecifications.hasReleaseYear(year),
                 SubjectSpecifications.hasReleaseQuarter(quarter),
                 SubjectSpecifications.hasCategory(category),
                 SubjectSpecifications.titleContainsKeyword(keyword),

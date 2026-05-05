@@ -67,6 +67,7 @@ public class SubjectController {
     @GetMapping
     public ApiResponse<List<SubjectResponse>> getSubjects(
             @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer releaseYearBefore,
             @RequestParam(required = false) Integer quarter,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String keyword,
@@ -74,13 +75,23 @@ public class SubjectController {
             @RequestParam(required = false) String tagName
     ) {
         List<SubjectResponse> subjects =
-                subjectService.getSubjects(year, quarter, category, keyword, status, null, tagName);
+                subjectService.getSubjects(
+                        year,
+                        releaseYearBefore,
+                        quarter,
+                        category,
+                        keyword,
+                        status,
+                        null,
+                        tagName
+                );
         return ApiResponse.success(subjects);
     }
 
     @GetMapping("/page")
     public ApiResponse<PageResponse<SubjectResponse>> getSubjectPage(
             @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer releaseYearBefore,
             @RequestParam(required = false) Integer quarter,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String keyword,
@@ -92,7 +103,16 @@ public class SubjectController {
     ) {
         PageResponse<SubjectResponse> response =
                 subjectService.getSubjectPage(
-                        year, quarter, category, keyword, status, page, size, sort, tagName
+                        year,
+                        releaseYearBefore,
+                        quarter,
+                        category,
+                        keyword,
+                        status,
+                        page,
+                        size,
+                        sort,
+                        tagName
                 );
         return ApiResponse.success(response);
     }

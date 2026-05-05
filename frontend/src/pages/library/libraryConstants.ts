@@ -1,7 +1,24 @@
 import type { SubjectPageSort } from '../../api/subjectApi'
 import type { LibraryStatus, ReleaseQuarter } from '../../types/common'
 
-export const yearOptions = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
+/** Inclusive lower bound for discrete year chips (older works use “before” filter). */
+export const LIBRARY_FILTER_YEAR_MIN = 2000
+
+/** Default year when opening 作品库. */
+export const LIBRARY_DEFAULT_YEAR = 2026
+
+/** API: subjects with release_year strictly less than this value. */
+export const LIBRARY_RELEASE_YEAR_BEFORE_EXCLUSIVE = 2000
+
+export const LIBRARY_BEFORE_YEAR_LABEL = '2000 以前'
+
+function buildLibraryYearOptions(): number[] {
+    const max = new Date().getFullYear() + 2
+    const span = Math.max(0, max - LIBRARY_FILTER_YEAR_MIN)
+    return Array.from({ length: span + 1 }, (_, index) => LIBRARY_FILTER_YEAR_MIN + index)
+}
+
+export const yearOptions = buildLibraryYearOptions()
 
 export type LibrarySortOption = {
     value: SubjectPageSort

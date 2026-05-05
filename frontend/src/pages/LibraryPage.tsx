@@ -21,7 +21,9 @@ import {
 } from '../components/common/FeedbackState'
 import FilterPillGroup from '../components/common/FilterPillGroup'
 import GlassCard from '../components/common/GlassCard'
-import YearScroller from '../components/common/YearScroller'
+import LibraryYearFilter, {
+    type LibraryYearFilterValue,
+} from './library/LibraryYearFilter'
 import PageHero from '../components/layout/PageHero'
 import AddRecordModal, {
     type AddRecordPayload,
@@ -41,6 +43,9 @@ import {
 import type { AcgnCategory, LibraryStatus, ReleaseQuarter } from '../types/common'
 import type { SubjectCardView } from '../types/subject'
 import {
+    LIBRARY_BEFORE_YEAR_LABEL,
+    LIBRARY_DEFAULT_YEAR,
+    LIBRARY_RELEASE_YEAR_BEFORE_EXCLUSIVE,
     quarterOptions,
     sortOptions,
     statusOptions,
@@ -66,7 +71,7 @@ function LibraryPage() {
     const [keyword, setKeyword] = useState('')
     const [selectedStatus, setSelectedStatus] = useState<LibraryStatus | 'ALL'>('ALL')
     const [selectedTagName, setSelectedTagName] = useState<string | 'ALL'>('ALL')
-    const [selectedYear, setSelectedYear] = useState<number | 'ALL'>('ALL')
+    const [selectedYear, setSelectedYear] = useState<LibraryYearFilterValue>(LIBRARY_DEFAULT_YEAR)
     const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter | 'ALL'>('ALL')
     const [sort, setSort] = useState<SubjectPageSort>('TITLE_ASC')
     const [currentPage, setCurrentPage] = useState(0)
@@ -76,13 +81,20 @@ function LibraryPage() {
         const pageStatus: SubjectStatus | LibraryStatus =
             selectedStatus === 'ALL' ? 'NORMAL' : selectedStatus
 
+        const isAllYear = selectedYear === 'ALL'
+        const isBefore2000 = selectedYear === 'BEFORE_2000'
+
         return {
             category: useGlobalKeywordSearch ? undefined : selectedCategory,
             keyword: normalizedKeyword || undefined,
             year:
-                useGlobalKeywordSearch || selectedYear === 'ALL'
+                useGlobalKeywordSearch || isAllYear || isBefore2000
                     ? undefined
                     : selectedYear,
+            releaseYearBefore:
+                useGlobalKeywordSearch || isAllYear || !isBefore2000
+                    ? undefined
+                    : LIBRARY_RELEASE_YEAR_BEFORE_EXCLUSIVE,
             quarter:
                 useGlobalKeywordSearch || selectedQuarter === 'ALL'
                     ? undefined
@@ -246,7 +258,7 @@ function LibraryPage() {
         setSelectedTagName(tagName)
     }
 
-    function handleYearChange(year: number | 'ALL') {
+    function handleYearChange(year: LibraryYearFilterValue) {
         resetPage()
         setSelectedYear(year)
     }
@@ -555,10 +567,12 @@ function LibraryPage() {
                                 />
                             </label>
 
-                            <YearScroller
+                            <LibraryYearFilter
                                 years={yearOptions}
                                 value={selectedYear}
                                 onChange={handleYearChange}
+                                beforeBoundYear={LIBRARY_RELEASE_YEAR_BEFORE_EXCLUSIVE}
+                                beforeLabel={LIBRARY_BEFORE_YEAR_LABEL}
                             />
 
                             <FilterPillGroup

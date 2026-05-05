@@ -14,6 +14,18 @@ public class SubjectSpecifications {
         };
     }
 
+    /**
+     * Matches subjects whose {@code releaseYear} is strictly less than the bound (e.g. bound 2000 → 1999 and earlier).
+     */
+    public static Specification<Subject> releaseYearStrictlyBefore(Integer upperExclusive) {
+        return (root, query, criteriaBuilder) -> {
+            if (upperExclusive == null) {
+                return null;
+            }
+            return criteriaBuilder.lessThan(root.get("releaseYear"), upperExclusive);
+        };
+    }
+
     public static Specification<Subject> hasReleaseQuarter(Integer quarter) {
         return (root, query, criteriaBuilder) -> {
             if (quarter == null) {

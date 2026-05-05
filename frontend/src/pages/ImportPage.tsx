@@ -495,6 +495,11 @@ function ImportPage() {
 
         void (async () => {
             try {
+                registerBackgroundJobUi(jobIdFromUrl, {
+                    silent: false,
+                    title: '导入中心任务',
+                    href: '/import',
+                })
                 const res = await waitForBackgroundJob(jobIdFromUrl)
                 if (cancelled) {
                     return
@@ -724,7 +729,11 @@ function ImportPage() {
                     jobType: 'BANGUMI_SUBJECT_PREVIEW',
                     payload: serializedPayload,
                 })
-                registerBackgroundJobUi(jobId, { silent: true, title: 'Bangumi sourceId 预览' })
+                registerBackgroundJobUi(jobId, {
+                    silent: false,
+                    title: 'Bangumi 作品预览',
+                    href: '/import',
+                })
                 const response = await waitForBackgroundJob(jobId)
                 if (response.status !== 'SUCCEEDED') {
                     throw new Error(
@@ -750,7 +759,11 @@ function ImportPage() {
                     jobType: 'COLLECTION_IMPORT_PREVIEW',
                     payload: serializedPayload,
                 })
-                registerBackgroundJobUi(jobId, { silent: true, title: '收藏导入预览' })
+                registerBackgroundJobUi(jobId, {
+                    silent: false,
+                    title: '收藏导入预览',
+                    href: '/import',
+                })
                 const response = await waitForBackgroundJob(jobId)
                 if (response.status !== 'SUCCEEDED') {
                     throw new Error(
@@ -773,7 +786,11 @@ function ImportPage() {
                     jobType: 'RECORD_IMPORT_PREVIEW',
                     payload: serializedPayload,
                 })
-                registerBackgroundJobUi(jobId, { silent: true, title: '记录导入预览' })
+                registerBackgroundJobUi(jobId, {
+                    silent: false,
+                    title: '记录导入预览',
+                    href: '/import',
+                })
                 const response = await waitForBackgroundJob(jobId)
                 if (response.status !== 'SUCCEEDED') {
                     throw new Error(

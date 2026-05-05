@@ -83,6 +83,8 @@ export type SubjectCreateRequest = {
 
 export type SubjectListParams = {
     year?: number
+    /** When set (e.g. 2000), matches subjects with releaseYear strictly less than this value. Omit `year` when using this. */
+    releaseYearBefore?: number
     quarter?: ReleaseQuarter
     category?: AcgnCategory
     keyword?: string

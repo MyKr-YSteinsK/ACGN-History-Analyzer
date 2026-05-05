@@ -1,5 +1,7 @@
 import CoverImage from '../common/CoverImage'
 import StatusBadge from '../common/StatusBadge'
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
     categoryTheme,
     neutralPanelGradient,
@@ -47,6 +49,19 @@ function SubjectDetailDrawer({
                              }: SubjectDetailDrawerProps) {
     useEscapeToClose(open, onClose)
 
+    useEffect(() => {
+        if (!open) {
+            return
+        }
+
+        const originalOverflow = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+
+        return () => {
+            document.body.style.overflow = originalOverflow
+        }
+    }, [open])
+
     if (!open || !subject) {
         return null
     }
@@ -66,16 +81,16 @@ function SubjectDetailDrawer({
     const actionDisabled = statusAction !== null || deleteAction !== null
     const platformDomain = extractPlatformDomain(subject.platformLink)
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+    return createPortal(
+        <div className="fixed inset-0 z-50">
             <button
                 type="button"
                 aria-label="关闭作品详情"
                 onClick={onClose}
-                className="absolute inset-0 bg-slate-900/22 backdrop-blur-[3px]"
+                className="absolute inset-0 bg-slate-900/30 backdrop-blur-md"
             />
 
-            <section className="content-enter relative flex max-h-[calc(100vh-48px)] w-full max-w-[920px] overflow-hidden rounded-[34px] border border-white/75 bg-white/82 shadow-[0_30px_110px_rgba(70,80,110,0.28)] backdrop-blur-2xl">
+            <section className="content-enter fixed left-1/2 top-1/2 z-[1] flex max-h-[calc(100vh-48px)] w-[min(920px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[34px] border border-white/75 bg-white/82 shadow-[0_30px_110px_rgba(70,80,110,0.28)] backdrop-blur-2xl">
                 <div
                     className={[
                         'w-[280px] shrink-0 border-r border-white/65 bg-gradient-to-br p-5',
@@ -419,7 +434,8 @@ function SubjectDetailDrawer({
                     </div>
                 </div>
             </section>
-        </div>
+        </div>,
+        document.body,
     )
 }
 
