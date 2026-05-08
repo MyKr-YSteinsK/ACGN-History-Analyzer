@@ -205,10 +205,13 @@ function LibraryPage() {
 
     useEffect(() => {
         if (!tagsQuery.isError) {
-            return
+            return undefined
         }
 
-        setFeedbackMessage(getApiErrorMessage(tagsQuery.error, '标签列表加载失败'))
+        const timer = window.setTimeout(() => {
+            setFeedbackMessage(getApiErrorMessage(tagsQuery.error, '标签列表加载失败'))
+        }, 0)
+        return () => window.clearTimeout(timer)
     }, [tagsQuery.error, tagsQuery.isError])
 
     const loadSubjectDetail = useCallback(

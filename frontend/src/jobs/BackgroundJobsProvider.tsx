@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router-dom'
-
-type JobSettledDetail = {
-    jobId: string
-    status: string
-    title: string
-    href?: string
-    errorMessage?: string | null
-}
+import {
+    isBackgroundJobSuccess,
+    subscribeBackgroundJobSettled,
+    type BackgroundJobSettledDetail,
+} from './backgroundJobEvents'
 
 type ToastItem = {
     id: string
@@ -37,17 +33,12 @@ export function BackgroundJobsProvider({ children }: { children: ReactNode }) {
     )
 
     useEffect(() => {
-        function onSettled(event: Event) {
-            const custom = event as CustomEvent<JobSettledDetail>
-            const detail = custom.detail
+        function onSettled(detail: BackgroundJobSettledDetail) {
             if (!detail) {
                 return
             }
 
-            const status = String(detail.status ?? '')
-                .trim()
-                .toUpperCase()
-            const ok = status === 'SUCCEEDED'
+            const ok = isBackgroundJobSuccess(detail.status)
             pushToast({
                 tone: ok ? 'success' : 'error',
                 title: ok ? '后台任务完成' : '后台任务失败',
@@ -56,10 +47,7 @@ export function BackgroundJobsProvider({ children }: { children: ReactNode }) {
             })
         }
 
-        window.addEventListener('acgn-background-job-settled', onSettled as EventListener)
-        return () => {
-            window.removeEventListener('acgn-background-job-settled', onSettled as EventListener)
-        }
+        return subscribeBackgroundJobSettled(onSettled)
     }, [pushToast])
 
     const toastStack = (
@@ -84,13 +72,13 @@ export function BackgroundJobsProvider({ children }: { children: ReactNode }) {
                                 {toast.message}
                             </p>
                             {toast.href ? (
-                                <Link
-                                    to={toast.href}
+                                <a
+                                    href={toast.href}
                                     className="mt-2 inline-flex text-xs font-semibold underline decoration-dotted underline-offset-2"
                                     onClick={() => dismissToast(toast.id)}
                                 >
                                     打开相关页面
-                                </Link>
+                                </a>
                             ) : null}
                         </div>
                         <button

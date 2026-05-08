@@ -1,66 +1,99 @@
-# 导入执行手册（Playbook）
+# 导入执行手册
 
-这份手册强调“怎么最快、最稳地完成导入”，用于日常维护和历史补录。
+这份手册面向日常维护和历史补录，强调怎么稳妥完成导入。
 
-## 1. 标准顺序
+## 1. 标准流程
 
-1. 导入作品库（Bangumi）
-2. 导入收藏（WANT / PAUSED）
-3. 导入正式记录（评分 / 备注）
+1. 用 Bangumi 导入作品库
+2. 补录缺失作品的 `sourceId`
+3. 导入收藏清单
+4. 导入正式记录
+5. 检查首页、作品库、记录页和 LLM 分析是否刷新
 
-## 2. 每一步怎么做
-
-### 步骤 A：作品库
+## 2. 作品库
 
 优先使用 Bangumi 季度导入：
 
-- 先 `preview`
-- 检查结果分层（可导入 / 更新 / 错误）
-- 再确认写入
+- 先预览
+- 排除不想写入的条目
+- 确认写入
+- 等待右上角 Toast 或页面内任务状态提示
 
-若有漏抓作品，再用 sourceId 补录导入：
+漏抓作品用 sourceId 补录：
 
 ```json
 {
   "subjects": [
-    { "sourceId": "400602", "releaseYear": 2020, "releaseQuarter": 4 }
+    {
+      "sourceId": "400602",
+      "releaseYear": 2020,
+      "releaseQuarter": 4
+    }
   ]
 }
 ```
 
-### 步骤 B：收藏
+重复作品只更新标签、平台评分和集数。需要改标题、档期、封面、系列时，请在作品详情里手动维护。
 
-使用 `collections` 顶层字段，`collectionType` 只能是 `WANT` / `PAUSED`。
+## 3. 收藏
 
-### 步骤 C：正式记录
+收藏 JSON 顶层字段是 `collections`：
 
-使用 `records` 顶层字段。  
-如果同一作品已有记录，正式导入会执行覆盖更新并返回 `UPDATED`。
+```json
+{
+  "collections": [
+    {
+      "sourceId": "400602",
+      "collectionType": "WANT",
+      "note": "之后补"
+    }
+  ]
+}
+```
 
-## 3. 预览阶段重点关注
+注意：
 
-- `AMBIGUOUS`：必须先人工选候选，再导入
-- `ERROR`：直接看 message 修字段
-- `UPDATED`：确认是你期望覆盖的数据
+- `collectionType` 只能是 `WANT` 或 `PAUSED`
+- 已有正式记录的作品不会再进入收藏
+- 已有收藏的作品会更新类型和备注
 
-## 4. 常见问题速查
+## 4. 正式记录
 
-### 为什么重复作品没更新标题？
+记录 JSON 顶层字段是 `records`：
 
-作品重复导入只更新三项：`tagNames`、`platformScore`、`episodeCount`。
+```json
+{
+  "records": [
+    {
+      "sourceId": "400602",
+      "recordYear": 2024,
+      "recordQuarter": 1,
+      "scoreValue": 47,
+      "note": "补完"
+    }
+  ]
+}
+```
 
-### 为什么收藏被跳过？
+注意：
 
-该作品已有正式记录时，收藏会被规则性跳过。
+- 一作品只保留一条正式记录
+- 已有记录时导入会覆盖更新并返回 `UPDATED`
+- 评分范围由后端 DTO 校验控制，错误行不会阻塞其他行
 
-### 为什么部分行报错但其余行成功？
+## 5. 处理预览结果
 
-导入按行处理，单行失败不阻断整批。
+- `CAN_IMPORT`：可直接导入
+- `UPDATED`：会覆盖已有数据，确认后再导入
+- `AMBIGUOUS`：先选择候选或跳过该行
+- `SKIPPED`：规则性跳过，通常无需重试
+- `ERROR`：根据 message 修正字段
 
-## 5. 快速排障清单
+## 6. 排障清单
 
-1. 先看 preview 的分层结果和逐行 message
-2. 确认必填字段与类型
-3. 检查 `sourceId` 是否有空格或非 Bangumi id
-4. 先处理 `AMBIGUOUS` 候选选择，再执行 import
-
+- 没有 Toast：确认前端构建包含 `BackgroundJobsProvider` 和 `backgroundJobEvents.ts`
+- 导入一直 running：刷新导入页，看 URL 中的 `jobId` 是否能继续轮询
+- 记录/收藏匹配不到作品：优先补 `sourceId`
+- 标题匹配歧义：补 `subjectSeasonIndex`、`subjectPartIndex` 或直接选候选
+- 收藏被跳过：检查该作品是否已有正式记录
+- LLM 结果旧：确认数据写入接口已触发缓存清理

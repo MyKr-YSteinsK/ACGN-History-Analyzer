@@ -132,26 +132,27 @@ function RecordsPage() {
         },
     })
 
-    const records = recordsQuery.data ?? []
+    const records = useMemo(() => recordsQuery.data ?? [], [recordsQuery.data])
 
     const listError = recordsQuery.isError ? getApiErrorMessage(recordsQuery.error) : null
     const listBlocking = recordsQuery.isPending && !recordsQuery.data
 
     useEffect(() => {
         if (!records.length || selectionSeeded.current) {
-            return
+            return undefined
         }
 
         const firstAnimeRecord =
             records.find((record) => record.subjectCategory === 'ANIME') ?? records[0]
-
-        if (firstAnimeRecord) {
-            setSelectedCategory(firstAnimeRecord.subjectCategory ?? 'ANIME')
-            setSelectedYear(firstAnimeRecord.recordYear)
-            setSelectedQuarter(firstAnimeRecord.recordQuarter)
-        }
-
-        selectionSeeded.current = true
+        const frame = window.requestAnimationFrame(() => {
+            if (firstAnimeRecord) {
+                setSelectedCategory(firstAnimeRecord.subjectCategory ?? 'ANIME')
+                setSelectedYear(firstAnimeRecord.recordYear)
+                setSelectedQuarter(firstAnimeRecord.recordQuarter)
+            }
+            selectionSeeded.current = true
+        })
+        return () => window.cancelAnimationFrame(frame)
     }, [records])
 
     const yearOptions = useMemo(() => {

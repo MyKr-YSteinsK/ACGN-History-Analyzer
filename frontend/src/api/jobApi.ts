@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPost } from './request'
+import { emitBackgroundJobSettledToast } from '../jobs/backgroundJobEvents'
 
 export type BackgroundJobType =
     | 'BANGUMI_SUBJECT_PREVIEW'
@@ -48,29 +49,6 @@ function sleep(ms: number) {
     return new Promise<void>((resolve) => {
         window.setTimeout(resolve, ms)
     })
-}
-
-/** Fire the same global toast event used by {@link BackgroundJobsProvider} (for non-/jobs flows too). */
-export function emitBackgroundJobSettledToast(detail: {
-    jobId?: string
-    status: BackgroundJobStatus
-    title: string
-    href?: string
-    errorMessage?: string | null
-}) {
-    const jobId =
-        detail.jobId ?? `toast-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-    window.dispatchEvent(
-        new CustomEvent('acgn-background-job-settled', {
-            detail: {
-                jobId,
-                status: detail.status,
-                title: detail.title,
-                href: detail.href,
-                errorMessage: detail.errorMessage ?? null,
-            },
-        }),
-    )
 }
 
 export function registerBackgroundJobUi(jobId: string, meta: BackgroundJobUiMeta) {

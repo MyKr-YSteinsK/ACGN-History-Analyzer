@@ -1,94 +1,67 @@
 # ACGN History Analyzer
 
-ACGN History Analyzer 是一个用于管理个人 ACGN 历史数据的全栈系统。  
-系统以“作品库”为数据底座，围绕“收藏/正式记录/统计/LLM 分析”构建完整闭环，目标是把历史行为数据转成可解释、可追溯、可执行的复盘结论。
+ACGN History Analyzer 是一个用于整理个人动画、漫画、游戏、小说历史数据的全栈系统。系统以“作品库”为数据底座，围绕“正式记录、收藏状态、系列关系、统计榜单、LLM 分析”构建复盘闭环。
 
-## 功能概览
+## 当前状态
 
-- 作品库：作品主数据管理、状态流转、详情查看、标签与系列关联
-- 正式记录：一作品一条记录，保存评分、记录时间和备注
-- 收藏夹：WANT / PAUSED 清单管理，和正式记录语义分离
-- 导入中心：支持 Bangumi 季度导入、sourceId 补录导入、记录/收藏 JSON/CSV 导入
-- 首页与榜单：季度仪表盘、历史搜索、TOP 视图
-- 智能分析：结构化报告 + 问答 + 推荐 + 趋势分析
-
-## 当前关键行为（2026-05）
-
-- 作品唯一键为 `sourceId`（Bangumi subject id）
-- 作品重复导入只更新三项：`tagNames`、`platformScore`、`episodeCount`
-- 记录/收藏导入定位优先级：`subjectId > sourceId > subjectTitle(+season/part)`
-- 记录导入遇到已存在记录时执行覆盖更新（`UPDATED`），不再跳过
-- 导入预览/结果支持分层状态展示：可导入、更新、歧义待选、跳过、错误
-- 作品库与记录库的关键词搜索是页面级全局搜索（输入关键词后不再受年/月/类型限制）
-
-## 技术栈
-
-- Frontend: React 19 + TypeScript + Vite + TailwindCSS
-- Backend: Java 17 + Spring Boot 3 + Spring Data JPA
+- Frontend: React 19 + TypeScript + Vite + Tailwind CSS v4 + React Query
+- Backend: Java 17 + Spring Boot 3.5 + Spring Data JPA
 - Database: MySQL
-- Integration: Bangumi API, LLM Provider（Mock / Real）
+- Integration: Bangumi API, DeepSeek/Mock LLM
+- Assets: Bangumi 封面会缓存到本地 `uploads/covers`
 
-## 架构总览
+## 核心功能
 
-前端通过 `api/*` 调用后端；后端采用 `controller -> service -> repository -> entity` 分层。  
-LLM 相关能力由独立 `llm/*` 模块负责：上下文构建、Prompt 组装、客户端路由、降级策略。
+- 作品库：作品主数据、标签、系列、封面、平台评分、状态流转
+- 正式记录：一作品一条记录，保存个人评分、记录年月档期、备注
+- 收藏夹：`WANT` / `PAUSED` 清单，与正式记录互斥
+- 导入中心：Bangumi 季度导入、Bangumi sourceId 补录、记录/收藏 JSON 或 CSV 导入
+- 后台任务：通用 `/api/jobs` 支持 sourceId 补录、记录/收藏导入、LLM 分析；Bangumi 季度导入有独立任务接口
+- 首页与榜单：季度仪表盘、搜索、年度高分、TOP 视图
+- 智能分析：结构化报告、问答、推荐、趋势、系列补完分析
 
-### 前端主要目录
+## 关键业务规则
 
-- `frontend/src/pages`: 页面编排（Library/Records/Collections/Import/Analysis 等）
-- `frontend/src/components`: 复用组件
-- `frontend/src/api`: 请求封装与 DTO
-- `frontend/src/mappers`: 后端响应映射
-- `frontend/src/theme`: 视觉主题
-- `frontend/src/utils|hooks|constants|types`: 工具与基础层
+- 作品唯一来源键为 `sourceId`，当前主要对应 Bangumi subject id
+- 作品重复导入只更新 `tagNames`、`platformScore`、`episodeCount`
+- 正式记录一作品最多一条；重复导入执行覆盖更新并返回 `UPDATED`
+- 收藏一作品最多一条；作品已有正式记录时收藏导入会跳过
+- 记录/收藏导入定位优先级：`subjectId > sourceId > subjectTitle(+season/part)`
+- 导入遵循 `preview -> import`；歧义匹配返回 `AMBIGUOUS`，需要前端选择候选
+- 数据写入后会清理读缓存和 LLM 结果缓存
 
-### 后端主要目录
+## 项目结构
 
-- `backend/src/main/java/com/mykr/acgnhistoryanalyzer/controller`
-- `backend/src/main/java/com/mykr/acgnhistoryanalyzer/service`
-- `backend/src/main/java/com/mykr/acgnhistoryanalyzer/repository`
-- `backend/src/main/java/com/mykr/acgnhistoryanalyzer/entity`
-- `backend/src/main/java/com/mykr/acgnhistoryanalyzer/request|response`
-- `backend/src/main/java/com/mykr/acgnhistoryanalyzer/llm`
+```text
+backend/
+  src/main/java/com/mykr/acgnhistoryanalyzer/
+    controller/        REST API
+    service/           核心业务逻辑
+    repository/        JPA 查询
+    entity/            JPA 实体
+    request|response/  DTO
+    job/               通用后台任务
+    llm/               LLM 上下文、Prompt、客户端、结果缓存
+    config/            缓存、静态资源、请求 ID 等
 
-## 导入体系
+frontend/
+  src/
+    api/         API DTO 与请求封装
+    pages/       页面编排
+    components/  复用组件
+    jobs/        后台任务轮询与全局 Toast
+    query/       React Query keys/cache
+    theme/       ACGN 分类、档期、状态视觉主题
+    utils|hooks|types|mappers/
 
-统一流程：`preview -> import`。  
-单行错误不会阻塞整批。
+docs/            开发和导入说明
+sql/             手动维护脚本
+uploads/         本地封面缓存
+```
 
-### 作品库导入
+## 前端设计语言
 
-1. Bangumi 季度导入（支持异步任务）
-2. Bangumi sourceId JSON 补录导入（每行只需 `sourceId + releaseYear + releaseQuarter`）
-
-### 记录/收藏导入
-
-- 支持 JSON / CSV
-- 支持歧义候选返回与人工选择
-- 记录重复项在正式导入阶段执行覆盖更新
-
-## LLM 模块（重点）
-
-LLM 模块不是“通用聊天”，而是“结构化复盘引擎”：
-
-1. 从作品/记录/收藏/标签/系列聚合上下文
-2. 计算统计特征并生成证据（evidence）
-3. 按分析类型构建 Prompt
-4. 调用运行时客户端（mock/real）
-5. 返回结构化结果供前端渲染与追溯
-
-### 支持能力
-
-- 状态与配置：`/api/llm/status`, `/api/llm/config`, `/api/llm/test-connection`
-- 报告分析：yearly、quarterly、type-preference、score-structure、tag-preference、recommendations、collection-backlog、taste-profile、preference-contradictions、interest-trend、franchise-completion、comprehensive-report、home-insight
-- 问答：`GET/POST /api/llm/qa`
-
-### 设计原则
-
-- 先结构化聚合，再让模型生成表达层文本
-- 尽量减少幻觉，增强结果可解释性
-- real 模式失败可降级 mock，保障可用性
-- 运行时配置为内存态，重启后回到启动配置
+整体是浅色玻璃拟态：柔和多色背景、半透明白色面板、大圆角卡片、轻阴影、按 ACGN 分类映射颜色。主题集中在 `frontend/src/theme/acgnTheme.ts`，全局背景和进入动画在 `frontend/src/index.css`。
 
 ## API 分组
 
@@ -97,34 +70,46 @@ LLM 模块不是“通用聊天”，而是“结构化复盘引擎”：
 - `/api/collections/*`
 - `/api/franchises/*`
 - `/api/tags/*`
-- `/api/import/overview`
-- `/api/import/templates/*`
+- `/api/import/*`
 - `/api/import/bangumi/*`
+- `/api/jobs/*`
 - `/api/home/*`
 - `/api/top/*`
 - `/api/options/*`
+- `/api/export/*`
 - `/api/llm/*`
 
 ## 本地运行
 
-### 后端
+后端：
 
-- Windows: `backend/mvnw.cmd spring-boot:run`
-- Unix-like: `backend/mvnw spring-boot:run`
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
+```
 
-常用配置来源：`backend/src/main/resources/application.properties`
+前端：
 
-### 前端
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-- `cd frontend && npm install`
-- `npm run dev`
-- `npm run build`
+构建与检查：
+
+```powershell
+cd frontend
+npm run build
+
+cd ..\backend
+.\mvnw.cmd test
+```
 
 ## 配套文档
 
-- `docs/import-guide.md`：导入规则主规范
-- `docs/import-playbook.md`：导入执行手册
-- `docs/api-integration-guide.md`：接口对接与示例
-- `docs/llm-guide.md`：LLM 模块详解
 - `docs/architecture-overview.md`：架构速查
-
+- `docs/api-integration-guide.md`：接口对接
+- `docs/import-guide.md`：导入规则
+- `docs/import-playbook.md`：导入执行手册
+- `docs/llm-guide.md`：LLM 模块说明

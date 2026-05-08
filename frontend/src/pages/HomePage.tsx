@@ -205,7 +205,7 @@ function HomePage() {
     const [homeInsight, setHomeInsight] = useState<LlmAnalysisResponse | null>(null)
     const [insightCacheInfo, setInsightCacheInfo] = useState<InsightCacheInfo | null>(null)
     const [insightError, setInsightError] = useState<string | null>(null)
-    const [error, setError] = useState<string | null>(null)
+    const [detailError, setDetailError] = useState<string | null>(null)
     const latestSelectionApplied = useRef(false)
 
     const selectedCategoryTheme = categoryTheme[selectedCategory]
@@ -222,30 +222,25 @@ function HomePage() {
         queryFn: () => getRecords(),
     })
 
-    const records = recordsQuery.data ?? []
+    const records = useMemo(() => recordsQuery.data ?? [], [recordsQuery.data])
+    const listError = recordsQuery.isError ? getApiErrorMessage(recordsQuery.error) : null
+    const error = detailError ?? listError
 
     useEffect(() => {
         if (!records.length || latestSelectionApplied.current) {
-            return
+            return undefined
         }
 
         const latestPosition = getLatestRecordPosition(records)
-
-        if (latestPosition) {
-            setSelectedYear(latestPosition.year)
-            setSelectedQuarter(latestPosition.quarter)
-        }
-
-        latestSelectionApplied.current = true
+        const frame = window.requestAnimationFrame(() => {
+            if (latestPosition) {
+                setSelectedYear(latestPosition.year)
+                setSelectedQuarter(latestPosition.quarter)
+            }
+            latestSelectionApplied.current = true
+        })
+        return () => window.cancelAnimationFrame(frame)
     }, [records])
-
-    useEffect(() => {
-        if (recordsQuery.isError) {
-            setError(getApiErrorMessage(recordsQuery.error))
-        } else {
-            setError(null)
-        }
-    }, [recordsQuery.error, recordsQuery.isError])
 
     const listBlocking = recordsQuery.isPending && !recordsQuery.data
 
@@ -321,7 +316,10 @@ function HomePage() {
     }, [homeInsightCacheKey])
 
     useEffect(() => {
-        void loadHomeInsight(false)
+        const timer = window.setTimeout(() => {
+            void loadHomeInsight(false)
+        }, 0)
+        return () => window.clearTimeout(timer)
     }, [loadHomeInsight])
 
     const yearRecords = useMemo(() => {
@@ -449,13 +447,13 @@ function HomePage() {
 
     async function handleOpenDetail(record: UserSubjectRecordResponse) {
         setDetailLoading(true)
-        setError(null)
+        setDetailError(null)
 
         try {
             const detail = await getSubjectById(record.subjectId)
             setSelectedSubject(mapSubjectDetailToCardView(detail))
         } catch (detailError) {
-            setError(getApiErrorMessage(detailError))
+            setDetailError(getApiErrorMessage(detailError))
         } finally {
             setDetailLoading(false)
         }

@@ -182,9 +182,12 @@ function LibraryYearFilter({
 
     useEffect(() => {
         if (value === 'ALL' || value === 'BEFORE_2000') {
-            return
+            return undefined
         }
-        syncStripToYear(value)
+        const frame = window.requestAnimationFrame(() => {
+            syncStripToYear(value)
+        })
+        return () => window.cancelAnimationFrame(frame)
     }, [syncStripToYear, value])
 
     const visibleYears = useMemo(

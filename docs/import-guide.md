@@ -1,47 +1,44 @@
 # ACGN History Analyzer 导入规范
 
-本文档是当前系统导入行为的主规范，覆盖作品库、收藏、正式记录三条导入链路。
+本文是导入行为的主规范，覆盖作品库、收藏、正式记录三条链路。
 
-## 1. 导入边界
+## 1. 推荐顺序
 
-- 作品库：推荐仅通过 Bangumi 导入
-- 收藏夹：支持 JSON / CSV 手动导入
-- 正式记录：支持 JSON / CSV 手动导入
+1. 先导入作品库
+2. 再导入收藏
+3. 最后导入正式记录
 
-说明：作品主数据是全系统的数据底座，常规流程不建议手工拼完整 `subjects` 内容。
+作品库是记录、收藏、统计、LLM 分析的底座。记录和收藏导入都需要先能定位到作品。
 
-## 2. 推荐顺序
+## 2. 统一流程
 
-1. 先导入作品库（Bangumi 季度导入）
-2. 再导入收藏（WANT / PAUSED）
-3. 最后导入正式记录（评分 / 备注）
+导入遵循：
 
-## 3. 统一流程与结果语义
+```text
+preview -> 处理歧义/排除行 -> import -> 刷新缓存
+```
 
-所有导入都遵循 `preview -> import`。  
-单行异常不会阻塞整批。
+单行失败不会阻塞整批。常见结果码：
 
-常见结果码：
+- `CAN_IMPORT`
+- `IMPORTED`
+- `UPDATED`
+- `AMBIGUOUS`
+- `SKIPPED`
+- `ERROR`
 
-- `CAN_IMPORT`：预览可导入
-- `IMPORTED`：正式导入成功
-- `UPDATED`：命中已有数据并执行更新
-- `AMBIGUOUS`：多候选，需要前端先选定
-- `SKIPPED`：规则性跳过
-- `ERROR`：字段或业务校验失败
+## 3. 档期口径
 
-## 4. 月份档期口径
-
-系统统一使用季度索引而非自然月：
+系统使用季度索引表示 ACGN 档期：
 
 - `1` = 一月
 - `2` = 四月
 - `3` = 七月
 - `4` = 十月
 
-## 5. 作品库导入
+## 4. 作品库导入
 
-### 5.1 Bangumi 季度导入（主流程）
+### 4.1 Bangumi 季度导入
 
 接口：
 
@@ -49,63 +46,70 @@
 - `POST /api/import/bangumi/season/import-jobs`
 - `GET /api/import/bangumi/season/import-jobs/{jobId}`
 
-说明：
+支持字段：
 
-- 支持 `includeWeb`、`japaneseOnly`、`excludedSourceIds`
-- 正式导入时会走封面缓存、标签同步、重复检查等完整流程
+- `year`
+- `quarter`
+- `includeWeb`
+- `japaneseOnly`
+- `excludedSourceIds`
 
-### 5.2 Bangumi sourceId 补录导入（补漏）
+正式导入会拉取 Bangumi 数据、缓存封面、同步标签、检查重复并写入作品库。
+
+### 4.2 Bangumi sourceId 补录
 
 接口：
 
 - `POST /api/import/bangumi/subject/preview`
 - `POST /api/import/bangumi/subject/import`
 
-请求体最小字段：
+前端当前优先通过通用 `/api/jobs` 异步执行补录预览和写入。
+
+最小请求：
 
 ```json
 {
   "subjects": [
-    { "sourceId": "400602", "releaseYear": 2020, "releaseQuarter": 4 }
+    {
+      "sourceId": "400602",
+      "releaseYear": 2020,
+      "releaseQuarter": 4
+    }
   ]
 }
 ```
 
-行为：
+## 5. 作品唯一性与重复更新
 
-- 后端按 `sourceId` 去 Bangumi 拉完整作品数据
-- `releaseYear` / `releaseQuarter` 以请求值为准并覆盖
-
-## 6. 作品唯一性与更新边界
-
-作品唯一键：`sourceId`。  
-若命中同 `sourceId`，重复导入只更新：
+作品唯一键按 `sourceId` 处理。命中已有作品时，重复导入只更新：
 
 - `tagNames`
 - `platformScore`
 - `episodeCount`
 
-其他字段（标题、系列、档期、封面等）保持原值。
+标题、档期、封面、系列等字段不会被重复导入覆盖。
 
-## 7. 正式记录导入
+## 6. 正式记录导入
 
 接口：
 
 - `POST /api/records/import/preview`
 - `POST /api/records/import`
 
-顶层字段：`records`。
+顶层字段：`records`
 
 定位优先级：
 
-`subjectId > sourceId > subjectTitle(+subjectSeasonIndex/subjectPartIndex)`
+```text
+subjectId > sourceId > subjectTitle(+subjectSeasonIndex/subjectPartIndex)
+```
 
-关键规则：
+规则：
 
-- `subjectId` / `sourceId` / `subjectTitle` 至少提供一个
-- 标题多命中返回 `AMBIGUOUS`，需前端先选候选
-- 一作品仅保留一条正式记录
-- 若记录已存在，正式导入执行覆盖更新并返回 `UPDATED`（不是跳过）
+- `subjectId`、`sourceId`、`subjectTitle` 至少提供一个
+- 标题多命中返回 `AMBIGUOUS`
+- 一作品只保留一条正式记录
+- 已有记录时正式导入覆盖更新并返回 `UPDATED`
 
 示例：
 
@@ -123,24 +127,26 @@
 }
 ```
 
-## 8. 收藏导入
+## 7. 收藏导入
 
 接口：
 
 - `POST /api/collections/import/preview`
 - `POST /api/collections/import`
 
-顶层字段：`collections`。
+顶层字段：`collections`
 
 定位优先级与正式记录一致：
 
-`subjectId > sourceId > subjectTitle(+subjectSeasonIndex/subjectPartIndex)`
+```text
+subjectId > sourceId > subjectTitle(+subjectSeasonIndex/subjectPartIndex)
+```
 
-关键规则：
+规则：
 
-- `collectionType` 必填，取值 `WANT` / `PAUSED`
-- 若作品已有正式记录，收藏导入会被跳过
-- 若已有收藏记录，正式导入会更新类型和备注
+- `collectionType` 必填，取值 `WANT` 或 `PAUSED`
+- 作品已有正式记录时跳过收藏导入
+- 作品已有收藏时更新清单类型和备注
 
 示例：
 
@@ -156,7 +162,10 @@
 }
 ```
 
+## 8. 后台提示
+
+前端导入中心使用后台任务轮询。任务完成、失败或超时时会通过 `frontend/src/jobs/backgroundJobEvents.ts` 发出全局 Toast，展示在页面右上角。
+
 ## 9. 旧接口说明
 
-`/api/subjects/import*` 仍可用于开发/脚本场景，但不是导入中心推荐路径。  
-日常使用请优先走 `/api/import/bangumi/*`。
+`/api/subjects/import*` 仍可用于开发或脚本场景，但日常作品导入推荐走 `/api/import/bangumi/*`。

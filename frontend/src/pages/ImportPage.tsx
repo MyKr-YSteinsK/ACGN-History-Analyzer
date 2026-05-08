@@ -15,11 +15,11 @@ import {
     type ImportTemplateResponse,
 } from '../api/importApi'
 import {
-    emitBackgroundJobSettledToast,
     enqueueBackgroundJob,
     registerBackgroundJobUi,
     waitForBackgroundJob,
 } from '../api/jobApi'
+import { emitBackgroundJobSettledToast } from '../jobs/backgroundJobEvents'
 import {
     type UserSubjectCollectionImportPreviewResponse,
     type UserSubjectCollectionImportResponse,
@@ -174,13 +174,14 @@ function BangumiRoundtripExportCard() {
                 href: '/import',
             })
         } catch (error) {
+            const message = getApiErrorMessage(error)
             setExportData(null)
-            setExportError(getApiErrorMessage(error))
+            setExportError(message)
             emitBackgroundJobSettledToast({
                 status: 'FAILED',
                 title: 'Bangumi 往返导出失败',
                 href: '/import',
-                errorMessage: getApiErrorMessage(error),
+                errorMessage: message,
             })
         } finally {
             setExportLoading(false)

@@ -125,8 +125,14 @@ function TopPage() {
         placeholderData: (previousData) => previousData,
     })
 
-    const rankingRecords = topQuery.data?.rankingRecords ?? []
-    const scoreBands = topQuery.data?.scoreBands ?? scoreBandConfig.map((band) => ({ ...band, count: 0 }))
+    const rankingRecords = useMemo(
+        () => topQuery.data?.rankingRecords ?? [],
+        [topQuery.data],
+    )
+    const scoreBands = useMemo(
+        () => topQuery.data?.scoreBands ?? scoreBandConfig.map((band) => ({ ...band, count: 0 })),
+        [topQuery.data],
+    )
     const loading = topQuery.isPending && !topQuery.data
     const rankingLoadError = topQuery.isError ? getApiErrorMessage(topQuery.error) : null
 

@@ -187,26 +187,29 @@ function FranchisesPage() {
         queryFn: () => getFranchisesOverview(),
     })
 
-    const franchises = franchisesQuery.data ?? []
+    const franchises = useMemo(() => franchisesQuery.data ?? [], [franchisesQuery.data])
     const loading = franchisesQuery.isPending && !franchisesQuery.data
     const listError = franchisesQuery.isError ? getApiErrorMessage(franchisesQuery.error) : null
 
     useEffect(() => {
         const details = franchisesQuery.data
         if (!details) {
-            return
+            return undefined
         }
 
-        if (details.length === 0) {
-            setSelectedFranchiseId(null)
-            return
-        }
+        const frame = window.requestAnimationFrame(() => {
+            if (details.length === 0) {
+                setSelectedFranchiseId(null)
+                return
+            }
 
-        setSelectedFranchiseId((currentId) =>
-            details.some((franchise) => franchise.id === currentId)
-                ? currentId
-                : details[0]?.id ?? null,
-        )
+            setSelectedFranchiseId((currentId) =>
+                details.some((franchise) => franchise.id === currentId)
+                    ? currentId
+                    : details[0]?.id ?? null,
+            )
+        })
+        return () => window.cancelAnimationFrame(frame)
     }, [franchisesQuery.data])
 
     const selectedFranchise = useMemo(

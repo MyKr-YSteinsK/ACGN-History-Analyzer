@@ -218,10 +218,14 @@ function AnalysisPage() {
         () => buildReportCacheKey(analysisMode, selectedYear, selectedQuarter, selectedCategory, question),
         [analysisMode, question, selectedCategory, selectedQuarter, selectedYear],
     )
-    currentSelectionRef.current = {
-        cacheKey: reportCacheKey,
-        analysisType: analysisMode,
-    }
+
+    useEffect(() => {
+        currentSelectionRef.current = {
+            cacheKey: reportCacheKey,
+            analysisType: analysisMode,
+        }
+    }, [analysisMode, reportCacheKey])
+
     const syncConfigState = useCallback((status: LlmStatusResponse) => {
         setLlmStatus(status)
         setConfigMode(status.mockMode ? 'preview' : 'deepseek')
@@ -248,11 +252,15 @@ function AnalysisPage() {
             return
         }
 
-        setReportHistory((items) => {
-            const nextItems = items.filter((item) => readCachedReport(item.cacheKey, item.analysisType))
-            writeReportHistory(nextItems)
-            return nextItems
-        })
+        const timer = window.setTimeout(() => {
+            setReportHistory((items) => {
+                const nextItems = items.filter((item) => readCachedReport(item.cacheKey, item.analysisType))
+                writeReportHistory(nextItems)
+                return nextItems
+            })
+        }, 0)
+
+        return () => window.clearTimeout(timer)
     }, [])
 
     useEffect(() => {
@@ -278,25 +286,32 @@ function AnalysisPage() {
 
     useEffect(() => {
         if (analysisMode === 'QUESTION_ANSWER' && !question.trim()) {
-            setReport(null)
-            setCacheInfo(null)
-            return
+            const timer = window.setTimeout(() => {
+                setReport(null)
+                setCacheInfo(null)
+            }, 0)
+            return () => window.clearTimeout(timer)
         }
 
         const cached = readCachedReport(reportCacheKey, analysisMode)
         if (cached) {
-            setReport(cached.report)
-            setCacheInfo({
-                source: 'cache',
-                cachedAt: cached.cachedAt,
-                expiresAt: cached.expiresAt,
-            })
-        setError(null)
-            return
+            const timer = window.setTimeout(() => {
+                setReport(cached.report)
+                setCacheInfo({
+                    source: 'cache',
+                    cachedAt: cached.cachedAt,
+                    expiresAt: cached.expiresAt,
+                })
+                setError(null)
+            }, 0)
+            return () => window.clearTimeout(timer)
         }
 
-        setReport(null)
-        setCacheInfo(null)
+        const timer = window.setTimeout(() => {
+            setReport(null)
+            setCacheInfo(null)
+        }, 0)
+        return () => window.clearTimeout(timer)
     }, [analysisMode, question, reportCacheKey])
 
     useEffect(() => {
@@ -320,8 +335,10 @@ function AnalysisPage() {
         }
 
         if (analysisMode === 'QUESTION_ANSWER') {
-            setHighScoreRecords([])
-            return
+            const timer = window.setTimeout(() => {
+                setHighScoreRecords([])
+            }, 0)
+            return () => window.clearTimeout(timer)
         }
 
         void loadHighScoreRecords()
@@ -436,7 +453,10 @@ function AnalysisPage() {
             return
         }
 
-        void runGenerationJob(nextJob)
+        const timer = window.setTimeout(() => {
+            void runGenerationJob(nextJob)
+        }, 0)
+        return () => window.clearTimeout(timer)
     }, [generationJobs, runGenerationJob])
 
     const generateReport = useCallback(() => {
@@ -462,8 +482,8 @@ function AnalysisPage() {
             analysisType: analysisMode,
             modeLabel: activeMode.label,
             scope: scopeText,
-                            year: selectedYear,
-                            quarter: selectedQuarter,
+            year: selectedYear,
+            quarter: selectedQuarter,
             category: selectedCategory,
             question: question.trim(),
             status: 'queued',

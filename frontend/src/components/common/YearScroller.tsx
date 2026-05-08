@@ -13,18 +13,21 @@ function YearScroller({ years, value, onChange }: YearScrollerProps) {
 
     useEffect(() => {
         if (value === 'ALL') {
-            return
+            return undefined
         }
         const idx = years.indexOf(value)
         if (idx < 0) {
-            return
+            return undefined
         }
         const maxStart = Math.max(0, years.length - visibleCount)
         const next = Math.min(
             maxStart,
             Math.max(0, idx - Math.floor(visibleCount / 2)),
         )
-        setStartIndex(next)
+        const frame = window.requestAnimationFrame(() => {
+            setStartIndex(next)
+        })
+        return () => window.cancelAnimationFrame(frame)
     }, [value, years])
 
     const visibleYears = useMemo(() => {

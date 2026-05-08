@@ -1,77 +1,89 @@
 # ACGN History Analyzer LLM 模块指南
 
-本文档描述 LLM 子系统的真实职责、调用链、输入输出契约和故障策略。
+LLM 模块用于把结构化历史数据转成可解释分析结论。它不是通用聊天入口，而是面向个人 ACGN 历史数据的分析引擎。
 
-## 1. 定位
+## 1. 后端调用链
 
-LLM 模块用于把结构化行为数据（作品、记录、收藏、标签、系列）转成可解释分析结论。  
-它不是通用闲聊模块，而是“面向个人历史数据的分析引擎”。
+```text
+LlmAnalysisController
+  -> LlmAnalysisService
+      -> LlmAnalysisResultCacheService
+      -> LlmContextBuilder
+      -> LlmPromptService
+      -> RuntimeSwitchingLlmClient
+          -> MockLlmClient / RealLlmClient
+```
+
+`AnalysisPage` 也可以通过通用 `/api/jobs` 以 `LLM_ANALYSIS` 后台任务方式生成报告。
 
 ## 2. 能力范围
 
 接口前缀：`/api/llm`
 
-- 状态与配置：`/status`, `/config`, `/test-connection`
-- 分析报告：`/analysis/*`
+- 状态：`GET /status`
+- 配置：`POST /config`
+- 连接测试：`POST /test-connection`
+- 分析报告：`GET/POST /analysis/*`
 - 问答：`GET/POST /qa`
 
-分析类型包含：
+分析类型：
 
-- yearly, quarterly
-- type-preference, score-structure, tag-preference
-- recommendations, collection-backlog
-- taste-profile, preference-contradictions, interest-trend
-- franchise-completion, comprehensive-report, home-insight
+- `yearly`
+- `quarterly`
+- `type-preference`
+- `score-structure`
+- `tag-preference`
+- `recommendations`
+- `collection-backlog`
+- `taste-profile`
+- `preference-contradictions`
+- `interest-trend`
+- `franchise-completion`
+- `comprehensive-report`
+- `home-insight`
 
-## 3. 后端调用链
+## 3. 上下文构建
 
-```text
-LlmAnalysisController
-  -> LlmAnalysisService
-      -> LlmContextBuilder
-      -> LlmPromptService
-      -> RuntimeSwitchingLlmClient
-           -> MockLlmClient / RealLlmClient
-```
+`LlmContextBuilder` 会聚合：
 
-职责：
+- 正式记录
+- 作品信息
+- 收藏清单
+- 标签
+- 系列
+- 评分分布
+- 年度/季度趋势
+- 推荐候选
+- evidence 文本
 
-- `LlmContextBuilder`：生成可推理上下文和证据
-- `LlmPromptService`：按分析类型组织提示词与约束
-- `RuntimeSwitchingLlmClient`：运行时路由 mock / real
+目标是先用代码形成可推理结构，再让模型负责表达和总结，降低幻觉。
 
-## 4. 上下文构建策略
+## 4. 返回契约
 
-核心流程：
-
-1. 参数归一化（年、档期、类型）
-2. 聚合业务数据（记录、作品、收藏、系列、标签）
-3. 计算统计信号（评分分布、偏好权重、趋势特征）
-4. 生成 evidence（供前端展示与追溯）
-5. 输出给 Prompt 层
-
-目标：减少幻觉，增强可解释性和稳定性。
-
-## 5. 返回契约
-
-报告类输出（`LlmAnalysisResponse`）关键字段：
+报告返回 `LlmAnalysisResponse`：
 
 - `analysisType`
-- `title`, `summary`
+- `title`
+- `summary`
 - `keywords`
 - `sections`
 - `recommendations`
 - `evidence`
 - `warnings`
 - `scope`
-- `mockMode`, `modelName`, `generatedAt`
+- `mockMode`
+- `modelName`
+- `generatedAt`
 
-问答类输出（`LlmQuestionAnswerResponse`）关键字段：
+问答返回 `LlmQuestionAnswerResponse`：
 
-- `question`, `answer`
-- `mockMode`, `modelName`, `generatedAt`
+- `question`
+- `answer`
+- `mockMode`
+- `modelName`
+- `generatedAt`
 
-## 6. 配置与运行模式
+## 5. 配置
 
 启动配置来源：`backend/src/main/resources/application.properties`
 
@@ -80,30 +92,50 @@ LlmAnalysisController
 - `app.llm.enabled`
 - `app.llm.provider`
 - `app.llm.base-url`
-- `app.llm.api-key`（可由 `DEEPSEEK_API_KEY` 注入）
+- `app.llm.api-key`
 - `app.llm.model`
-- `app.llm.timeout-millis`
+- `app.llm.timeout-seconds`
 - `app.llm.temperature`
 - `app.llm.max-tokens`
+- `app.llm.cache-content-version`
+- `app.llm.result-cache-days`
 
 运行时通过 `POST /api/llm/config` 切换：
 
-- `previewMode=true`：强制 mock
-- `previewMode=false`：走 real（需有效 provider/baseUrl/apiKey/model）
+```json
+{
+  "previewMode": true,
+  "baseUrl": "https://api.deepseek.com",
+  "apiKey": "sk-***",
+  "model": "deepseek-v4-flash",
+  "timeoutSeconds": 30,
+  "temperature": 0.4,
+  "maxTokens": 3000
+}
+```
 
-运行时配置是内存态，重启后回到启动配置。
+`previewMode=true` 强制使用 mock。运行时配置是内存态，重启后回到启动配置。
 
-## 7. 失败与降级
+## 6. 缓存与失效
 
-- real 调用支持重试（典型限流/5xx场景）
-- 返回 JSON 不规整时会做清洗/回退
-- real 失败可降级到 mock（保证功能可用）
-- 异常统一映射为标准业务错误响应
+LLM 结果缓存位于数据库表对应的 `LlmAnalysisResultCacheEntity`。缓存 key 由结果类型、逻辑 key、模型、mock/real 模式、内容版本构成。
 
-## 8. 前端消费策略（AnalysisPage）
+数据写入后，`CacheInvalidationService` 会清理 LLM 结果缓存。修改 prompt 逻辑或上下文结构时，可以提高 `app.llm.cache-content-version` 让旧缓存自然失效。
 
-- 分析报告与问答分流
-- 本地缓存报告与历史问答
-- 请求失败时优先回退缓存
-- UI 展示 evidence/warnings，保证结果可追溯
+## 7. 失败策略
 
+- real client 会校验 provider/baseUrl/apiKey/model
+- real 调用遇到限流或 5xx 会重试
+- 模型返回 JSON 不规整时会尝试清洗和文本 fallback
+- real 失败时可降级为 mock，并在 `warnings` 中说明
+
+## 8. 前端消费
+
+`AnalysisPage` 负责：
+
+- 选择分析类型、年份、季度、分类
+- 发起后台 LLM 任务
+- 展示生成进度
+- 缓存报告和问答历史到 localStorage
+- 展示 evidence、warnings、recommendations
+- 任务完成后通过全局 Toast 提示

@@ -1,10 +1,13 @@
 import AppRouter from './routes/AppRouter'
 import ErrorBoundary from './components/common/ErrorBoundary'
+import { BackgroundJobsProvider } from './jobs/BackgroundJobsProvider'
 
 function App() {
   return (
     <ErrorBoundary>
-      <AppRouter />
+      <BackgroundJobsProvider>
+        <AppRouter />
+      </BackgroundJobsProvider>
     </ErrorBoundary>
   )
 }
