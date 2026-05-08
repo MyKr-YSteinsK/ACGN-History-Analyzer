@@ -40,6 +40,7 @@ import {
 import type { SubjectCardView } from '../types/subject'
 import { invalidateLibraryRelatedQueries } from '../query/invalidateDataCaches'
 import { queryKeys } from '../query/queryKeys'
+import { usePersistentState } from '../hooks/usePersistentState'
 
 type SortOption = {
     value: RecordPageSort
@@ -107,13 +108,25 @@ function getReleaseMonthText(record: UserSubjectRecordResponse) {
 
 function RecordsPage() {
     const queryClient = useQueryClient()
-    const selectionSeeded = useRef(false)
+    const selectionSeeded = useRef(true)
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
-    const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-    const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(getCurrentReleaseQuarter())
-    const [keyword, setKeyword] = useState('')
-    const [sort, setSort] = useState<RecordPageSort>('TITLE_ASC')
+    const [selectedCategory, setSelectedCategory] = usePersistentState<AcgnCategory>(
+        'acgn.records.selectedCategory',
+        'ANIME',
+    )
+    const [selectedYear, setSelectedYear] = usePersistentState(
+        'acgn.records.selectedYear',
+        () => new Date().getFullYear(),
+    )
+    const [selectedQuarter, setSelectedQuarter] = usePersistentState<ReleaseQuarter>(
+        'acgn.records.selectedQuarter',
+        getCurrentReleaseQuarter,
+    )
+    const [keyword, setKeyword] = usePersistentState('acgn.records.keyword', '')
+    const [sort, setSort] = usePersistentState<RecordPageSort>(
+        'acgn.records.sort',
+        'TITLE_ASC',
+    )
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
     const [addRecordSubject, setAddRecordSubject] = useState<SubjectCardView | null>(null)
     const [detailLoading, setDetailLoading] = useState(false)
@@ -153,7 +166,7 @@ function RecordsPage() {
             selectionSeeded.current = true
         })
         return () => window.cancelAnimationFrame(frame)
-    }, [records])
+    }, [records, setSelectedCategory, setSelectedQuarter, setSelectedYear])
 
     const yearOptions = useMemo(() => {
         return Array.from(new Set(records.map((record) => record.recordYear))).sort(

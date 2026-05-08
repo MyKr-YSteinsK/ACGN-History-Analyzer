@@ -52,6 +52,7 @@ import {
     yearOptions,
 } from './library/libraryConstants'
 import type { PendingStatusChange, SubjectPageState, StatusTarget } from './library/libraryTypes'
+import { usePersistentState } from '../hooks/usePersistentState'
 import TagFilterBar from './library/TagFilterBar'
 import { invalidateLibraryRelatedQueries } from '../query/invalidateDataCaches'
 import { queryKeys } from '../query/queryKeys'
@@ -67,14 +68,32 @@ const initialPageState: SubjectPageState = {
 
 function LibraryPage() {
     const queryClient = useQueryClient()
-    const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
-    const [keyword, setKeyword] = useState('')
-    const [selectedStatus, setSelectedStatus] = useState<LibraryStatus | 'ALL'>('ALL')
-    const [selectedTagName, setSelectedTagName] = useState<string | 'ALL'>('ALL')
-    const [selectedYear, setSelectedYear] = useState<LibraryYearFilterValue>(LIBRARY_DEFAULT_YEAR)
-    const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter | 'ALL'>('ALL')
-    const [sort, setSort] = useState<SubjectPageSort>('TITLE_ASC')
-    const [currentPage, setCurrentPage] = useState(0)
+    const [selectedCategory, setSelectedCategory] = usePersistentState<AcgnCategory>(
+        'acgn.library.selectedCategory',
+        'ANIME',
+    )
+    const [keyword, setKeyword] = usePersistentState('acgn.library.keyword', '')
+    const [selectedStatus, setSelectedStatus] = usePersistentState<LibraryStatus | 'ALL'>(
+        'acgn.library.selectedStatus',
+        'ALL',
+    )
+    const [selectedTagName, setSelectedTagName] = usePersistentState<string | 'ALL'>(
+        'acgn.library.selectedTagName',
+        'ALL',
+    )
+    const [selectedYear, setSelectedYear] = usePersistentState<LibraryYearFilterValue>(
+        'acgn.library.selectedYear',
+        LIBRARY_DEFAULT_YEAR,
+    )
+    const [selectedQuarter, setSelectedQuarter] = usePersistentState<ReleaseQuarter | 'ALL'>(
+        'acgn.library.selectedQuarter',
+        'ALL',
+    )
+    const [sort, setSort] = usePersistentState<SubjectPageSort>(
+        'acgn.library.sort',
+        'TITLE_ASC',
+    )
+    const [currentPage, setCurrentPage] = usePersistentState('acgn.library.currentPage', 0)
     const subjectQueryParams = useMemo(() => {
         const normalizedKeyword = keyword.trim()
         const useGlobalKeywordSearch = normalizedKeyword.length > 0

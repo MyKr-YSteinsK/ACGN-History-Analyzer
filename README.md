@@ -17,6 +17,7 @@ ACGN History Analyzer 是一个用于整理个人动画、漫画、游戏、小�
 - 收藏夹：`WANT` / `PAUSED` 清单，与正式记录互斥
 - 导入中心：Bangumi 季度导入、Bangumi sourceId 补录、记录/收藏 JSON 或 CSV 导入
 - 后台任务：通用 `/api/jobs` 支持 sourceId 补录、记录/收藏导入、LLM 分析；Bangumi 季度导入有独立任务接口
+- 页面记忆：导入中心、作品库、记录库、收藏、系列、TOP、首页和分析页会记住上次筛选/输入
 - 首页与榜单：季度仪表盘、搜索、年度高分、TOP 视图
 - 智能分析：结构化报告、问答、推荐、趋势、系列补完分析
 
@@ -50,6 +51,7 @@ frontend/
     pages/       页面编排
     components/  复用组件
     jobs/        后台任务轮询与全局 Toast
+    hooks/       页面状态持久化等复用 Hook
     query/       React Query keys/cache
     theme/       ACGN 分类、档期、状态视觉主题
     utils|hooks|types|mappers/

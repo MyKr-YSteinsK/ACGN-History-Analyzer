@@ -32,6 +32,7 @@ Spring Boot backend
 - `pages`：页面级状态和业务编排；大页面包括 `ImportPage`、`AnalysisPage`、`HomePage`
 - `api`：接口 DTO 与请求函数；`request.ts` 统一拆包 `ApiResponse<T>`
 - `jobs`：后台任务轮询、全局完成 Toast、事件中心
+- `hooks`：复用状态逻辑；`usePersistentState` 用 localStorage 记住页面筛选和输入
 - `query`：React Query client、query keys、写入后缓存失效
 - `components`：通用 UI、分析面板、作品卡片、详情抽屉、记录弹窗
 - `theme`：分类、档期、状态、评分的视觉 token
@@ -57,7 +58,7 @@ Spring Boot backend
   -> 全局 Toast 提示任务结果
 ```
 
-Bangumi 季度导入走 `/api/import/bangumi/season/import-jobs`，状态为 `PENDING/RUNNING/SUCCESS/FAILED`。通用后台任务走 `/api/jobs`，状态为 `PENDING/RUNNING/SUCCEEDED/FAILED/CANCELLED`。
+Bangumi 季度导入走 `/api/import/bangumi/season/import-jobs`，状态为 `PENDING/RUNNING/SUCCESS/FAILED`，由前端 `bangumiSeasonJobMonitor` 跨路由轮询。通用后台任务走 `/api/jobs`，状态为 `PENDING/RUNNING/SUCCEEDED/FAILED/CANCELLED`，注册 UI 信息后会立即进入共享轮询，完成后通过全局 Toast 提示。
 
 ### LLM
 

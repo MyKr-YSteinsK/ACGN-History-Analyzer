@@ -50,6 +50,7 @@ import {
 } from '../utils/localStorageCache'
 import { polishAnalysisText } from '../utils/llmReportFormat'
 import { isAcgnCategory, normalizeLlmAnalysisReport } from '../utils/llmAnalysisNormalize'
+import { usePersistentState } from '../hooks/usePersistentState'
 
 type GenerationProgress = {
     percent: number
@@ -168,11 +169,26 @@ const reportCacheTtlMs = 7 * 24 * 60 * 60 * 1000
 const allAiCachePrefixes = [reportCachePrefix, HOME_INSIGHT_CACHE_PREFIX]
 
 function AnalysisPage() {
-    const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('COMPREHENSIVE_REPORT')
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-    const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(1)
-    const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('ALL')
-    const [question, setQuestion] = useState('2025 年我有哪些高分动画？')
+    const [analysisMode, setAnalysisMode] = usePersistentState<AnalysisMode>(
+        'acgn.analysis.mode',
+        'COMPREHENSIVE_REPORT',
+    )
+    const [selectedYear, setSelectedYear] = usePersistentState(
+        'acgn.analysis.selectedYear',
+        () => new Date().getFullYear(),
+    )
+    const [selectedQuarter, setSelectedQuarter] = usePersistentState<ReleaseQuarter>(
+        'acgn.analysis.selectedQuarter',
+        1,
+    )
+    const [selectedCategory, setSelectedCategory] = usePersistentState<CategoryFilter>(
+        'acgn.analysis.selectedCategory',
+        'ALL',
+    )
+    const [question, setQuestion] = usePersistentState(
+        'acgn.analysis.question',
+        '2025 年我有哪些高分动画？',
+    )
     const [report, setReport] = useState<LlmAnalysisResponse | null>(null)
     const [reportHistory, setReportHistory] = useState<ReportHistoryItem[]>(() => readReportHistory())
     const [loading, setLoading] = useState(false)
@@ -606,7 +622,13 @@ function AnalysisPage() {
             expiresAt: cached.expiresAt,
         })
         setError(null)
-    }, [])
+    }, [
+        setAnalysisMode,
+        setQuestion,
+        setSelectedCategory,
+        setSelectedQuarter,
+        setSelectedYear,
+    ])
 
     const clearReportHistory = useCallback(() => {
         writeReportHistory([])

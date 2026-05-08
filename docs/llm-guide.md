@@ -137,5 +137,6 @@ LLM 结果缓存位于数据库表对应的 `LlmAnalysisResultCacheEntity`。缓
 - 发起后台 LLM 任务
 - 展示生成进度
 - 缓存报告和问答历史到 localStorage
+- 记住上次选择的分析模式、年份、季度、分类和问题
 - 展示 evidence、warnings、recommendations
-- 任务完成后通过全局 Toast 提示
+- 任务完成后通过全局 Toast 提示；切换页面后通用后台任务轮询仍会继续

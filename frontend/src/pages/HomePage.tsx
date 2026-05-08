@@ -41,6 +41,7 @@ import {
 import { formatRecordRelease, sortRecordsByScoreDesc } from '../utils/recordDisplay'
 import { queryKeys } from '../query/queryKeys'
 import { normalizeLlmAnalysisReport } from '../utils/llmAnalysisNormalize'
+import { usePersistentState } from '../hooks/usePersistentState'
 
 type CategoryCount = {
     category: AcgnCategory
@@ -196,9 +197,18 @@ function getPreviousQuarterPosition(year: number, quarter: ReleaseQuarter) {
 }
 
 function HomePage() {
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-    const [selectedQuarter, setSelectedQuarter] = useState<ReleaseQuarter>(getCurrentReleaseQuarter())
-    const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
+    const [selectedYear, setSelectedYear] = usePersistentState(
+        'acgn.home.selectedYear',
+        () => new Date().getFullYear(),
+    )
+    const [selectedQuarter, setSelectedQuarter] = usePersistentState<ReleaseQuarter>(
+        'acgn.home.selectedQuarter',
+        getCurrentReleaseQuarter,
+    )
+    const [selectedCategory, setSelectedCategory] = usePersistentState<AcgnCategory>(
+        'acgn.home.selectedCategory',
+        'ANIME',
+    )
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
     const [detailLoading, setDetailLoading] = useState(false)
     const [insightLoading, setInsightLoading] = useState(false)
@@ -206,7 +216,7 @@ function HomePage() {
     const [insightCacheInfo, setInsightCacheInfo] = useState<InsightCacheInfo | null>(null)
     const [insightError, setInsightError] = useState<string | null>(null)
     const [detailError, setDetailError] = useState<string | null>(null)
-    const latestSelectionApplied = useRef(false)
+    const latestSelectionApplied = useRef(true)
 
     const selectedCategoryTheme = categoryTheme[selectedCategory]
     const selectedQuarterTheme = quarterTheme[selectedQuarter]
@@ -240,7 +250,7 @@ function HomePage() {
             latestSelectionApplied.current = true
         })
         return () => window.cancelAnimationFrame(frame)
-    }, [records])
+    }, [records, setSelectedQuarter, setSelectedYear])
 
     const listBlocking = recordsQuery.isPending && !recordsQuery.data
 

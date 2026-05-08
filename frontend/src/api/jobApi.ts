@@ -53,6 +53,9 @@ function sleep(ms: number) {
 
 export function registerBackgroundJobUi(jobId: string, meta: BackgroundJobUiMeta) {
     uiMetaByJobId.set(jobId, meta)
+    void waitForBackgroundJob(jobId).catch(() => {
+        uiMetaByJobId.delete(jobId)
+    })
 }
 
 export async function enqueueBackgroundJob(body: {

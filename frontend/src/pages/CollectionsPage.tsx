@@ -40,6 +40,7 @@ import type { PageResponse } from '../types/api'
 import type { SubjectCardView } from '../types/subject'
 import { invalidateLibraryRelatedQueries } from '../query/invalidateDataCaches'
 import { queryKeys } from '../query/queryKeys'
+import { usePersistentState } from '../hooks/usePersistentState'
 
 type CollectionPageState = Pick<
     PageResponse<unknown>,
@@ -114,10 +115,16 @@ function formatCollectionDate(value?: string | null) {
 
 function CollectionsPage() {
     const queryClient = useQueryClient()
-    const [selectedType, setSelectedType] = useState<CollectionType>('WANT')
-    const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
-    const [keyword, setKeyword] = useState('')
-    const [currentPage, setCurrentPage] = useState(0)
+    const [selectedType, setSelectedType] = usePersistentState<CollectionType>(
+        'acgn.collections.selectedType',
+        'WANT',
+    )
+    const [selectedCategory, setSelectedCategory] = usePersistentState<AcgnCategory>(
+        'acgn.collections.selectedCategory',
+        'ANIME',
+    )
+    const [keyword, setKeyword] = usePersistentState('acgn.collections.keyword', '')
+    const [currentPage, setCurrentPage] = usePersistentState('acgn.collections.currentPage', 0)
     const [actionLoading, setActionLoading] = useState(false)
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [openMenuId, setOpenMenuId] = useState<number | null>(null)

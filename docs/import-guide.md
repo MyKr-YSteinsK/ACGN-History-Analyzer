@@ -164,7 +164,9 @@ subjectId > sourceId > subjectTitle(+subjectSeasonIndex/subjectPartIndex)
 
 ## 8. 后台提示
 
-前端导入中心使用后台任务轮询。任务完成、失败或超时时会通过 `frontend/src/jobs/backgroundJobEvents.ts` 发出全局 Toast，展示在页面右上角。
+前端导入中心使用后台任务轮询。通用 `/api/jobs` 在注册 UI 信息后会立即启动共享轮询；Bangumi 季度导入由 `frontend/src/jobs/bangumiSeasonJobMonitor.ts` 独立轮询。任务完成、失败或超时时会通过 `frontend/src/jobs/backgroundJobEvents.ts` 发出全局 Toast，展示在页面右上角，即使用户中途切换到其他页面也会继续等待终态。
+
+导入中心会记住上次选择的导入目标、导入模式、草稿文本，以及 Bangumi 年份、季度、Web/日语筛选。作品库、记录库、收藏、系列、TOP、首页和分析页的主要筛选条件也会保存在浏览器 localStorage 中，切换页面后再回来会恢复上次状态。
 
 ## 9. 旧接口说明
 

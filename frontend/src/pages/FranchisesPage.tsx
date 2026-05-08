@@ -29,6 +29,7 @@ import {
 } from '../types/common'
 import type { SubjectCardView } from '../types/subject'
 import { queryKeys } from '../query/queryKeys'
+import { usePersistentState } from '../hooks/usePersistentState'
 
 type CategoryScope = AcgnCategory | 'ALL'
 
@@ -175,9 +176,15 @@ function sortSubjectsForTimeline(subjects: SubjectCardView[]) {
 }
 
 function FranchisesPage() {
-    const [selectedFranchiseId, setSelectedFranchiseId] = useState<number | null>(null)
-    const [selectedScope, setSelectedScope] = useState<CategoryScope>('ALL')
-    const [keyword, setKeyword] = useState('')
+    const [selectedFranchiseId, setSelectedFranchiseId] = usePersistentState<number | null>(
+        'acgn.franchises.selectedFranchiseId',
+        null,
+    )
+    const [selectedScope, setSelectedScope] = usePersistentState<CategoryScope>(
+        'acgn.franchises.selectedScope',
+        'ALL',
+    )
+    const [keyword, setKeyword] = usePersistentState('acgn.franchises.keyword', '')
     const [detailLoading, setDetailLoading] = useState(false)
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)
@@ -210,7 +217,7 @@ function FranchisesPage() {
             )
         })
         return () => window.cancelAnimationFrame(frame)
-    }, [franchisesQuery.data])
+    }, [franchisesQuery.data, setSelectedFranchiseId])
 
     const selectedFranchise = useMemo(
         () =>

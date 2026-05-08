@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import { useSearchParams } from 'react-router-dom'
 import {
     getCollectionImportTemplate,
-    getBangumiSeasonImportJobStatus,
     getImportOverview,
     getRecordImportTemplate,
     getSubjectImportTemplate,
@@ -20,6 +19,11 @@ import {
     waitForBackgroundJob,
 } from '../api/jobApi'
 import { emitBackgroundJobSettledToast } from '../jobs/backgroundJobEvents'
+import {
+    registerBangumiSeasonImportJob,
+    subscribeBangumiSeasonImportJob,
+    waitForBangumiSeasonImportJob,
+} from '../jobs/bangumiSeasonJobMonitor'
 import {
     type UserSubjectCollectionImportPreviewResponse,
     type UserSubjectCollectionImportResponse,
@@ -48,7 +52,6 @@ import {
     parseDraftPayload,
     pickTemplate,
     stringifyTemplate,
-    wait,
 } from './import/importFlowHelpers'
 import type {
     BangumiPreviewProgress,
@@ -66,6 +69,7 @@ import type { ReleaseQuarter } from '../types/common'
 import { invalidateLibraryRelatedQueries } from '../query/invalidateDataCaches'
 import type { BackgroundJobResponse } from '../api/jobApi'
 import type { SubjectImportPreviewResponse, SubjectImportResponse } from '../api/subjectApi'
+import { usePersistentState } from '../hooks/usePersistentState'
 
 function applyImportJobSnapshot(
     res: BackgroundJobResponse,
@@ -340,9 +344,15 @@ function ImportPage() {
     const [collectionTemplate, setCollectionTemplate] =
         useState<ImportTemplateResponse | null>(null)
     const [recordTemplate, setRecordTemplate] = useState<ImportTemplateResponse | null>(null)
-    const [selectedTarget, setSelectedTarget] = useState<ImportTarget>('SUBJECT')
-    const [selectedMode, setSelectedMode] = useState<ImportMode>('BANGUMI')
-    const [draftText, setDraftText] = useState('')
+    const [selectedTarget, setSelectedTarget] = usePersistentState<ImportTarget>(
+        'acgn.import.selectedTarget',
+        'SUBJECT',
+    )
+    const [selectedMode, setSelectedMode] = usePersistentState<ImportMode>(
+        'acgn.import.selectedMode',
+        'BANGUMI',
+    )
+    const [draftText, setDraftText] = usePersistentState('acgn.import.draftText', '')
     const [preview, setPreview] = useState<PreviewState | null>(null)
     const [excludedPreviewKeys, setExcludedPreviewKeys] = useState<string[]>([])
     const [previewSelections, setPreviewSelections] = useState<Record<number, number | 'SKIP'>>({})
@@ -350,10 +360,28 @@ function ImportPage() {
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
     const [loadingDocs, setLoadingDocs] = useState(false)
     const [submitting, setSubmitting] = useState(false)
-    const [bangumiYear, setBangumiYear] = useState(() => new Date().getFullYear())
-    const [bangumiQuarter, setBangumiQuarter] = useState<ReleaseQuarter>(1)
-    const [bangumiIncludeWeb, setBangumiIncludeWeb] = useState(false)
-    const [bangumiJapaneseOnly, setBangumiJapaneseOnly] = useState(true)
+    const [bangumiYear, setBangumiYear] = usePersistentState(
+        'acgn.import.bangumiYear',
+        () => new Date().getFullYear(),
+    )
+    const [bangumiQuarter, setBangumiQuarter] = usePersistentState<ReleaseQuarter>(
+        'acgn.import.bangumiQuarter',
+        1,
+    )
+    const [bangumiIncludeWeb, setBangumiIncludeWeb] = usePersistentState(
+        'acgn.import.bangumiIncludeWeb',
+        false,
+    )
+    const [bangumiJapaneseOnly, setBangumiJapaneseOnly] = usePersistentState(
+        'acgn.import.bangumiJapaneseOnly',
+        true,
+    )
+    const [activeImportJobId, setActiveImportJobId] = usePersistentState<string | null>(
+        'acgn.import.activeImportJobId',
+        null,
+    )
+    const [activeBangumiSeasonJobId, setActiveBangumiSeasonJobId] =
+        usePersistentState<string | null>('acgn.import.activeBangumiSeasonJobId', null)
     const [bangumiJobStatus, setBangumiJobStatus] =
         useState<BangumiImportJobStatusResponse | null>(null)
     const [bangumiPreviewProgress, setBangumiPreviewProgress] =
@@ -483,7 +511,6 @@ function ImportPage() {
             setSubjectTemplate(subjectTemplateResponse)
             setCollectionTemplate(collectionTemplateResponse)
             setRecordTemplate(recordTemplateResponse)
-            setDraftText('')
         } catch (error) {
             setFeedbackMessage(getApiErrorMessage(error))
         } finally {
@@ -498,9 +525,26 @@ function ImportPage() {
     }, [loadDocs])
 
     const jobIdFromUrl = searchParams.get('jobId')
+    const trackedImportJobId = jobIdFromUrl ?? activeImportJobId
+
+    const applyBangumiImportSnapshot = useCallback((status: BangumiImportJobStatusResponse) => {
+        if (status.result) {
+            setPreview(null)
+            setExcludedPreviewKeys([])
+            setImportResult({ target: 'SUBJECT', data: status.result })
+            setFeedbackMessage(
+                `已从 Bangumi 写入 ${status.result.importedCount} 条作品，预览结果已刷新为写入结果`,
+            )
+        } else {
+            setPreview(null)
+            setExcludedPreviewKeys([])
+            setFeedbackMessage('Bangumi 导入完成')
+        }
+        invalidateLibraryRelatedQueries(queryClient)
+    }, [queryClient])
 
     useEffect(() => {
-        if (!jobIdFromUrl) {
+        if (!trackedImportJobId) {
             return undefined
         }
 
@@ -508,12 +552,12 @@ function ImportPage() {
 
         void (async () => {
             try {
-                registerBackgroundJobUi(jobIdFromUrl, {
+                registerBackgroundJobUi(trackedImportJobId, {
                     silent: false,
                     title: '导入中心任务',
                     href: '/import',
                 })
-                const res = await waitForBackgroundJob(jobIdFromUrl)
+                const res = await waitForBackgroundJob(trackedImportJobId)
                 if (cancelled) {
                     return
                 }
@@ -541,6 +585,7 @@ function ImportPage() {
                 }
             } finally {
                 if (!cancelled) {
+                    setActiveImportJobId(null)
                     setSearchParams(
                         (prev) => {
                             const next = new URLSearchParams(prev)
@@ -556,7 +601,49 @@ function ImportPage() {
         return () => {
             cancelled = true
         }
-    }, [jobIdFromUrl, queryClient, setSearchParams])
+    }, [
+        queryClient,
+        setActiveImportJobId,
+        setSearchParams,
+        setSelectedTarget,
+        trackedImportJobId,
+    ])
+
+    useEffect(() => {
+        if (!activeBangumiSeasonJobId) {
+            return undefined
+        }
+
+        let cancelled = false
+        registerBangumiSeasonImportJob(activeBangumiSeasonJobId, {
+            silent: false,
+            title: 'Bangumi 季度导入',
+            href: '/import',
+        })
+
+        const unsubscribe = subscribeBangumiSeasonImportJob(activeBangumiSeasonJobId, (status) => {
+            if (cancelled) {
+                return
+            }
+
+            setBangumiJobStatus(status)
+            if (status.status !== 'SUCCESS' && status.status !== 'FAILED') {
+                return
+            }
+
+            if (status.status === 'SUCCESS') {
+                applyBangumiImportSnapshot(status)
+            } else {
+                setFeedbackMessage(status.errorMessage || 'Bangumi 导入失败')
+            }
+            setActiveBangumiSeasonJobId(null)
+        })
+
+        return () => {
+            cancelled = true
+            unsubscribe()
+        }
+    }, [activeBangumiSeasonJobId, applyBangumiImportSnapshot, setActiveBangumiSeasonJobId])
 
     function resetResultState() {
         setPreview(null)
@@ -569,54 +656,23 @@ function ImportPage() {
     }
 
     async function waitForBangumiImportJob(jobId: string) {
-        for (let attempt = 0; attempt < 300; attempt += 1) {
-            await wait(1000)
-            const status = await getBangumiSeasonImportJobStatus(jobId)
-            setBangumiJobStatus(status)
+        registerBangumiSeasonImportJob(jobId, {
+            silent: false,
+            title: 'Bangumi 季度导入',
+            href: '/import',
+        })
+        setActiveBangumiSeasonJobId(jobId)
+        const status = await waitForBangumiSeasonImportJob(jobId)
+        setBangumiJobStatus(status)
 
-            if (status.status === 'SUCCESS') {
-                if (status.result) {
-                    setPreview(null)
-                    setExcludedPreviewKeys([])
-                    setImportResult({ target: 'SUBJECT', data: status.result })
-                    setFeedbackMessage(`已从 Bangumi 写入 ${status.result.importedCount} 条作品，预览结果已刷新为写入结果`)
-                    emitBackgroundJobSettledToast({
-                        status: 'SUCCEEDED',
-                        title: `已从 Bangumi 写入 ${status.result.importedCount} 条作品`,
-                        href: '/import',
-                    })
-                } else {
-                    setPreview(null)
-                    setExcludedPreviewKeys([])
-                    setFeedbackMessage('Bangumi 导入完成')
-                    emitBackgroundJobSettledToast({
-                        status: 'SUCCEEDED',
-                        title: 'Bangumi 导入完成',
-                        href: '/import',
-                    })
-                }
-                invalidateLibraryRelatedQueries(queryClient)
-                return
-            }
-
-            if (status.status === 'FAILED') {
-                emitBackgroundJobSettledToast({
-                    status: 'FAILED',
-                    title: 'Bangumi 季度导入失败',
-                    href: '/import',
-                    errorMessage: status.errorMessage || 'Bangumi 导入失败',
-                })
-                throw new Error(status.errorMessage || 'Bangumi 导入失败')
-            }
+        if (status.status === 'SUCCESS') {
+            applyBangumiImportSnapshot(status)
+            setActiveBangumiSeasonJobId(null)
+            return
         }
 
-        emitBackgroundJobSettledToast({
-            status: 'FAILED',
-            title: 'Bangumi 导入等待超时',
-            href: '/import',
-            errorMessage: '任务等待超时，请稍后刷新作品库确认结果',
-        })
-        throw new Error('Bangumi 导入任务等待超时，请稍后刷新作品库确认结果')
+        setActiveBangumiSeasonJobId(null)
+        throw new Error(status.errorMessage || 'Bangumi 导入失败')
     }
 
     function handleTargetChange(target: ImportTarget) {
@@ -764,6 +820,7 @@ function ImportPage() {
                     jobType: 'BANGUMI_SUBJECT_PREVIEW',
                     payload: serializedPayload,
                 })
+                setActiveImportJobId(jobId)
                 registerBackgroundJobUi(jobId, {
                     silent: false,
                     title: 'Bangumi 作品预览',
@@ -794,6 +851,7 @@ function ImportPage() {
                     jobType: 'COLLECTION_IMPORT_PREVIEW',
                     payload: serializedPayload,
                 })
+                setActiveImportJobId(jobId)
                 registerBackgroundJobUi(jobId, {
                     silent: false,
                     title: '收藏导入预览',
@@ -821,6 +879,7 @@ function ImportPage() {
                     jobType: 'RECORD_IMPORT_PREVIEW',
                     payload: serializedPayload,
                 })
+                setActiveImportJobId(jobId)
                 registerBackgroundJobUi(jobId, {
                     silent: false,
                     title: '记录导入预览',
@@ -893,6 +952,7 @@ function ImportPage() {
                     jobType: 'BANGUMI_SUBJECT_IMPORT',
                     payload: JSON.parse(JSON.stringify(rawPayload)) as Record<string, unknown>,
                 })
+                setActiveImportJobId(jobId)
                 registerBackgroundJobUi(jobId, {
                     silent: false,
                     title: 'Bangumi 作品批量写入',
@@ -933,6 +993,7 @@ function ImportPage() {
                     jobType: 'COLLECTION_IMPORT',
                     payload: serializedPayload,
                 })
+                setActiveImportJobId(jobId)
                 registerBackgroundJobUi(jobId, {
                     silent: false,
                     title: '收藏批量写入',
@@ -960,6 +1021,7 @@ function ImportPage() {
                     jobType: 'RECORD_IMPORT',
                     payload: serializedPayload,
                 })
+                setActiveImportJobId(jobId)
                 registerBackgroundJobUi(jobId, {
                     silent: false,
                     title: '观看记录批量写入',

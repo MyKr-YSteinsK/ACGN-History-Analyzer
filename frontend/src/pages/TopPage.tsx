@@ -23,6 +23,7 @@ import type { AcgnCategory } from '../types/common'
 import type { SubjectCardView } from '../types/subject'
 import { formatRecordRelease, sortRecordsByScoreDesc } from '../utils/recordDisplay'
 import { queryKeys } from '../query/queryKeys'
+import { usePersistentState } from '../hooks/usePersistentState'
 
 const rankingFetchSize = 200
 
@@ -86,7 +87,10 @@ function applyTopRule(records: UserSubjectRecordResponse[]) {
 }
 
 function TopPage() {
-    const [selectedCategory, setSelectedCategory] = useState<AcgnCategory>('ANIME')
+    const [selectedCategory, setSelectedCategory] = usePersistentState<AcgnCategory>(
+        'acgn.top.selectedCategory',
+        'ANIME',
+    )
     const [detailLoading, setDetailLoading] = useState(false)
     const [detailError, setDetailError] = useState<string | null>(null)
     const [selectedSubject, setSelectedSubject] = useState<SubjectCardView | null>(null)

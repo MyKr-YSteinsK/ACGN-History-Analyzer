@@ -1,73 +1,37 @@
-# React + TypeScript + Vite
+# ACGN History Analyzer Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + TypeScript + Vite + Tailwind CSS v4 前端。页面以作品库、记录、收藏、导入、分析为核心，所有 API 调用都通过 `src/api/*` 进入后端。
 
-Currently, two official plugins are available:
+## 目录
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```text
+src/
+  api/          API DTO 与请求封装
+  components/   通用 UI、作品卡、分析面板、弹窗和详情抽屉
+  hooks/        复用 Hook，包括页面状态持久化
+  jobs/         后台任务轮询和全局 Toast 事件
+  mappers/      后端响应到前端卡片模型的转换
+  pages/        页面级状态和业务编排
+  query/        React Query keys 和缓存失效
+  theme/        分类、档期、状态、评分视觉 token
+  utils/        localStorage cache、LLM 报告格式化等工具
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 后台任务
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- 通用任务走 `/api/jobs`，`registerBackgroundJobUi` 会立即启动共享轮询。
+- Bangumi 季度导入走 `/api/import/bangumi/season/import-jobs`，由 `jobs/bangumiSeasonJobMonitor.ts` 独立轮询。
+- 任务完成、失败或超时时都会通过 `jobs/backgroundJobEvents.ts` 发出全局 Toast，路由切换不会中断轮询。
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 页面状态记忆
+
+`hooks/usePersistentState.ts` 使用 localStorage 保存页面筛选和输入。当前覆盖导入中心、作品库、记录库、收藏、系列、TOP、首页和分析页的主要选择项。
+
+## 本地命令
+
+```powershell
+npm install
+npm run dev
+npm run lint
+npm run build
 ```
