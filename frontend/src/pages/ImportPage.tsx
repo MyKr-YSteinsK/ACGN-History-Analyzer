@@ -15,6 +15,7 @@ import {
     type ImportTemplateResponse,
 } from '../api/importApi'
 import {
+    emitBackgroundJobSettledToast,
     enqueueBackgroundJob,
     registerBackgroundJobUi,
     waitForBackgroundJob,
@@ -167,9 +168,20 @@ function BangumiRoundtripExportCard() {
         try {
             const data = await getBangumiRoundtripExport()
             setExportData(data)
+            emitBackgroundJobSettledToast({
+                status: 'SUCCEEDED',
+                title: 'Bangumi 往返 JSON 已就绪，可复制或下载',
+                href: '/import',
+            })
         } catch (error) {
             setExportData(null)
             setExportError(getApiErrorMessage(error))
+            emitBackgroundJobSettledToast({
+                status: 'FAILED',
+                title: 'Bangumi 往返导出失败',
+                href: '/import',
+                errorMessage: getApiErrorMessage(error),
+            })
         } finally {
             setExportLoading(false)
         }
@@ -567,20 +579,42 @@ function ImportPage() {
                     setExcludedPreviewKeys([])
                     setImportResult({ target: 'SUBJECT', data: status.result })
                     setFeedbackMessage(`已从 Bangumi 写入 ${status.result.importedCount} 条作品，预览结果已刷新为写入结果`)
+                    emitBackgroundJobSettledToast({
+                        status: 'SUCCEEDED',
+                        title: `已从 Bangumi 写入 ${status.result.importedCount} 条作品`,
+                        href: '/import',
+                    })
                 } else {
                     setPreview(null)
                     setExcludedPreviewKeys([])
                     setFeedbackMessage('Bangumi 导入完成')
+                    emitBackgroundJobSettledToast({
+                        status: 'SUCCEEDED',
+                        title: 'Bangumi 导入完成',
+                        href: '/import',
+                    })
                 }
                 invalidateLibraryRelatedQueries(queryClient)
                 return
             }
 
             if (status.status === 'FAILED') {
+                emitBackgroundJobSettledToast({
+                    status: 'FAILED',
+                    title: 'Bangumi 季度导入失败',
+                    href: '/import',
+                    errorMessage: status.errorMessage || 'Bangumi 导入失败',
+                })
                 throw new Error(status.errorMessage || 'Bangumi 导入失败')
             }
         }
 
+        emitBackgroundJobSettledToast({
+            status: 'FAILED',
+            title: 'Bangumi 导入等待超时',
+            href: '/import',
+            errorMessage: '任务等待超时，请稍后刷新作品库确认结果',
+        })
         throw new Error('Bangumi 导入任务等待超时，请稍后刷新作品库确认结果')
     }
 

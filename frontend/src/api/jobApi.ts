@@ -50,6 +50,29 @@ function sleep(ms: number) {
     })
 }
 
+/** Fire the same global toast event used by {@link BackgroundJobsProvider} (for non-/jobs flows too). */
+export function emitBackgroundJobSettledToast(detail: {
+    jobId?: string
+    status: BackgroundJobStatus
+    title: string
+    href?: string
+    errorMessage?: string | null
+}) {
+    const jobId =
+        detail.jobId ?? `toast-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    window.dispatchEvent(
+        new CustomEvent('acgn-background-job-settled', {
+            detail: {
+                jobId,
+                status: detail.status,
+                title: detail.title,
+                href: detail.href,
+                errorMessage: detail.errorMessage ?? null,
+            },
+        }),
+    )
+}
+
 export function registerBackgroundJobUi(jobId: string, meta: BackgroundJobUiMeta) {
     uiMetaByJobId.set(jobId, meta)
 }
@@ -61,8 +84,28 @@ export async function enqueueBackgroundJob(body: {
     return apiPost<BackgroundJobStartResponse, typeof body>('/jobs', body)
 }
 
+function normalizeJobStatus(value: unknown): BackgroundJobStatus {
+    const upper = String(value ?? '')
+        .trim()
+        .toUpperCase()
+    switch (upper) {
+        case 'PENDING':
+        case 'RUNNING':
+        case 'SUCCEEDED':
+        case 'FAILED':
+        case 'CANCELLED':
+            return upper
+        default:
+            return 'RUNNING'
+    }
+}
+
 export async function getBackgroundJob(jobId: string): Promise<BackgroundJobResponse> {
-    return apiGet<BackgroundJobResponse>(`/jobs/${jobId}`)
+    const raw = await apiGet<BackgroundJobResponse>(`/jobs/${jobId}`)
+    return {
+        ...raw,
+        status: normalizeJobStatus(raw.status),
+    }
 }
 
 export async function cancelBackgroundJob(jobId: string): Promise<void> {
@@ -81,17 +124,13 @@ function dispatchJobSettled(
         return
     }
 
-    window.dispatchEvent(
-        new CustomEvent('acgn-background-job-settled', {
-            detail: {
-                jobId,
-                status,
-                title: meta.title,
-                href: meta.href,
-                errorMessage,
-            },
-        }),
-    )
+    emitBackgroundJobSettledToast({
+        jobId,
+        status,
+        title: meta.title,
+        href: meta.href,
+        errorMessage,
+    })
 }
 
 async function pollUntilTerminal(jobId: string): Promise<BackgroundJobResponse> {
