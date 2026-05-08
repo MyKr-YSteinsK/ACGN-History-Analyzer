@@ -10,6 +10,8 @@ type InsightSnapshotProps = {
 }
 
 function InsightSnapshot({ report }: InsightSnapshotProps) {
+    const visibleSectionCount = getVisibleSectionCount(report)
+
     return (
         <SidePanel
             title="分析快照"
@@ -17,7 +19,7 @@ function InsightSnapshot({ report }: InsightSnapshotProps) {
             gradient="from-white/75 to-sky-50/70"
         >
             <div className="grid grid-cols-2 gap-3">
-                <SnapshotMetric label="结论段落" value={report.sections.length} />
+                <SnapshotMetric label="结论段落" value={visibleSectionCount} />
                 <SnapshotMetric label="关键词" value={report.keywords.length} />
                 <SnapshotMetric label="推荐候选" value={report.recommendations.length} />
                 <SnapshotMetric label="引用依据" value={report.evidence.length} />
@@ -39,6 +41,7 @@ function ReportReadingHighlights({ report, highScoreRecords }: ReportReadingHigh
         .filter((item) => item.coverUrl)
         .slice(0, 4)
     const visibleHighScoreRecords = highScoreRecords.slice(0, 4)
+    const visibleSectionCount = getVisibleSectionCount(report)
 
     return (
         <div className="mt-6 grid gap-4 xl:grid-cols-[1.1fr_1fr]">
@@ -49,8 +52,8 @@ function ReportReadingHighlights({ report, highScoreRecords }: ReportReadingHigh
                 <h4 className="mt-2 text-base font-black text-slate-800">
                     先看这几个结论点
                 </h4>
-                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-                    <SnapshotMetric label="正文段落" value={report.sections.length} />
+                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-2 2xl:gap-3">
+                    <SnapshotMetric label="正文段落" value={visibleSectionCount} />
                     <SnapshotMetric label="关键词" value={report.keywords.length} />
                     <SnapshotMetric label="推荐作品" value={report.recommendations.length} />
                     <SnapshotMetric label="依据条目" value={report.evidence.length} />
@@ -145,11 +148,19 @@ type SnapshotMetricProps = {
 
 function SnapshotMetric({ label, value }: SnapshotMetricProps) {
     return (
-        <div className="rounded-[22px] border border-white/75 bg-white/62 p-4 text-center shadow-sm">
-            <p className="text-[11px] font-semibold text-slate-400">{label}</p>
+        <div className="min-w-0 rounded-[22px] border border-white/75 bg-white/62 px-3 py-4 text-center shadow-sm">
+            <p className="whitespace-nowrap text-[11px] font-semibold text-slate-400">{label}</p>
             <p className="mt-1 text-2xl font-black text-slate-800">{value}</p>
         </div>
     )
+}
+
+function getVisibleSectionCount(report: LlmAnalysisResponse) {
+    if (report.analysisType !== 'QUESTION_ANSWER') {
+        return report.sections.length
+    }
+
+    return Math.max(1, report.sections.length - 1)
 }
 
 export { InsightSnapshot, ReportReadingHighlights }

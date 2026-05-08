@@ -57,6 +57,12 @@ function AnalysisReport({
         activeCategory === 'ALL'
             ? null
             : categoryTheme[activeCategory]
+    const isQuestionAnswerReport = report.analysisType === 'QUESTION_ANSWER'
+    const questionSection = isQuestionAnswerReport ? report.sections[0] : null
+    const answerSection = isQuestionAnswerReport ? report.sections[1] : null
+    const reportSections = isQuestionAnswerReport
+        ? (answerSection ? [answerSection] : report.sections.slice(0, 1))
+        : report.sections
 
     async function handleCopyMarkdown() {
         try {
@@ -94,16 +100,30 @@ function AnalysisReport({
                     ].join(' ')}
                 >
                     <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="max-w-4xl">
+                        <div className="max-w-4xl flex-1">
                             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
                                 analysis report
                             </p>
-                            <h3 className="mt-2 text-2xl font-black text-slate-800">
-                                {polishAnalysisText(report.title)}
-                            </h3>
-                            <p className="mt-3 text-sm leading-7 text-slate-500">
-                                {summaryText}
-                            </p>
+                            <div className="mt-2 flex flex-wrap items-start gap-3">
+                                <h3 className="text-2xl font-black text-slate-800">
+                                    {polishAnalysisText(report.title)}
+                                </h3>
+                                {questionSection ? (
+                                    <div className="min-w-[260px] flex-1 rounded-2xl border border-sky-100 bg-white/68 px-4 py-3 shadow-sm">
+                                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">
+                                            question
+                                        </p>
+                                        <p className="mt-1 text-sm font-black leading-6 text-slate-700">
+                                            {polishAnalysisText(questionSection.content)}
+                                        </p>
+                                    </div>
+                                ) : null}
+                            </div>
+                            {!isQuestionAnswerReport ? (
+                                <p className="mt-3 text-sm leading-7 text-slate-500">
+                                    {summaryText}
+                                </p>
+                            ) : null}
                         </div>
 
                         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -152,7 +172,7 @@ function AnalysisReport({
                     />
 
                     <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                        {report.sections.map((section, index) => {
+                        {reportSections.map((section, index) => {
                             const rawFallbackSection = isRawFallbackSection(section)
 
                             return (
@@ -160,7 +180,7 @@ function AnalysisReport({
                                     key={`${section.title}-${index}`}
                                     className={[
                                         'rounded-[26px] border border-white/75 bg-white/62 p-5 shadow-sm backdrop-blur',
-                                        index === 0 ? 'lg:col-span-2' : '',
+                                        index === 0 || isQuestionAnswerReport ? 'lg:col-span-2' : '',
                                     ].join(' ')}
                                 >
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">
@@ -179,7 +199,12 @@ function AnalysisReport({
                                             </pre>
                                         </details>
                                     ) : (
-                                        <p className="mt-2 text-sm leading-7 text-slate-500">
+                                        <p className={[
+                                            'mt-2 text-slate-500',
+                                            isQuestionAnswerReport
+                                                ? 'text-base leading-8 md:text-lg md:leading-9'
+                                                : 'text-sm leading-7',
+                                        ].join(' ')}>
                                             {polishAnalysisText(section.content)}
                                         </p>
                                     )}
