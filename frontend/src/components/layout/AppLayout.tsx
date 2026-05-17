@@ -5,8 +5,8 @@ function AppLayout() {
     const location = useLocation()
 
     return (
-        <div className="min-h-screen px-6 pb-20 pt-6 lg:px-8 lg:pb-28">
-            <div className="mx-auto flex max-w-[1500px] items-start gap-6">
+        <div className="min-h-screen px-4 pb-16 pt-4 sm:px-6 lg:px-8 lg:pb-28 lg:pt-6">
+            <div className="mx-auto flex max-w-[1500px] flex-col items-stretch gap-5 lg:flex-row lg:items-start lg:gap-6">
                 <AppNavigation />
 
                 <main

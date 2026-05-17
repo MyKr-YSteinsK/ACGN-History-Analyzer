@@ -1,81 +1,110 @@
-# ACGN History Analyzer 架构速查
+# 架构与接口概览
 
-本文按当前代码实现整理，旧文档如与代码冲突，以代码为准。
+本文按当前代码整理，作为项目维护入口。旧说明如与代码冲突，以代码为准。
 
-## 1. 总体分层
+## 技术栈
 
-```text
-React + TypeScript frontend
-  pages -> components -> api -> query/jobs/theme/utils
-        |
-        v
-Spring Boot backend
-  controller -> service -> repository -> entity
-        |
-        +-> job/* 通用后台任务
-        +-> llm/* 智能分析
-        +-> config/* 缓存、静态资源、请求追踪
-```
+- 前端：React 19、TypeScript、Vite、Tailwind CSS v4、React Query
+- 后端：Java 17、Spring Boot 3.5、Spring Data JPA
+- 数据库：MySQL，Hibernate `ddl-auto=update`
+- 集成：Bangumi API、DeepSeek / Mock LLM
+- 本地资源：Bangumi 封面缓存到 `uploads/covers`
 
-## 2. 后端模块职责
-
-- `controller`：薄控制器，负责参数入口、基础业务错误返回、调用 service
-- `service`：核心业务规则，包括导入、统计、系列自动关联、封面缓存、LLM 编排
-- `repository`：JPA Repository 与少量 JPQL 查询
-- `entity`：`Subject`、`UserSubjectRecord`、`UserSubjectCollection`、`Franchise`、`Tag`、`BackgroundJob`、LLM cache entity
-- `job`：通用后台任务，支持 sourceId 作品导入、记录/收藏导入、LLM 分析
-- `llm`：上下文构建、Prompt、mock/real client、运行时配置、DB 结果缓存
-- `config`：Caffeine 读缓存清理、本地封面静态资源、请求 ID filter
-
-## 3. 前端模块职责
-
-- `pages`：页面级状态和业务编排；大页面包括 `ImportPage`、`AnalysisPage`、`HomePage`
-- `api`：接口 DTO 与请求函数；`request.ts` 统一拆包 `ApiResponse<T>`
-- `jobs`：后台任务轮询、全局完成 Toast、事件中心
-- `hooks`：复用状态逻辑；`usePersistentState` 用 localStorage 记住页面筛选和输入
-- `query`：React Query client、query keys、写入后缓存失效
-- `components`：通用 UI、分析面板、作品卡片、详情抽屉、记录弹窗
-- `theme`：分类、档期、状态、评分的视觉 token
-
-## 4. 数据模型核心
-
-- `Subject`：作品底座，主要来源唯一键是 `sourceId`
-- `Tag`：结构化标签，通过 `subject_tag` 与作品多对多关联
-- `UserSubjectRecord`：正式记录，数据库约束保证一个 `subject_id` 一条记录
-- `UserSubjectCollection`：收藏状态，数据库约束保证一个 `subject_id` 一条收藏
-- `Franchise`：系列信息，`Subject.franchiseId` 保存关联
-
-## 5. 关键链路
-
-### 导入
+## 代码分层
 
 ```text
-前端解析 JSON/CSV
-  -> preview
-  -> 处理 AMBIGUOUS 候选
-  -> import
-  -> invalidateLibraryRelatedQueries
-  -> 全局 Toast 提示任务结果
+frontend/src
+  routes        路由和懒加载
+  pages         页面级状态与业务编排
+  components    通用 UI、作品卡、详情抽屉、分析面板
+  api           前端 DTO 与请求函数
+  jobs          后台任务轮询与全局 Toast
+  query         React Query key 与缓存失效
+  hooks         页面状态持久化等复用 Hook
+  theme         分类、档期、状态、评分视觉 token
+  utils         localStorage cache、报告格式化、展示辅助
+
+backend/src/main/java/com/mykr/acgnhistoryanalyzer
+  controller    REST 入口
+  service       核心业务规则
+  repository    JPA Repository / JPQL
+  entity        JPA 表映射
+  request       请求 DTO
+  response      响应 DTO
+  job           通用后台任务
+  llm           LLM 上下文、Prompt、客户端、结果缓存
+  config        缓存、静态资源、请求追踪、运行时配置
 ```
 
-Bangumi 季度导入走 `/api/import/bangumi/season/import-jobs`，状态为 `PENDING/RUNNING/SUCCESS/FAILED`，由前端 `bangumiSeasonJobMonitor` 跨路由轮询。通用后台任务走 `/api/jobs`，状态为 `PENDING/RUNNING/SUCCEEDED/FAILED/CANCELLED`，注册 UI 信息后会立即进入共享轮询，完成后通过全局 Toast 提示。
+## 主要页面
 
-### LLM
+- 首页：季度概览、高分记录、分类占比、首页智能洞察。
+- 我的记录：按年份、档期、分类、关键词和排序查看正式记录。
+- 作品库：作品基础信息、状态、标签、封面、详情与记录操作。
+- TOP 榜单：年度高分和个人神作视图。
+- 收藏夹：`WANT` / `PAUSED` 清单，与正式记录互斥。
+- 导入：Bangumi 季度导入、sourceId 补录、收藏/记录 JSON 或 CSV 导入。
+- 系列：跨季、跨媒介系列整理。
+- 智能分析：年度、季度、偏好、推荐、问答等 LLM 报告。
 
-```text
-LlmAnalysisController
-  -> LlmAnalysisService
-      -> LlmAnalysisResultCacheService
-      -> LlmContextBuilder
-      -> LlmPromptService
-      -> RuntimeSwitchingLlmClient
-          -> MockLlmClient / RealLlmClient
+## 核心业务规则
+
+- 作品库是记录、收藏、统计、导入和 LLM 分析的底座。
+- 作品当前主要以 Bangumi `sourceId` 作为来源唯一键；唯一性由服务层检查。
+- 作品重复导入只更新标签、平台评分、集数，不覆盖标题、档期、封面、系列。
+- 正式记录一作品最多一条；重复导入会覆盖更新。
+- 收藏一作品最多一条；已有正式记录的作品不会保留收藏。
+- 记录/收藏导入定位优先级：`subjectId > sourceId > subjectTitle(+season/part)`。
+- 写入作品、记录、收藏、系列或标签后，需要清理读缓存和 LLM 结果缓存。
+
+## 后台任务
+
+通用任务走 `/api/jobs`，实体表为 `background_job`。
+
+- 创建：`POST /api/jobs`
+- 查询：`GET /api/jobs/{jobId}`
+- 取消：`DELETE /api/jobs/{jobId}`
+- 类型：`BANGUMI_SUBJECT_PREVIEW`、`BANGUMI_SUBJECT_IMPORT`、`COLLECTION_IMPORT_PREVIEW`、`COLLECTION_IMPORT`、`RECORD_IMPORT_PREVIEW`、`RECORD_IMPORT`、`LLM_ANALYSIS`
+- 状态：`PENDING`、`RUNNING`、`SUCCEEDED`、`FAILED`、`CANCELLED`
+
+前端 `registerBackgroundJobUi` 会注册 UI 信息并启动共享轮询；完成后通过 `BackgroundJobsProvider` 显示全局 Toast。Bangumi 季度导入使用独立接口和 `bangumiSeasonJobMonitor`，但同样会跨路由继续轮询。
+
+## API 分组
+
+所有响应统一包裹为：
+
+```json
+{
+  "code": 0,
+  "message": "OK",
+  "data": {}
+}
 ```
 
-### 缓存
+常用接口组：
 
-读缓存使用 Spring Cache + Caffeine。作品、记录、收藏、系列、标签等写入后会调用 `CacheInvalidationService.invalidateAfterDataMutation()`，同时清理 LLM 结果缓存，避免报告基于旧数据。
+- 健康与选项：`GET /api/hello`、`GET /api/health`、`GET /api/options/*`
+- 作品：`/api/subjects/*`
+- 记录：`/api/records/*`
+- 收藏：`/api/collections/*`
+- 系列：`/api/franchises/*`
+- 标签：`/api/tags/*`
+- 导入说明与模板：`/api/import/overview`、`/api/import/templates/*`
+- Bangumi 导入：`/api/import/bangumi/*`
+- 后台任务：`/api/jobs/*`
+- 首页与榜单：`/api/home/*`、`/api/top/*`
+- 导出：`GET /api/export/bangumi-roundtrip`
+- LLM：`/api/llm/*`
 
-## 6. 视觉架构
+## 前端体验约定
 
-前端使用浅色玻璃拟态：固定多色柔光背景、半透明白色面板、大圆角、分类色渐变。样式主要来自 Tailwind class，主题 token 位于 `frontend/src/theme/acgnTheme.ts`。
+- 整体为浅色玻璃拟态：半透明白色面板、柔和多色背景、轻阴影、分类色点缀。
+- 全局视觉 token 在 `frontend/src/theme/acgnTheme.ts`，背景和动画在 `frontend/src/index.css`。
+- 移动端导航在顶部显示，桌面端为左侧侧栏。
+- 导入、作品库、记录库、收藏、系列、TOP、首页和分析页使用 `usePersistentState` 记住主要筛选和输入。
+
+## 相关文档
+
+- `docs/database-schema.md`：数据库表、字段、约束、索引。
+- `docs/import-guide.md`：导入流程、请求格式、结果码和排障。
+- `docs/llm-guide.md`：LLM 模块、缓存、配置和前端消费。

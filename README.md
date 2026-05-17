@@ -1,37 +1,36 @@
 # ACGN History Analyzer
 
-ACGN History Analyzer 是一个用于整理个人动画、漫画、游戏、小说历史数据的全栈系统。系统以“作品库”为数据底座，围绕“正式记录、收藏状态、系列关系、统计榜单、LLM 分析”构建复盘闭环。
+ACGN History Analyzer 是一个个人 ACGN 历史数据管理系统。它以作品库为底座，串联正式记录、收藏、系列、榜单、导入导出和 LLM 分析。
 
-## 当前状态
+## 技术栈
 
-- Frontend: React 19 + TypeScript + Vite + Tailwind CSS v4 + React Query
-- Backend: Java 17 + Spring Boot 3.5 + Spring Data JPA
-- Database: MySQL
-- Integration: Bangumi API, DeepSeek/Mock LLM
-- Assets: Bangumi 封面会缓存到本地 `uploads/covers`
+- Frontend：React 19、TypeScript、Vite、Tailwind CSS v4、React Query
+- Backend：Java 17、Spring Boot 3.5、Spring Data JPA
+- Database：MySQL
+- Integration：Bangumi API、DeepSeek / Mock LLM
+- Assets：Bangumi 封面缓存到 `uploads/covers`
 
-## 核心功能
+## 功能
 
-- 作品库：作品主数据、标签、系列、封面、平台评分、状态流转
-- 正式记录：一作品一条记录，保存个人评分、记录年月档期、备注
-- 收藏夹：`WANT` / `PAUSED` 清单，与正式记录互斥
-- 导入中心：Bangumi 季度导入、Bangumi sourceId 补录、记录/收藏 JSON 或 CSV 导入
-- 后台任务：通用 `/api/jobs` 支持 sourceId 补录、记录/收藏导入、LLM 分析；Bangumi 季度导入有独立任务接口
-- 页面记忆：导入中心、作品库、记录库、收藏、系列、TOP、首页和分析页会记住上次筛选/输入
-- 首页与榜单：季度仪表盘、搜索、年度高分、TOP 视图
-- 智能分析：结构化报告、问答、推荐、趋势、系列补完分析
+- 作品库：作品主数据、封面、标签、系列、平台评分和状态。
+- 正式记录：一作品一条记录，保存个人评分、年月档期和备注。
+- 收藏夹：`WANT` / `PAUSED`，与正式记录互斥。
+- 导入导出：Bangumi 季度导入、sourceId 补录、记录/收藏 JSON 或 CSV 导入、Bangumi 往返 JSON 导出。
+- 后台任务：通用 `/api/jobs` 处理异步导入和 LLM 分析，完成后显示全局 Toast。
+- 页面记忆：主要页面会记住筛选条件和输入。
+- 统计与榜单：首页季度仪表盘、TOP 榜单、高分记录。
+- 智能分析：年度、季度、偏好、推荐、趋势、系列补完和自由问答。
 
-## 关键业务规则
+## 业务规则
 
-- 作品唯一来源键为 `sourceId`，当前主要对应 Bangumi subject id
-- 作品重复导入只更新 `tagNames`、`platformScore`、`episodeCount`
-- 正式记录一作品最多一条；重复导入执行覆盖更新并返回 `UPDATED`
-- 收藏一作品最多一条；作品已有正式记录时收藏导入会跳过
-- 记录/收藏导入定位优先级：`subjectId > sourceId > subjectTitle(+season/part)`
-- 导入遵循 `preview -> import`；歧义匹配返回 `AMBIGUOUS`，需要前端选择候选
-- 数据写入后会清理读缓存和 LLM 结果缓存
+- 作品当前主要以 Bangumi `sourceId` 作为来源唯一键。
+- 作品重复导入只更新标签、平台评分、集数。
+- 正式记录一作品最多一条；重复导入覆盖更新。
+- 收藏一作品最多一条；作品已有正式记录时收藏导入跳过。
+- 记录/收藏导入定位优先级：`subjectId > sourceId > subjectTitle(+season/part)`。
+- 数据写入后会清理读缓存和 LLM 结果缓存。
 
-## 项目结构
+## 目录
 
 ```text
 backend/
@@ -42,44 +41,25 @@ backend/
     entity/            JPA 实体
     request|response/  DTO
     job/               通用后台任务
-    llm/               LLM 上下文、Prompt、客户端、结果缓存
-    config/            缓存、静态资源、请求 ID 等
+    llm/               LLM 上下文、Prompt、客户端、缓存
+    config/            缓存、静态资源、请求追踪
 
 frontend/
   src/
-    api/         API DTO 与请求封装
+    routes/      路由
     pages/       页面编排
     components/  复用组件
-    jobs/        后台任务轮询与全局 Toast
-    hooks/       页面状态持久化等复用 Hook
+    api/         请求封装和 DTO
+    jobs/        后台任务轮询与 Toast
+    hooks/       状态持久化等 Hook
     query/       React Query keys/cache
-    theme/       ACGN 分类、档期、状态视觉主题
-    utils|hooks|types|mappers/
+    theme/       视觉 token
+    utils/       工具函数
 
-docs/            开发和导入说明
+docs/            架构、数据库、导入、LLM 文档
 sql/             手动维护脚本
 uploads/         本地封面缓存
 ```
-
-## 前端设计语言
-
-整体是浅色玻璃拟态：柔和多色背景、半透明白色面板、大圆角卡片、轻阴影、按 ACGN 分类映射颜色。主题集中在 `frontend/src/theme/acgnTheme.ts`，全局背景和进入动画在 `frontend/src/index.css`。
-
-## API 分组
-
-- `/api/subjects/*`
-- `/api/records/*`
-- `/api/collections/*`
-- `/api/franchises/*`
-- `/api/tags/*`
-- `/api/import/*`
-- `/api/import/bangumi/*`
-- `/api/jobs/*`
-- `/api/home/*`
-- `/api/top/*`
-- `/api/options/*`
-- `/api/export/*`
-- `/api/llm/*`
 
 ## 本地运行
 
@@ -98,20 +78,20 @@ npm install
 npm run dev
 ```
 
-构建与检查：
+验证：
 
 ```powershell
 cd frontend
+npm run lint
 npm run build
 
 cd ..\backend
 .\mvnw.cmd test
 ```
 
-## 配套文档
+## 文档
 
-- `docs/architecture-overview.md`：架构速查
-- `docs/api-integration-guide.md`：接口对接
-- `docs/import-guide.md`：导入规则
-- `docs/import-playbook.md`：导入执行手册
-- `docs/llm-guide.md`：LLM 模块说明
+- `docs/architecture-overview.md`：架构、页面、接口、任务和前端体验约定。
+- `docs/database-schema.md`：数据库表、字段、约束、索引。
+- `docs/import-guide.md`：导入流程、请求格式、结果码和排障。
+- `docs/llm-guide.md`：LLM 链路、配置、缓存和前端消费。

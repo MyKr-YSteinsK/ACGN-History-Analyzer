@@ -6,12 +6,12 @@ type PageHeroProps = {
 
 function PageHero({ eyebrow, title, description }: PageHeroProps) {
     return (
-        <section className="rounded-[36px] border border-white/70 bg-white/50 p-8 shadow-[0_24px_80px_rgba(120,135,160,0.14)] backdrop-blur-xl">
+        <section className="overflow-hidden rounded-[30px] border border-white/70 bg-white/54 p-6 shadow-[0_20px_70px_rgba(120,135,160,0.13)] backdrop-blur-xl sm:p-8">
             <p className="text-xs font-semibold tracking-[0.32em] text-sky-500">
                 {eyebrow}
             </p>
 
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-800">
+            <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
                 {title}
             </h2>
 

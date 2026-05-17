@@ -51,42 +51,78 @@ export function BackgroundJobsProvider({ children }: { children: ReactNode }) {
     }, [pushToast])
 
     const toastStack = (
-        <div className="pointer-events-none fixed right-4 top-4 z-[300] flex w-[min(360px,calc(100vw-2rem))] flex-col gap-2">
+        <div className="pointer-events-none fixed right-4 top-4 z-[300] flex w-[min(420px,calc(100vw-2rem))] flex-col gap-3">
             {toasts.map((toast) => (
                 <div
                     key={toast.id}
                     className={[
-                        'pointer-events-auto rounded-2xl border px-4 py-3 shadow-lg backdrop-blur-md transition',
+                        'content-enter pointer-events-auto relative overflow-hidden rounded-[28px] border bg-white/82 p-4 shadow-[0_22px_70px_rgba(72,84,110,0.18)] backdrop-blur-2xl transition',
                         toast.tone === 'success'
-                            ? 'border-emerald-200/80 bg-emerald-50/92 text-emerald-900'
-                            : 'border-rose-200/80 bg-rose-50/92 text-rose-900',
+                            ? 'border-emerald-200/75 text-emerald-950'
+                            : 'border-rose-200/75 text-rose-950',
                     ].join(' ')}
                 >
+                    <div
+                        className={[
+                            'absolute inset-y-0 left-0 w-1.5',
+                            toast.tone === 'success'
+                                ? 'bg-gradient-to-b from-emerald-300 to-sky-300'
+                                : 'bg-gradient-to-b from-rose-300 to-amber-300',
+                        ].join(' ')}
+                    />
+
                     <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] opacity-70">
-                                {toast.tone === 'success' ? 'done' : 'error'}
-                            </p>
-                            <p className="mt-1 text-sm font-bold leading-snug">{toast.title}</p>
-                            <p className="mt-1 text-xs font-medium leading-snug opacity-90">
+                        <div
+                            className={[
+                                'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border text-sm font-black shadow-sm',
+                                toast.tone === 'success'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-rose-200 bg-rose-50 text-rose-700',
+                            ].join(' ')}
+                            aria-hidden="true"
+                        >
+                            {toast.tone === 'success' ? '✓' : '!'}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-black leading-snug text-slate-800">
+                                    {toast.title}
+                                </p>
+                                <span
+                                    className={[
+                                        'rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em]',
+                                        toast.tone === 'success'
+                                            ? 'border-emerald-200 bg-emerald-50/80 text-emerald-700'
+                                            : 'border-rose-200 bg-rose-50/80 text-rose-700',
+                                    ].join(' ')}
+                                >
+                                    {toast.tone === 'success' ? 'done' : 'failed'}
+                                </span>
+                            </div>
+
+                            <p className="mt-1.5 text-xs font-medium leading-5 text-slate-500">
                                 {toast.message}
                             </p>
+
                             {toast.href ? (
                                 <a
                                     href={toast.href}
-                                    className="mt-2 inline-flex text-xs font-semibold underline decoration-dotted underline-offset-2"
+                                    className="mt-3 inline-flex items-center rounded-full border border-white/80 bg-white/76 px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-900 hover:text-white"
                                     onClick={() => dismissToast(toast.id)}
                                 >
-                                    打开相关页面
+                                    查看结果
                                 </a>
                             ) : null}
                         </div>
+
                         <button
                             type="button"
-                            className="shrink-0 rounded-full border border-black/10 bg-white/55 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-white"
+                            aria-label="关闭通知"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/80 bg-white/58 text-sm font-black text-slate-400 shadow-sm transition hover:bg-white hover:text-slate-700"
                             onClick={() => dismissToast(toast.id)}
                         >
-                            关闭
+                            ×
                         </button>
                     </div>
                 </div>
