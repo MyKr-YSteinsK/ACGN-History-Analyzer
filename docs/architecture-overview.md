@@ -1,6 +1,6 @@
 # 架构与接口概览
 
-本文按当前代码整理，作为项目维护入口。旧说明如与代码冲突，以代码为准。
+本文提供当前代码的架构和接口索引。接手、运行和维护任务见[项目源文件](项目源文件/00-START_HERE.md)。
 
 ## 技术栈
 
@@ -8,7 +8,7 @@
 - 后端：Java 17、Spring Boot 3.5、Spring Data JPA
 - 数据库：MySQL，Hibernate `ddl-auto=update`
 - 集成：Bangumi API、DeepSeek / Mock LLM
-- 本地资源：Bangumi 封面缓存到 `uploads/covers`
+- 本地资源：Bangumi 封面缓存到后端工作目录下的 `uploads/covers`
 
 ## 代码分层
 
@@ -52,8 +52,8 @@ backend/src/main/java/com/mykr/acgnhistoryanalyzer
 - 作品库是记录、收藏、统计、导入和 LLM 分析的底座。
 - 作品当前主要以 Bangumi `sourceId` 作为来源唯一键；唯一性由服务层检查。
 - 作品重复导入只更新标签、平台评分、集数，不覆盖标题、档期、封面、系列。
-- 正式记录一作品最多一条；重复导入会覆盖更新。
-- 收藏一作品最多一条；已有正式记录的作品不会保留收藏。
+- 正式记录一作品最多一条，重复导入会覆盖更新。
+- 收藏一作品最多一条。创建、更新或重新导入正式记录时移除对应收藏，有正式记录时跳过收藏导入。
 - 记录/收藏导入定位优先级：`subjectId > sourceId > subjectTitle(+season/part)`。
 - 写入作品、记录、收藏、系列或标签后，需要清理读缓存和 LLM 结果缓存。
 
@@ -67,11 +67,11 @@ backend/src/main/java/com/mykr/acgnhistoryanalyzer
 - 类型：`BANGUMI_SUBJECT_PREVIEW`、`BANGUMI_SUBJECT_IMPORT`、`COLLECTION_IMPORT_PREVIEW`、`COLLECTION_IMPORT`、`RECORD_IMPORT_PREVIEW`、`RECORD_IMPORT`、`LLM_ANALYSIS`
 - 状态：`PENDING`、`RUNNING`、`SUCCEEDED`、`FAILED`、`CANCELLED`
 
-前端 `registerBackgroundJobUi` 会注册 UI 信息并启动共享轮询；完成后通过 `BackgroundJobsProvider` 显示全局 Toast。Bangumi 季度导入使用独立接口和 `bangumiSeasonJobMonitor`，但同样会跨路由继续轮询。
+前端通过 `registerBackgroundJobUi` 注册任务界面信息并启动共享轮询，`BackgroundJobsProvider` 负责显示全局提示。Bangumi 季度导入使用独立接口和 `bangumiSeasonJobMonitor`，同样支持跨路由轮询。通用任务保存在 MySQL，季度任务状态仅驻留在运行进程中。
 
 ## API 分组
 
-所有响应统一包裹为：
+业务 API 的常用响应结构
 
 ```json
 {
@@ -93,13 +93,12 @@ backend/src/main/java/com/mykr/acgnhistoryanalyzer
 - Bangumi 导入：`/api/import/bangumi/*`
 - 后台任务：`/api/jobs/*`
 - 首页与榜单：`/api/home/*`、`/api/top/*`
-- 导出：`GET /api/export/bangumi-roundtrip`
+- 导出：`GET /api/export/bangumi-roundtrip`，包含记录 JSON 与可选的关联 Bangumi 作品 JSON
 - LLM：`/api/llm/*`
 
-## 前端体验约定
+## 前端实现入口
 
-- 整体为浅色玻璃拟态：半透明白色面板、柔和多色背景、轻阴影、分类色点缀。
-- 全局视觉 token 在 `frontend/src/theme/acgnTheme.ts`，背景和动画在 `frontend/src/index.css`。
+- 全局视觉 token 在 `frontend/src/theme/acgnTheme.ts`，基础样式在 `frontend/src/index.css`。
 - 移动端导航在顶部显示，桌面端为左侧侧栏。
 - 导入、作品库、记录库、收藏、系列、TOP、首页和分析页使用 `usePersistentState` 记住主要筛选和输入。
 

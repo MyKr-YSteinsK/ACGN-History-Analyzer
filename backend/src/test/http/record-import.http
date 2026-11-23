@@ -1,9 +1,9 @@
 @baseUrl = http://localhost:8080
 
 ### 使用说明
-# 1. 建议先运行 00-seed-data.http
+# 1. 在独立测试库中先运行 00-seed-data.http
 # 2. 本文件会先创建两个“无记录的新作品”
-# 3. 先预览记录导入，再正式导入
+# 3. 将作品 A 加入想看后预览，再正式导入
 
 ### 1. 创建记录导入专用作品A
 POST {{baseUrl}}/api/subjects
@@ -20,6 +20,9 @@ Content-Type: application/json
   "platformLink": "https://example.com/record-import-a",
   "status": "NORMAL"
 }
+> {%
+    client.global.set("record_import_subject_a_id", response.body.data.id);
+%}
 
 ### 2. 创建记录导入专用作品B
 POST {{baseUrl}}/api/subjects
@@ -37,7 +40,10 @@ Content-Type: application/json
   "status": "NORMAL"
 }
 
-### 3. 预览批量导入记录
+### 3. 将作品 A 加入想看
+POST {{baseUrl}}/api/collections/want/{{record_import_subject_a_id}}
+
+### 4. 预览批量导入记录
 POST {{baseUrl}}/api/records/import/preview
 Content-Type: application/json
 
@@ -62,7 +68,7 @@ Content-Type: application/json
       "scoreValue": 48,
       "recordYear": 2024,
       "recordQuarter": 1,
-      "note": "已存在记录，应跳过"
+      "note": "已存在记录，应覆盖更新"
     },
     {
       "sourceId": "record-import-not-exist",
@@ -73,7 +79,7 @@ Content-Type: application/json
   ]
 }
 
-### 4. 正式批量导入记录
+### 5. 正式批量导入记录
 POST {{baseUrl}}/api/records/import
 Content-Type: application/json
 
@@ -98,7 +104,7 @@ Content-Type: application/json
       "scoreValue": 48,
       "recordYear": 2024,
       "recordQuarter": 1,
-      "note": "已存在记录，应跳过"
+      "note": "已存在记录，应覆盖更新"
     },
     {
       "sourceId": "record-import-not-exist",
@@ -108,6 +114,22 @@ Content-Type: application/json
     }
   ]
 }
+> {%
+    client.test("正式记录导入成功", function () {
+        client.assert(response.status === 200 && response.body.code === 0);
+        client.assert(response.body.data.importedCount === 3 && response.body.data.skippedCount === 1);
+    });
+%}
 
-### 5. 查询 2026 年记录
+### 6. 确认正式导入移除了作品 A 的想看状态
+GET {{baseUrl}}/api/collections?type=WANT&size=100
+
+> {%
+    client.test("正式记录所属作品退出想看", function () {
+        const subjectId = Number(client.global.get("record_import_subject_a_id"));
+        client.assert(response.body.data.content.every(item => item.subjectId !== subjectId));
+    });
+%}
+
+### 7. 查询 2026 年记录
 GET {{baseUrl}}/api/records?year=2026

@@ -27,9 +27,16 @@ Thumbs.db
 
 # Environment
 .env
+.env.*
+!.env.example
 
 # Local cached cover images
 uploads/
+
+# Local holding area for files pending manual removal
+/docs/delete/
+
+# Historical local-only maintenance files
 /sql/cleanup_duplicate_subjects.sql
 /docs/thesis-demo-route.md
 /backend/src/main/resources/db/indexes.sql

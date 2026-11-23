@@ -1,6 +1,6 @@
 # 数据库表结构
 
-本文按当前后端代码整理，主要来源是 JPA Entity、`application.properties` 和 `backend/src/main/resources/db/indexes.sql`。项目使用 MySQL，且当前配置为 `spring.jpa.hibernate.ddl-auto=update`，因此表结构以 Hibernate 根据实体自动维护为主。
+本文按当前 JPA 实体和 application.properties 整理。MySQL 表结构主要由 Hibernate 的 `ddl-auto=update` 根据实体维护，既有实例的实际索引和约束须查询数据库确认。
 
 ## 说明
 
@@ -106,7 +106,7 @@
 | `id` | `Long` | `BIGINT` | PK, auto increment, not null | 主键 |
 | `subject_id` | `Long` | `BIGINT` | not null, unique | 作品 ID，业务关联 `subject.id`，未声明数据库外键 |
 | `subject_title` | `String` | `VARCHAR(255)` | not null | 记录时冗余保存的作品标题 |
-| `score_value` | `Integer` | `INT` | nullable | 个人评分 |
+| `score_value` | `Integer` | `INT` | nullable | 个人评分，写入接口接受 0 至 50 |
 | `record_year` | `Integer` | `INT` | not null | 记录年份 |
 | `record_quarter` | `Integer` | `INT` | not null | 记录档期：`1` 一月、`2` 四月、`3` 七月、`4` 十月 |
 | `note` | `String` | `VARCHAR(500)` | nullable | 备注 |
@@ -204,27 +204,15 @@ LLM 结果缓存表。字段未显式写 `name` 的列由默认命名策略推�
 
 - 主键：`cache_key`
 
-## 手工索引脚本
+## 历史手工索引
 
-`backend/src/main/resources/db/indexes.sql` 当前包含：
-
-```sql
-CREATE INDEX idx_user_subject_record_subject_id ON user_subject_record (subject_id);
-CREATE INDEX idx_user_subject_record_year_quarter ON user_subject_record (record_year, record_quarter);
-
-CREATE INDEX idx_subject_source ON subject (source_platform, source_id(64));
-CREATE INDEX idx_subject_franchise_id ON subject (franchise_id);
-
-CREATE INDEX idx_background_job_status_created ON background_job (status, created_at);
-```
-
-这些索引不是自动迁移脚本，注释中说明需要在 MySQL 上手动运行。重复运行前要先检查或删除同名索引。
+旧工作区索引脚本已移入本地 docs/delete。候选涉及记录的 subject_id 与 (record_year, record_quarter)、作品的 (source_platform, source_id 前 64 字符) 与 franchise_id，以及通用任务的 (status, created_at)。旧脚本未纳入版本化迁移。重新采用时按实际 SHOW INDEX、查询形态及 EXPLAIN 决定，记录表已有 subject_id 唯一索引声明。
 
 ## 关系概览
 
 ```text
-subject 1 --- n user_subject_record      业务关联：user_subject_record.subject_id
-subject 1 --- n user_subject_collection  业务关联：user_subject_collection.subject_id
+subject 1 --- 0..1 user_subject_record      业务关联：user_subject_record.subject_id
+subject 1 --- 0..1 user_subject_collection  业务关联：user_subject_collection.subject_id
 franchise 1 --- n subject                业务关联：subject.franchise_id
 subject n --- n tag                      JPA 多对多：subject_tag(subject_id, tag_id)
 ```

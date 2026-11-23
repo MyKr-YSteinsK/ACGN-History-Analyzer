@@ -34,14 +34,7 @@ export function removeCacheItem(key: string) {
 
 export function removeCacheItemsByPrefixes(prefixes: string[]) {
     try {
-        const keys = Array.from(
-            { length: window.localStorage.length },
-            (_, index) => window.localStorage.key(index),
-        ).filter((key): key is string => Boolean(key))
-
-        keys
-            .filter((key) => prefixes.some((prefix) => key.startsWith(prefix)))
-            .forEach((key) => window.localStorage.removeItem(key))
+        listCacheKeysByPrefixes(prefixes).forEach((key) => window.localStorage.removeItem(key))
     } catch {
         // Ignore unavailable localStorage.
     }

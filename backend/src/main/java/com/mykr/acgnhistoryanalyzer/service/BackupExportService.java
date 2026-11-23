@@ -48,7 +48,7 @@ public class BackupExportService {
         Map<Long, Subject> subjectById = subjectIds.isEmpty()
                 ? Map.of()
                 : subjectRepository.findAllById(subjectIds).stream()
-                .collect(Collectors.toMap(Subject::getId, s -> s));
+                .collect(Collectors.toMap(Subject::getId, subject -> subject));
 
         List<Map<String, Object>> recordRows = new ArrayList<>();
         List<Map<String, Object>> subjectRows = new ArrayList<>();
@@ -63,19 +63,20 @@ public class BackupExportService {
             row.put("note", record.getNote());
 
             if (subject != null && isBangumi(subject)) {
-                row.put("sourceId", subject.getSourceId() == null ? null : subject.getSourceId().trim());
+                String sourceId = subject.getSourceId().trim();
+                row.put("sourceId", sourceId);
+
+                if (bangumiSubjectIdsExported.add(subject.getId())) {
+                    Map<String, Object> subjectRow = new LinkedHashMap<>();
+                    subjectRow.put("sourceId", sourceId);
+                    subjectRow.put("releaseYear", subject.getReleaseYear());
+                    subjectRow.put("releaseQuarter", subject.getReleaseQuarter());
+                    subjectRows.add(subjectRow);
+                }
             } else {
                 row.put("subjectId", record.getSubjectId());
             }
             recordRows.add(row);
-
-            if (subject != null && isBangumi(subject) && bangumiSubjectIdsExported.add(subject.getId())) {
-                Map<String, Object> sj = new LinkedHashMap<>();
-                sj.put("sourceId", subject.getSourceId().trim());
-                sj.put("releaseYear", subject.getReleaseYear());
-                sj.put("releaseQuarter", subject.getReleaseQuarter());
-                subjectRows.add(sj);
-            }
         }
 
         try {

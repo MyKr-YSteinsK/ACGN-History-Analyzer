@@ -80,17 +80,14 @@ public class UserSubjectRecordService {
 
         UserSubjectRecord savedRecord = userSubjectRecordRepository.save(record);
 
-        // 作品进入正式记录后，不再保留“想看/搁置”收藏状态。
-        if (userSubjectCollectionRepository.existsBySubjectId(subject.getId())) {
-            userSubjectCollectionRepository.deleteBySubjectId(subject.getId());
-        }
-
+        removeCollectionForRecordedSubject(subject.getId());
         franchiseAutoLinkService.detectAndLinkForRecordedSubject(subject.getId());
 
         cacheInvalidationService.invalidateAfterDataMutation();
         return toResponse(savedRecord);
     }
 
+    @Transactional
     public UserSubjectRecordImportResponse importRecords(UserSubjectRecordBatchImportRequest request) {
         List<UserSubjectRecordImportItemResponse> items = new ArrayList<>();
 
@@ -552,10 +549,7 @@ public class UserSubjectRecordService {
 
         UserSubjectRecord updatedRecord = userSubjectRecordRepository.save(existingRecord);
 
-        if (userSubjectCollectionRepository.existsBySubjectId(subject.getId())) {
-            userSubjectCollectionRepository.deleteBySubjectId(subject.getId());
-        }
-
+        removeCollectionForRecordedSubject(subject.getId());
         cacheInvalidationService.invalidateAfterDataMutation();
         return toResponse(updatedRecord);
     }
@@ -624,8 +618,15 @@ public class UserSubjectRecordService {
         existingRecord.setRecordQuarter(item.getRecordQuarter());
         existingRecord.setNote(item.getNote());
         UserSubjectRecord savedRecord = userSubjectRecordRepository.save(existingRecord);
+        removeCollectionForRecordedSubject(subject.getId());
         franchiseAutoLinkService.detectAndLinkForRecordedSubject(subject.getId());
         return toResponse(savedRecord);
+    }
+
+    private void removeCollectionForRecordedSubject(Long subjectId) {
+        if (userSubjectCollectionRepository.existsBySubjectId(subjectId)) {
+            userSubjectCollectionRepository.deleteBySubjectId(subjectId);
+        }
     }
 
     private String buildSubjectLabel(UserSubjectRecordImportItemRequest item, int rowNumber) {
